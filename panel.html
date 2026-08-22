@@ -10,31 +10,19 @@
         .navbar { background-color: #141414; border-bottom: 1px solid #2a2a2a; }
         .card-panel { background: #141414; border-radius: 15px; border: 1px solid #2a2a2a; padding: 25px; margin-bottom: 20px; box-shadow: 0 5px 20px rgba(138, 43, 226, 0.1); }
         h4, h5 { color: #b066ff; font-weight: 600; }
-        
-        /* Inputs oscuros */
         .form-control { background-color: #222222; border: 1px solid #333333; color: #ffffff; border-radius: 8px; }
         .form-control:focus { border-color: #b066ff; background-color: #222222; color: #ffffff; box-shadow: none; }
-        
-        /* Botones táctiles grandes para Tablet */
         .btn-custom { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; font-weight: bold; padding: 12px; border-radius: 8px; color: white; transition: 0.3s; }
         .btn-custom:hover { background: linear-gradient(135deg, #9d4edd, #7b2cbf); transform: translateY(-2px); color: white; }
-        
         .btn-danger-custom { background: #ff3b3b; border: none; font-weight: bold; color: white; border-radius: 8px; }
         .btn-success-custom { background: #00d26a; border: none; font-weight: bold; color: white; border-radius: 8px; padding: 12px; }
-        
-        /* Lienzo de Firma (Blanco para que contraste el trazo negro) */
         canvas#signature-pad { background-color: #ffffff; border-radius: 10px; width: 100%; height: 250px; border: 2px solid #b066ff; touch-action: none; }
-        
-        /* Lector QR */
         #reader { width: 100%; border-radius: 10px; overflow: hidden; border: 2px solid #333333; }
-        
-        /* Tabla oscura */
         .table-dark { --bs-table-bg: #141414; --bs-table-border-color: #2a2a2a; }
     </style>
 </head>
 <body>
 
-<!-- BARRA DE NAVEGACIÓN -->
 <nav class="navbar navbar-expand-lg navbar-dark mb-4 p-3">
     <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="#">
@@ -47,11 +35,8 @@
 
 <div class="container">
     <div class="row">
-        
-        <!-- COLUMNA IZQUIERDA: CONFIGURACIÓN Y ESCÁNER -->
+        <!-- COLUMNA IZQ -->
         <div class="col-lg-5">
-            
-            <!-- 1. Configurar Programa -->
             <div class="card-panel" id="seccionConfiguracion">
                 <h5>1. Datos del Programa</h5>
                 <p class="text-muted" style="font-size: 0.9em;">Define el evento antes de abrir las puertas.</p>
@@ -60,38 +45,24 @@
                 <button class="btn btn-custom w-100" id="btnIniciarPuerta">Abrir Puertas (Activar Escáner)</button>
             </div>
 
-            <!-- 2. Escáner de Puerta (Oculto hasta configurar) -->
             <div class="card-panel d-none" id="seccionEscaner">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">2. Escáner de Ingreso</h5>
-                    <span class="badge bg-success" id="indicadorActivo">Grabando: Matinal VIP</span>
+                    <span class="badge bg-success" id="indicadorActivo">Grabando</span>
                 </div>
-                <div id="reader"></div> <!-- Aquí se enciende la cámara -->
-                <div id="mensajeEscaneo" class="alert alert-info mt-3 d-none text-center" style="background: #1c103f; border: none; color: #d6b3ff;">
-                    Buscando RUT...
-                </div>
+                <div id="reader"></div>
+                <div id="mensajeEscaneo" class="alert alert-info mt-3 d-none text-center" style="background: #1c103f; border: none; color: #d6b3ff;">Buscando RUT...</div>
             </div>
         </div>
 
-        <!-- COLUMNA DERECHA: FIRMA Y LISTA EN VIVO -->
+        <!-- COLUMNA DER -->
         <div class="col-lg-7">
-            
-            <!-- 3. Pantalla de Acción y Firma (Aparece al escanear un QR) -->
             <div class="card-panel d-none" id="seccionFirma">
                 <h4 class="text-success mb-1">¡Asistente Encontrado!</h4>
                 <h3 id="nombreAsistenteDisplay" class="mb-3 text-white">Juan Pérez</h3>
                 
-                <div class="row mb-3">
-                    <div class="col-6">
-                        <button class="btn btn-custom w-100 py-3" id="btnMarcarPago">Ingresa con Pago</button>
-                    </div>
-                    <div class="col-6">
-                        <button class="btn btn-outline-light w-100 py-3" id="btnMarcarCortesia">Ingresa Cortesía</button>
-                    </div>
-                </div>
-
-                <div id="zonaFirmaPad" class="d-none">
-                    <p class="text-muted mb-2">Pídele al trabajador que firme aquí con el dedo para aceptar el Contrato DT y la Cesión de Imagen:</p>
+                <div id="zonaFirmaPad">
+                    <p class="text-muted mb-2">Firma del trabajador para aceptar Contrato DT y Cesión de Imagen:</p>
                     <canvas id="signature-pad"></canvas>
                     <div class="d-flex justify-content-between mt-3">
                         <button class="btn btn-outline-danger btn-sm" id="btnLimpiarFirma">Borrar Firma</button>
@@ -100,44 +71,31 @@
                 </div>
             </div>
 
-            <!-- 4. Lista de Asistentes en Vivo -->
             <div class="card-panel" id="seccionLista">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5>Asistentes en Set (<span id="contadorAsistentes">0</span>)</h5>
-                    <!-- El botón mágico para generar los contratos e irse a casa -->
-                    <button class="btn btn-custom btn-sm" id="btnCerrarPrograma">Cerrar Programa y Generar Excel</button>
+                    <h5>Asistentes (<span id="contadorAsistentes">0</span>)</h5>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success btn-sm fw-bold" id="btnExcelBanco">🏦 Banco (Día)</button>
+                        <button class="btn btn-warning btn-sm fw-bold text-dark" id="btnExcelContador">📊 Contador (Mes)</button>
+                    </div>
                 </div>
                 
                 <div class="table-responsive">
                     <table class="table table-dark table-hover align-middle">
                         <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Hora Ingreso</th>
-                                <th>Tipo</th>
-                                <th>Acción</th>
-                            </tr>
+                            <tr><th>Nombre</th><th>Hora</th><th>Tipo</th><th>Acción</th></tr>
                         </thead>
-                        <tbody id="tablaAsistentes">
-                            <!-- Los asistentes aparecerán aquí mediante JavaScript -->
-                        </tbody>
+                        <tbody id="tablaAsistentes"></tbody>
                     </table>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
 
-<!-- LIBRERÍAS EXTERNAS -->
-<!-- Bootstrap JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<!-- Librería para leer códigos QR con la cámara -->
 <script src="https://unpkg.com/html5-qrcode"></script>
-<!-- Librería para el panel de firma táctil -->
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-<!-- Nuestro código lógico -->
 <script type="module" src="panel.js"></script>
-
 </body>
 </html>
