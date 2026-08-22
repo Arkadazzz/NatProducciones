@@ -1,9 +1,7 @@
-// 1. IMPORTAR FIREBASE (Versión Web Modular)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-// 2. CONFIGURACIÓN DE TU BASE DE DATOS
-// IMPORTANTE: Cuando crees tu proyecto en Firebase, debes reemplazar estos valores vacíos por los tuyos.
+// RECUERDA: Pegar aquí las credenciales de Firebase cuando las tengas
 const firebaseConfig = {
     apiKey: "AQUI_IRA_TU_API_KEY",
     authDomain: "tu-proyecto.firebaseapp.com",
@@ -14,50 +12,67 @@ const firebaseConfig = {
     appId: "1:123456789:web:abcdef"
 };
 
-// 3. INICIALIZAR LA APLICACIÓN Y LA BASE DE DATOS
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// 4. LÓGICA DE AUTOCOMPLETADO POR RUT
-document.getElementById('rut').addEventListener('blur', async (e) => {
-    const rutIngresado = e.target.value.trim();
-    const mensajeDiv = document.getElementById('mensajeAutocompletado');
-    mensajeDiv.innerText = ""; 
+// Función universal para dibujar el QR
+function generarQR(texto) {
+    document.getElementById('formularioRegistro').classList.add('d-none');
+    document.getElementById('encabezadoFormulario').classList.add('d-none');
+    document.getElementById('contenedorQR').classList.remove('d-none');
     
-    if (rutIngresado.length > 7) {
-        try {
-            const dbRef = ref(db);
-            // Busca en la base de datos si el RUT ya existe
-            const snapshot = await get(child(dbRef, `1_trabajadores/${rutIngresado}`));
+    document.getElementById('codigoQR').innerHTML = ""; // Limpiar por si acaso
+    new QRCode(document.getElementById("codigoQR"), {
+        text: texto,
+        width: 200,
+        height: 200,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+}
+
+// 1. LÓGICA DEL BOTÓN "CONTINUAR" (Verificar RUT)
+document.getElementById('btnVerificarRut').addEventListener('click', async () => {
+    const rut = document.getElementById('rut').value.trim();
+    
+    if (rut.length < 8) {
+        alert("Por favor ingresa un RUT válido.");
+        return;
+    }
+
+    try {
+        const dbRef = ref(db);
+        const snapshot = await get(child(dbRef, `1_trabajadores/${rut}`));
+        
+        if (snapshot.exists()) {
+            // EL RUT YA EXISTE: Le mostramos el QR de inmediato
+            const datos = snapshot.val();
+            document.getElementById('mensajeExito').innerText = `¡Hola de nuevo, ${datos.nombres}!`;
+            generarQR(rut);
+        } else {
+            // EL RUT ES NUEVO: Le mostramos el resto del formulario
+            document.getElementById('btnVerificarRut').classList.add('d-none'); // Ocultar el botón Continuar
+            document.getElementById('rut').readOnly = true; // Bloquear el RUT para que no lo cambie
+            document.getElementById('camposExtras').classList.remove('d-none'); // Mostrar los campos
             
-            if (snapshot.exists()) {
-                const datos = snapshot.val();
-                // Rellena los campos automáticamente
-                document.getElementById('nombres').value = datos.nombres || "";
-                document.getElementById('apellidos').value = datos.apellidos || "";
-                document.getElementById('telefono').value = datos.telefono || "";
-                document.getElementById('email').value = datos.email || "";
-                document.getElementById('afp').value = datos.afp || "";
-                document.getElementById('salud').value = datos.salud || "";
-                document.getElementById('banco').value = datos.banco || "";
-                document.getElementById('tipoCuenta').value = datos.tipoCuenta || "";
-                document.getElementById('numeroCuenta').value = datos.numeroCuenta || "";
-                
-                mensajeDiv.innerText = "✓ ¡Datos recuperados con éxito!";
-            }
-        } catch (error) {
-            console.error("Error buscando el RUT:", error);
+            // Hacer que los campos nuevos sean obligatorios ahora
+            const inputs = document.querySelectorAll('#camposExtras input, #camposExtras select');
+            inputs.forEach(input => input.setAttribute('required', 'true'));
         }
+    } catch (error) {
+        console.error("Error buscando el RUT:", error);
+        // Si hay error (ej. Firebase no configurado aún), mostramos el formulario por defecto para que puedas probar visualmente
+        document.getElementById('btnVerificarRut').classList.add('d-none');
+        document.getElementById('camposExtras').classList.remove('d-none');
     }
 });
 
-// 5. LÓGICA DE GUARDADO Y GENERACIÓN DE QR
+// 2. LÓGICA DEL BOTÓN FINAL (Guardar usuario nuevo)
 document.getElementById('formularioRegistro').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Evita que la página se refresque al enviar
+    e.preventDefault(); 
 
-    // Capturar el RUT y estructurar todos los datos ingresados
     const rut = document.getElementById('rut').value.trim();
-    
     const trabajadorData = {
         rut: rut,
         nombres: document.getElementById('nombres').value.trim(),
@@ -73,28 +88,11 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
     };
 
     try {
-        // Guardar la información en Firebase (Nodo: 1_trabajadores / RUT)
         await set(ref(db, '1_trabajadores/' + rut), trabajadorData);
-        
-        // Ocultar el formulario visualmente
-        document.getElementById('formularioRegistro').classList.add('d-none');
-        
-        // Mostrar el contenedor del código QR
-        const contenedorQR = document.getElementById('contenedorQR');
-        contenedorQR.classList.remove('d-none');
-
-        // Dibujar el Código QR en la pantalla usando la librería
-        new QRCode(document.getElementById("codigoQR"), {
-            text: rut, // El QR solo almacena el RUT para que el escáner de la puerta lo lea rápido
-            width: 200,
-            height: 200,
-            colorDark : "#000000",
-            colorLight : "#ffffff",
-            correctLevel : QRCode.CorrectLevel.H
-        });
-
+        document.getElementById('mensajeExito').innerText = "¡Registro Exitoso!";
+        generarQR(rut);
     } catch (error) {
-        console.error("Error al guardar en Firebase:", error);
-        alert("Ocurrió un error de conexión al guardar los datos. Revisa tu internet e intenta nuevamente.");
+        console.error("Error al guardar:", error);
+        alert("Error al procesar. Revisa tu conexión (o las claves de Firebase).");
     }
 });
