@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Staff | Nat Producciones</title>
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #0a0a0a; 
+            color: #ffffff; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        .login-card { 
+            background: #141414; 
+            padding: 40px; 
+            border-radius: 15px; 
+            border: 1px solid #2a2a2a; 
+            box-shadow: 0 10px 40px rgba(138, 43, 226, 0.15); 
+            width: 100%; 
+            max-width: 400px; 
+        }
+        .form-control { 
+            background-color: #222222; 
+            border: 1px solid #333333; 
+            color: #ffffff; 
+            border-radius: 8px; 
+            padding: 12px; 
+        }
+        .form-control:focus { 
+            border-color: #b066ff; 
+            box-shadow: 0 0 0 0.25rem rgba(176, 102, 255, 0.25); 
+            background-color: #222222; 
+            color: #ffffff;
+        }
+        .btn-primary { 
+            background: linear-gradient(135deg, #7b2cbf, #5a189a); 
+            border: none; 
+            padding: 12px; 
+            font-weight: bold; 
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            width: 100%; 
+            border-radius: 8px; 
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover { 
+            background: linear-gradient(135deg, #9d4edd, #7b2cbf); 
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container d-flex justify-content-center">
+    <div class="login-card">
+        
+        <!-- Puedes reutilizar el mismo logo aquí -->
+        <div class="text-center mb-4">
+            <h3 style="color: #b066ff; font-weight: 600;">Acceso Staff</h3>
+            <p class="text-muted" style="font-size: 0.9em;">Panel de Acreditación y Contratos</p>
+        </div>
+
+        <form id="formularioLogin">
+            <div class="mb-3">
+                <label class="form-label" style="color: #cccccc; font-size: 0.9em;">Correo Electrónico</label>
+                <input type="email" class="form-control" id="emailStaff" required placeholder="ejemplo@nat.cl">
+            </div>
+            <div class="mb-3">
+                <label class="form-label" style="color: #cccccc; font-size: 0.9em;">Contraseña</label>
+                <input type="password" class="form-control" id="passStaff" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn btn-primary">Ingresar al Panel</button>
+        </form>
+        
+        <div id="mensajeError" class="text-danger mt-3 text-center d-none" style="font-size: 0.85em;">
+            Credenciales incorrectas. Intenta nuevamente.
+        </div>
+    </div>
+</div>
+
+<script type="module" src="login.js"></script>
+</body>
+</html>
