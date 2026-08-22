@@ -3,123 +3,188 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Público | Producción</title>
-    <!-- Bootstrap para el diseño profesional y responsivo -->
+    <title>Acreditación | Nat Producciones</title>
+    <!-- Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f4f7f6; }
-        .card-form { max-width: 600px; margin: 40px auto; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background: white; }
-        #codigoQR img { margin: 0 auto; } /* Centra el QR */
+        /* Paleta Premium Dark Mode */
+        body { 
+            background-color: #0a0a0a; 
+            color: #ffffff; 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        .card-form { 
+            max-width: 600px; 
+            margin: 50px auto; 
+            padding: 40px 30px; 
+            border-radius: 20px; 
+            background: #141414; 
+            border: 1px solid #2a2a2a;
+            box-shadow: 0 10px 40px rgba(138, 43, 226, 0.15); 
+        }
+
+        .logo-container { text-align: center; margin-bottom: 30px; }
+        .logo-container img { width: 100%; max-width: 250px; border-radius: 10px; }
+
+        h3, h4, h5 { color: #b066ff; font-weight: 600; }
+        .form-label { color: #cccccc; font-size: 0.95em; }
+        
+        .form-control, .form-select {
+            background-color: #222222;
+            border: 1px solid #333333;
+            color: #ffffff;
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: #222222;
+            border-color: #b066ff;
+            color: #ffffff;
+            box-shadow: 0 0 0 0.25rem rgba(176, 102, 255, 0.25);
+        }
+        .form-control::placeholder { color: #666666; }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #7b2cbf, #5a189a);
+            border: none;
+            border-radius: 10px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #9d4edd, #7b2cbf);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(123, 44, 191, 0.4);
+        }
+        
+        .text-muted { color: #888888 !important; }
+        #codigoQR { background: #ffffff; padding: 20px; border-radius: 15px; display: inline-block; margin-top: 15px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="card-form">
-        <h3 class="text-center mb-4">Registro de Asistencia</h3>
-        <p class="text-muted text-center">Ingresa tus datos para la acreditación y pago de tu participación.</p>
         
-        <!-- FORMULARIO DE CAPTURA -->
+        <!-- LOGOTIPO -->
+        <div class="logo-container">
+            <img src="NAT_Blanco.jpg" alt="Nat Producciones">
+        </div>
+
+        <div id="encabezadoFormulario">
+            <h3 class="text-center mb-2">Registro de Asistencia</h3>
+            <p class="text-muted text-center mb-4">Ingresa tu RUT para comenzar.</p>
+        </div>
+        
         <form id="formularioRegistro">
             
-            <h5 class="mt-4 mb-3">1. Datos Personales</h5>
-            <div class="mb-3">
+            <!-- PASO 1: SOLO EL RUT -->
+            <div id="seccionRut" class="mb-3">
                 <label class="form-label">RUT (Ej: 19123456-7)</label>
-                <input type="text" class="form-control" id="rut" required placeholder="Ingresa tu RUT">
-                <div class="form-text text-primary" id="mensajeAutocompletado"></div>
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Nombres</label>
-                    <input type="text" class="form-control" id="nombres" required>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Apellidos</label>
-                    <input type="text" class="form-control" id="apellidos" required>
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Teléfono</label>
-                    <input type="tel" class="form-control" id="telefono" required>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Correo Electrónico</label>
-                    <input type="email" class="form-control" id="email" required>
-                </div>
+                <input type="text" class="form-control mb-3" id="rut" required placeholder="Ingresa tu RUT sin puntos y con guion">
+                <button type="button" id="btnVerificarRut" class="btn btn-primary w-100 py-3">Continuar</button>
             </div>
 
-            <h5 class="mt-4 mb-3">2. Datos Previsionales</h5>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">AFP</label>
-                    <select class="form-select" id="afp" required>
-                        <option value="">Selecciona...</option>
-                        <option value="Capital">Capital</option>
-                        <option value="Cuprum">Cuprum</option>
-                        <option value="Habitat">Habitat</option>
-                        <option value="Modelo">Modelo</option>
-                        <option value="PlanVital">PlanVital</option>
-                        <option value="ProVida">ProVida</option>
-                        <option value="Uno">Uno</option>
-                    </select>
+            <!-- PASO 2: EL RESTO DEL FORMULARIO (Oculto al inicio) -->
+            <div id="camposExtras" class="d-none">
+                <div class="alert alert-info" style="background-color: #1c103f; border-color: #3b1d70; color: #d6b3ff;">
+                    No encontramos tus datos. Por favor, completa tu registro por primera vez.
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Sistema de Salud</label>
-                    <select class="form-select" id="salud" required>
-                        <option value="">Selecciona...</option>
-                        <option value="Fonasa">Fonasa</option>
-                        <option value="Isapre">Isapre</option>
-                    </select>
-                </div>
-            </div>
 
-            <h5 class="mt-4 mb-3">3. Datos Bancarios</h5>
-            <div class="mb-3">
-                <label class="form-label">Banco</label>
-                <input type="text" class="form-control" id="banco" required placeholder="Ej: BancoEstado">
-            </div>
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Tipo de Cuenta</label>
-                    <select class="form-select" id="tipoCuenta" required>
-                        <option value="">Selecciona...</option>
-                        <option value="Cuenta RUT">Cuenta RUT</option>
-                        <option value="Cuenta Corriente">Cuenta Corriente</option>
-                        <option value="Cuenta Vista">Cuenta Vista</option>
-                    </select>
+                <h5 class="mt-4 mb-3">1. Datos Personales</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Nombres</label>
+                        <input type="text" class="form-control" id="nombres">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Apellidos</label>
+                        <input type="text" class="form-control" id="apellidos">
+                    </div>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label class="form-label">Número de Cuenta</label>
-                    <input type="number" class="form-control" id="numeroCuenta" required>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Teléfono</label>
+                        <input type="tel" class="form-control" id="telefono" placeholder="+56 9...">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Correo Electrónico</label>
+                        <input type="email" class="form-control" id="email">
+                    </div>
                 </div>
-            </div>
 
-            <!-- CHECKBOX LEGAL -->
-            <div class="form-check mt-4 mb-4">
-                <input class="form-check-input" type="checkbox" id="aceptoTerminos" required>
-                <label class="form-check-label text-muted" style="font-size: 0.9em;" for="aceptoTerminos">
-                    Acepto los términos y el tratamiento de mis datos personales para fines de remuneración, acreditación de acceso y generación de contratos laborales (Ley N° 19.628).
-                </label>
-            </div>
+                <h5 class="mt-4 mb-3">2. Datos Previsionales</h5>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">AFP</label>
+                        <select class="form-select" id="afp">
+                            <option value="">Selecciona...</option>
+                            <option value="Capital">Capital</option>
+                            <option value="Cuprum">Cuprum</option>
+                            <option value="Habitat">Habitat</option>
+                            <option value="Modelo">Modelo</option>
+                            <option value="PlanVital">PlanVital</option>
+                            <option value="ProVida">ProVida</option>
+                            <option value="Uno">Uno</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Sistema de Salud</label>
+                        <select class="form-select" id="salud">
+                            <option value="">Selecciona...</option>
+                            <option value="Fonasa">Fonasa</option>
+                            <option value="Isapre">Isapre</option>
+                        </select>
+                    </div>
+                </div>
 
-            <button type="submit" class="btn btn-primary w-100 py-2">Confirmar y Generar Entrada</button>
+                <h5 class="mt-4 mb-3">3. Datos Bancarios</h5>
+                <div class="mb-3">
+                    <label class="form-label">Banco</label>
+                    <input type="text" class="form-control" id="banco" placeholder="Ej: BancoEstado">
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Tipo de Cuenta</label>
+                        <select class="form-select" id="tipoCuenta">
+                            <option value="">Selecciona...</option>
+                            <option value="Cuenta RUT">Cuenta RUT</option>
+                            <option value="Cuenta Corriente">Cuenta Corriente</option>
+                            <option value="Cuenta Vista">Cuenta Vista</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Número de Cuenta</label>
+                        <input type="number" class="form-control" id="numeroCuenta">
+                    </div>
+                </div>
+
+                <!-- CHECKBOX LEGAL -->
+                <div class="form-check mt-4 mb-4">
+                    <input class="form-check-input" type="checkbox" id="aceptoTerminos">
+                    <label class="form-check-label text-muted" style="font-size: 0.85em;" for="aceptoTerminos">
+                        Acepto los términos y el tratamiento de mis datos personales para fines de remuneración, acreditación de acceso y generación de contratos (Ley N° 19.628).
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-3 mt-2">Guardar Datos y Generar QR</button>
+            </div>
         </form>
         
         <!-- CONTENEDOR DEL CÓDIGO QR (Oculto por defecto) -->
         <div id="contenedorQR" class="text-center mt-4 d-none">
-            <h4 class="text-success fw-bold">¡Registro Exitoso!</h4>
-            <p class="mb-4">Toma una captura de pantalla a este código y muéstralo en la entrada del canal.</p>
-            <div id="codigoQR" class="d-flex justify-content-center bg-light p-3 border rounded"></div>
+            <h4 style="color: #00d26a;" id="mensajeExito">¡Registro Exitoso!</h4>
+            <p class="text-muted mb-3">Toma una captura de pantalla a este código y muéstralo en la entrada del canal.</p>
+            <div id="codigoQR"></div>
         </div>
 
     </div>
 </div>
 
-<!-- LIBRERÍAS Y SCRIPTS -->
-<!-- Librería para generar el Código QR -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<!-- Tu archivo JavaScript principal (type="module" es obligatorio para Firebase) -->
 <script type="module" src="app.js"></script>
 
 </body>
