@@ -59,10 +59,14 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
 document.getElementById('formularioRegistro').addEventListener('submit', async (e) => {
     e.preventDefault(); 
     const rut = document.getElementById('rut').value.trim();
+    
     const trabajadorData = {
         rut: rut,
         nombres: document.getElementById('nombres').value.trim(),
         apellidos: document.getElementById('apellidos').value.trim(),
+        fechaNacimiento: document.getElementById('fechaNacimiento').value,
+        sexo: document.getElementById('sexo').value,
+        direccion: document.getElementById('direccion').value.trim(),
         telefono: document.getElementById('telefono').value.trim(),
         email: document.getElementById('email').value.trim(),
         afp: document.getElementById('afp').value,
