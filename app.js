@@ -15,32 +15,62 @@ const db = getDatabase(app);
 
 let eventoActivo = null;
 let trabajadorExistente = false;
+let programasActivos = {};
 
-onValue(ref(db, '0_estado_sistema/programa_activo'), (snapshot) => {
+onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     document.getElementById('spinnerCarga').classList.add('d-none');
     
     if (snapshot.exists()) {
-        eventoActivo = snapshot.val();
-        document.getElementById('pantallaSinEvento').classList.add('d-none');
-        document.getElementById('formularioPrincipal').classList.remove('d-none');
+        programasActivos = snapshot.val();
+        const keys = Object.keys(programasActivos);
         
-        document.getElementById('lblProgramaActivo').innerText = eventoActivo.nombre.toUpperCase();
-        const partes = eventoActivo.fecha.split('-');
-        if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
+        document.getElementById('pantallaSinEvento').classList.add('d-none');
 
-        // MAGIA: Si el programa es Cortesía, forzamos mostrar el menú del Staff. Si es I/P o Dale Play, lo ocultamos.
-        if (eventoActivo.nombre === "Detrás del Muro Cortesía") {
-            document.getElementById('divInvitadoPor').classList.remove('d-none');
-            document.getElementById('invitadoPor').setAttribute('required', 'true');
+        // MULTI-SALA LOGIC
+        if (keys.length === 1) {
+            // Solo hay 1 evento abierto: ir directo
+            activarFormulario(programasActivos[keys[0]]);
         } else {
-            document.getElementById('divInvitadoPor').classList.add('d-none');
-            document.getElementById('invitadoPor').removeAttribute('required');
+            // Hay varios: mostrar menú de selección
+            document.getElementById('formularioPrincipal').classList.add('d-none');
+            document.getElementById('pantallaSeleccion').classList.remove('d-none');
+            
+            const divBotones = document.getElementById('botonesProgramas');
+            divBotones.innerHTML = '';
+            keys.forEach(k => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-outline-light fs-5 py-3 mb-2 w-100 fw-bold';
+                btn.style.borderColor = '#b066ff';
+                btn.innerText = programasActivos[k].nombre;
+                btn.onclick = () => activarFormulario(programasActivos[k]);
+                divBotones.appendChild(btn);
+            });
         }
     } else {
         document.getElementById('msgSinEvento').classList.remove('d-none');
         document.getElementById('subMsgSinEvento').classList.remove('d-none');
+        document.getElementById('formularioPrincipal').classList.add('d-none');
+        document.getElementById('pantallaSeleccion').classList.add('d-none');
     }
 });
+
+function activarFormulario(programaSeleccionado) {
+    eventoActivo = programaSeleccionado;
+    document.getElementById('pantallaSeleccion').classList.add('d-none');
+    document.getElementById('formularioPrincipal').classList.remove('d-none');
+    
+    document.getElementById('lblProgramaActivo').innerText = eventoActivo.nombre.toUpperCase();
+    const partes = eventoActivo.fecha.split('-');
+    if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
+
+    if (eventoActivo.nombre === "Detrás del Muro Cortesía") {
+        document.getElementById('divInvitadoPor').classList.remove('d-none');
+        document.getElementById('invitadoPor').setAttribute('required', 'true');
+    } else {
+        document.getElementById('divInvitadoPor').classList.add('d-none');
+        document.getElementById('invitadoPor').removeAttribute('required');
+    }
+}
 
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
@@ -56,7 +86,7 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
         if (snapshot.exists()) {
             trabajadorExistente = true;
             const datos = snapshot.val();
-            document.getElementById('encabezadoFormulario').innerText = `¡Hola de nuevo, ${datos.nombres}!`;
+            document.getElementById('encabezadoFormulario').innerText = `¡Hola, ${datos.nombres}!`;
         } else {
             trabajadorExistente = false;
             document.getElementById('camposExtras').classList.remove('d-none');
@@ -68,7 +98,7 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
 
 document.getElementById('formularioRegistro').addEventListener('submit', async (e) => {
     e.preventDefault(); 
-    if (!eventoActivo) return alert("No hay programa activo para registrarse.");
+    if (!eventoActivo) return alert("Error de programa.");
 
     const rut = document.getElementById('rut').value.trim();
     const esCortesia = (eventoActivo.nombre === "Detrás del Muro Cortesía");
