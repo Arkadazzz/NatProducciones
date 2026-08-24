@@ -16,7 +16,6 @@ const db = getDatabase(app);
 let eventoActivo = null;
 let trabajadorExistente = false;
 
-// 1. ESCUCHAR AL INTERRUPTOR MAESTRO DEL PANEL
 onValue(ref(db, '0_estado_sistema/programa_activo'), (snapshot) => {
     document.getElementById('spinnerCarga').classList.add('d-none');
     
@@ -29,13 +28,13 @@ onValue(ref(db, '0_estado_sistema/programa_activo'), (snapshot) => {
         const partes = eventoActivo.fecha.split('-');
         if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
 
-        // MAGIA: Si el programa es "Detrás del muro", habilitar la sección de invitados
-        const nombreLimpio = eventoActivo.nombre.toLowerCase();
-        if (nombreLimpio.includes("muro")) {
-            document.getElementById('zonaCortesia').classList.remove('d-none');
+        // MAGIA: Si el programa es Cortesía, forzamos mostrar el menú del Staff. Si es I/P o Dale Play, lo ocultamos.
+        if (eventoActivo.nombre === "Detrás del Muro Cortesía") {
+            document.getElementById('divInvitadoPor').classList.remove('d-none');
+            document.getElementById('invitadoPor').setAttribute('required', 'true');
         } else {
-            document.getElementById('zonaCortesia').classList.add('d-none');
-            document.getElementById('tipoAsistencia').value = "Extra"; // Forzar Extra por defecto
+            document.getElementById('divInvitadoPor').classList.add('d-none');
+            document.getElementById('invitadoPor').removeAttribute('required');
         }
     } else {
         document.getElementById('msgSinEvento').classList.remove('d-none');
@@ -43,18 +42,6 @@ onValue(ref(db, '0_estado_sistema/programa_activo'), (snapshot) => {
     }
 });
 
-// 2. MOSTRAR LISTA DE STAFF SI ES INVITADO
-document.getElementById('tipoAsistencia').addEventListener('change', (e) => {
-    if (e.target.value === "Cortesía") {
-        document.getElementById('divInvitadoPor').classList.remove('d-none');
-        document.getElementById('invitadoPor').setAttribute('required', 'true');
-    } else {
-        document.getElementById('divInvitadoPor').classList.add('d-none');
-        document.getElementById('invitadoPor').removeAttribute('required');
-    }
-});
-
-// 3. RECONOCIMIENTO DE RUT
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
     if (rut.length < 8) return alert("Ingresa un RUT válido.");
@@ -67,12 +54,10 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
         document.getElementById('aceptoTerminos').setAttribute('required', 'true');
 
         if (snapshot.exists()) {
-            // EL TRABAJADOR YA EXISTE: Le ahorramos el formulario largo
             trabajadorExistente = true;
             const datos = snapshot.val();
             document.getElementById('encabezadoFormulario').innerText = `¡Hola de nuevo, ${datos.nombres}!`;
         } else {
-            // ES NUEVO: Le pedimos todos los datos por primera vez
             trabajadorExistente = false;
             document.getElementById('camposExtras').classList.remove('d-none');
             const inputs = document.querySelectorAll('#camposExtras input, #camposExtras select');
@@ -81,17 +66,16 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
     } catch (error) { console.error(error); }
 });
 
-// 4. GUARDAR RESERVA Y GENERAR QR
 document.getElementById('formularioRegistro').addEventListener('submit', async (e) => {
     e.preventDefault(); 
     if (!eventoActivo) return alert("No hay programa activo para registrarse.");
 
     const rut = document.getElementById('rut').value.trim();
-    const tipoAsis = document.getElementById('tipoAsistencia').value;
-    const invitadoPor = document.getElementById('invitadoPor').value;
+    const esCortesia = (eventoActivo.nombre === "Detrás del Muro Cortesía");
+    const tipoAsis = esCortesia ? "Cortesía" : "Pago";
+    const invitadoPor = esCortesia ? document.getElementById('invitadoPor').value : "";
 
     try {
-        // A. Si es nuevo, guardar sus datos personales en la base general
         if (!trabajadorExistente) {
             const trabajadorData = {
                 rut: rut, nombres: document.getElementById('nombres').value.trim(), apellidos: document.getElementById('apellidos').value.trim(),
@@ -104,19 +88,17 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
             await set(ref(db, '1_trabajadores/' + rut), trabajadorData);
         }
 
-        // B. AGENDAR SU ASISTENCIA (Esto aumenta el número de "Esperados" en tu panel)
         const reservaData = {
-            rut: rut, tipo: tipoAsis, invitado_por: (tipoAsis === "Cortesía") ? invitadoPor : "", hora_registro: new Date().toLocaleTimeString()
+            rut: rut, tipo: tipoAsis, invitado_por: invitadoPor, hora_registro: new Date().toLocaleTimeString()
         };
         await set(ref(db, `3_reservas/${eventoActivo.fecha}/${eventoActivo.nombre}/${rut}`), reservaData);
 
-        // C. MOSTRAR QR
         document.getElementById('formularioPrincipal').classList.add('d-none');
         document.getElementById('encabezadoFormulario').classList.add('d-none');
         document.getElementById('contenedorQR').classList.remove('d-none');
         
         let textoResumen = `${eventoActivo.nombre.toUpperCase()}`;
-        if (tipoAsis === "Cortesía") textoResumen += ` (Invitado de ${invitadoPor})`;
+        if (esCortesia) textoResumen += ` (De: ${invitadoPor})`;
         document.getElementById('resumenProgramaQR').innerText = textoResumen;
         
         document.getElementById('codigoQR').innerHTML = ""; 
