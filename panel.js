@@ -26,6 +26,7 @@ let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
 let totalEsperados = 0;
 let totalFirmados = 0;
+window.siguienteTicketAutomatico = 1; // Contador global de números
 
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
@@ -55,17 +56,24 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
         totalFirmados = Object.keys(asistencias).length;
         actualizarTablero();
         
+        // CALCULAR EL NÚMERO MÁS ALTO ASIGNADO HOY
+        let maxNumero = 0;
         const tbody = document.getElementById('tablaAsistentes');
         tbody.innerHTML = "";
+        
         for (const rut in asistencias) {
             const asis = asistencias[rut];
             const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
-            const numeroMostrado = asis.numero_asignado || '-'; // Si no tiene número guardado, muestra un guion
+            const num = parseInt(asis.numero_asignado) || 0;
+            if (num > maxNumero) maxNumero = num; // Buscamos el mayor
+            
             const tr = document.createElement('tr');
-            // AGREGADA LA COLUMNA CON EL NÚMERO
-            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${numeroMostrado}</span></td><td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
+            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td><td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
         }
+        
+        // Guardamos el siguiente número disponible
+        window.siguienteTicketAutomatico = maxNumero + 1;
     });
 });
 
@@ -100,8 +108,10 @@ async function onScanSuccess(decodedText) {
             } else { infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; }
 
             document.getElementById('seccionFirma').classList.remove('d-none');
-            // Limpiamos la firma y el cuadro del número cada vez que escaneamos a alguien nuevo
-            document.getElementById('numeroAsignado').value = "";
+            
+            // ASIGNAR NÚMERO AUTOMÁTICO AL CAMPO VISUAL
+            document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
+            
             if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad'));
             signaturePad.clear(); document.getElementById('mensajeEscaneo').classList.add('d-none');
         } else {
@@ -114,16 +124,13 @@ async function onScanSuccess(decodedText) {
 document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 
 document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
-    // 1. VALIDAR QUE EL NÚMERO SE HAYA ESCRITO
-    const numeroAsignado = document.getElementById('numeroAsignado').value.trim();
-    if (!numeroAsignado) return alert("Por favor, asígnale un Número de Identificación (Ticket) antes de guardar.");
-    
-    // 2. VALIDAR LA FIRMA
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
-    
     const firmaBase64 = signaturePad.toDataURL(); 
     const horaActual = new Date().toLocaleTimeString(); 
     const tipo = document.getElementById('infoInvitado').innerText.includes("CORTESÍA") ? "Cortesía" : "Pago";
+    
+    // CAPTURAMOS EL NÚMERO QUE SE AUTO-ASIGNÓ
+    const numeroFinal = document.getElementById('numeroAsignado').value;
 
     try {
         await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
@@ -134,7 +141,7 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
             hora_ingreso: horaActual, 
             firma_digital: firmaBase64, 
             estado_pago: "Pendiente",
-            numero_asignado: numeroAsignado // <-- GUARDAMOS EL NÚMERO
+            numero_asignado: numeroFinal // <-- SE GUARDA EN FIREBASE
         });
         document.getElementById('seccionFirma').classList.add('d-none');
         signaturePad.clear(); html5QrcodeScanner.resume(); rutActual = "";
