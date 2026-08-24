@@ -20,39 +20,44 @@ const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "1
 onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
+// Variables de la SALA ACTUAL
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let rutActual = "";
 let html5QrcodeScanner = null; let signaturePad;
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
 let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico = 1;
+let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
 // ==========================================
-// PESTAÑA 1: PUERTA, ESCÁNER Y MONITOREO
+// PESTAÑA 1: MULTI-SALA Y ESCÁNER
 // ==========================================
-onValue(ref(db, '0_estado_sistema/programa_activo'), (snapshot) => {
+onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
+    const container = document.getElementById('contenedorProgramasActivos');
+    container.innerHTML = "";
+    
     if (snapshot.exists()) {
-        const data = snapshot.val();
-        nombrePrograma = data.nombre; fechaPrograma = data.fecha; montoPago = data.monto;
-
-        document.getElementById('seccionConfiguracion').classList.add('d-none');
-        document.getElementById('seccionEscaner').classList.remove('d-none');
-        document.getElementById('seccionLista').classList.remove('d-none');
-
-        if (!html5QrcodeScanner) {
-            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
-            html5QrcodeScanner.render(onScanSuccess, () => {});
+        const programas = snapshot.val();
+        for (const clave in programas) {
+            const p = programas[clave];
+            container.innerHTML += `
+                <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
+                    <div>
+                        <strong class="text-white">${p.nombre}</strong><br>
+                        <small style="color: #d6b3ff;">${p.fecha} | $${p.monto}</small>
+                    </div>
+                    <div>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}')">🚪 Entrar</button>
+                        <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
+                    </div>
+                </div>
+            `;
         }
-        activarRadares();
     } else {
-        document.getElementById('seccionConfiguracion').classList.remove('d-none');
-        document.getElementById('seccionEscaner').classList.add('d-none');
-        document.getElementById('seccionFirma').classList.add('d-none');
-        document.getElementById('seccionLista').classList.add('d-none');
-        document.getElementById('tablaAsistentes').innerHTML = "";
-        
-        if (html5QrcodeScanner) { try { html5QrcodeScanner.clear(); } catch(e) {} html5QrcodeScanner = null; }
+        container.innerHTML = "<p class='text-muted' style='font-size: 0.9em;'>No hay programas corriendo.</p>";
+        // Si no hay programas y estaba en una sala, lo sacamos
+        salirDeSala();
     }
 });
 
@@ -61,26 +66,66 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
     if (!nom || !fec) return alert("Selecciona programa y fecha.");
-    await set(ref(db, '0_estado_sistema/programa_activo'), { nombre: nom, fecha: fec, monto: mon });
+    
+    const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
+    await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { nombre: nom, fecha: fec, monto: mon });
+    
+    // Auto unirse a la sala que acaba de crear
+    window.unirseASala(claveSegura, nom, fec, mon);
 });
 
-document.getElementById('btnCerrarPuertas').addEventListener('click', async () => {
-    if(confirm("¿Cerrar puertas y volver al inicio?")) await remove(ref(db, '0_estado_sistema/programa_activo'));
-});
+window.unirseASala = function(clave, nom, fec, mon) {
+    nombrePrograma = nom; fechaPrograma = fec; montoPago = mon;
+    
+    document.getElementById('tituloEscaner').innerText = `Sala: ${nom}`;
+    document.getElementById('seccionConfiguracion').classList.add('d-none');
+    document.getElementById('seccionEscaner').classList.remove('d-none');
+    document.getElementById('seccionLista').classList.remove('d-none');
+
+    if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+        html5QrcodeScanner.render(onScanSuccess, () => {});
+    }
+    activarRadares();
+}
+
+window.cerrarProgramaGlobal = async function(clave) {
+    if(confirm("¿Estás seguro de TERMINAR este programa para todos?\n\nDesaparecerá de la web pública.")) {
+        await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
+    }
+}
+
+document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
+
+function salirDeSala() {
+    nombrePrograma = ""; fechaPrograma = ""; montoPago = 0;
+    document.getElementById('seccionConfiguracion').classList.remove('d-none');
+    document.getElementById('seccionEscaner').classList.add('d-none');
+    document.getElementById('seccionFirma').classList.add('d-none');
+    document.getElementById('seccionLista').classList.add('d-none');
+    document.getElementById('tablaAsistentes').innerHTML = "";
+    
+    if (unsubscribeReservas) unsubscribeReservas();
+    if (unsubscribeAsistencias) unsubscribeAsistencias();
+    if (html5QrcodeScanner) { try { html5QrcodeScanner.clear(); } catch(e) {} html5QrcodeScanner = null; }
+}
 
 function activarRadares() {
-    onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
+    if (unsubscribeReservas) unsubscribeReservas();
+    if (unsubscribeAsistencias) unsubscribeAsistencias();
+
+    unsubscribeReservas = onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         totalEsperados = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
         actualizarTablero();
     });
 
-    onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
+    unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         const asistencias = snapshot.exists() ? snapshot.val() : {};
         totalFirmados = Object.keys(asistencias).length;
         actualizarTablero();
         
         let maxNumero = 0;
-        const conteoStaff = {}; // <- AQUI SE GUARDA EL RANKING DE INVITADOS
+        const conteoStaff = {}; 
         const tbody = document.getElementById('tablaAsistentes');
         tbody.innerHTML = "";
         
@@ -90,7 +135,6 @@ function activarRadares() {
             const num = parseInt(asis.numero_asignado) || 0;
             if (num > maxNumero) maxNumero = num; 
 
-            // Sumatoria automática de invitados por Staff
             if (asis.tipo_ingreso === "Cortesía" && asis.invitado_por) {
                 conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
             }
@@ -101,7 +145,6 @@ function activarRadares() {
         }
         window.siguienteTicketAutomatico = maxNumero + 1;
 
-        // DIBUJAR EL RANKING SOLO SI ES PROGRAMA DE CORTESÍA
         if (nombrePrograma === "Detrás del Muro Cortesía") {
             document.getElementById('seccionConteoInvitados').classList.remove('d-none');
             let htmlConteo = "";
@@ -168,7 +211,6 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
     const horaActual = new Date().toLocaleTimeString(); 
     const numeroFinal = document.getElementById('numeroAsignado').value;
 
-    // EXTRACCIÓN INTELIGENTE DEL STAFF QUE LO INVITÓ
     const textoInfo = document.getElementById('infoInvitado').innerText;
     const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
     let invitadoPor = "";
@@ -180,7 +222,7 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
         await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
             rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), 
             tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente",
-            numero_asignado: numeroFinal, invitado_por: invitadoPor // <-- SE GUARDA EN FIREBASE PARA EL RANKING
+            numero_asignado: numeroFinal, invitado_por: invitadoPor 
         });
         document.getElementById('seccionFirma').classList.add('d-none');
         signaturePad.clear(); html5QrcodeScanner.resume(); rutActual = "";
@@ -309,11 +351,11 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
 });
 
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
-    if (!nombrePrograma) return alert("Ve a la pestaña Puerta y abre un programa primero.");
+    if (!nombrePrograma) return alert("Debes estar DENTRO de una sala activa en la Pestaña 'Control Puerta' para descargar su Excel Diario.");
     if (nombrePrograma === "Dale Play") {
         if (!confirm("⚠️ ATENCIÓN: Seleccionaste 'Dale Play'.\n\nEste programa normalmente se acumula en la semana. Si descargas esta nómina diaria, estas personas desaparecerán de la Bóveda del viernes.\n\n¿Estás seguro?")) return;
     } else {
-        if (!confirm(`¿Descargar nómina diaria para ${nombrePrograma}?\n\nAl confirmar, los asistentes de HOY se marcarán como PAGADOS.`)) return;
+        if (!confirm(`¿Descargar nómina diaria para la sala en la que estás actualmente (${nombrePrograma})?\n\nAl confirmar, los asistentes se marcarán como PAGADOS.`)) return;
     }
     try {
         const snap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`)));
@@ -332,10 +374,9 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
                 actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${r}/estado_pago`] = "Pagado";
             }
         }
-        if (!hayPagosNuevos) return alert("Las personas de hoy ya fueron marcadas como Pagadas.");
+        if (!hayPagosNuevos) return alert("Las personas de esta sala ya fueron marcadas como Pagadas.");
         await update(ref(db), actualizacionesFirebase);
         
-        // Evitar que un "/" en el nombre del archivo rompa la descarga en Windows/Mac
         const nombreArchivoLimpio = nombrePrograma.replace(/[ \/]/g, "_");
         descargarCSV(csv, `Nomina_Banco_DIARIA_${nombreArchivoLimpio}_${fechaPrograma}.csv`);
         alert("¡Nómina diaria descargada con éxito!");
