@@ -22,6 +22,10 @@
         canvas#signature-pad { background-color: #ffffff; border-radius: 10px; width: 100%; height: 250px; border: 2px solid #b066ff; touch-action: none; }
         #reader { width: 100%; border-radius: 10px; border: 2px solid #333333; }
         .table-dark { --bs-table-bg: #141414; --bs-table-border-color: #2a2a2a; }
+        
+        /* Cajas de métricas */
+        .metric-box { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 10px; text-align: center; }
+        .metric-box span { display: block; font-size: 2em; font-weight: bold; line-height: 1; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -83,13 +87,30 @@
                     </div>
 
                     <div class="card-panel" id="seccionLista">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5><span class="led-green"></span> En Vivo</h5>
-                            <div class="text-end">
-                                <span class="badge bg-secondary">Esperados: <span id="contadorEsperados">0</span></span>
-                                <span class="badge bg-primary fs-6">Adentro: <span id="contadorAsistentes">0</span></span>
+                        <h5 class="mb-4"><span class="led-green"></span> Monitoreo en Vivo</h5>
+                        
+                        <!-- TABLERO DE MÉTRICAS MULTI-COMPUTADOR -->
+                        <div class="row mb-4">
+                            <div class="col-4">
+                                <div class="metric-box">
+                                    <small class="text-muted">📝 Llenaron Formulario</small>
+                                    <span class="text-info" id="contEsperados">0</span>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="metric-box">
+                                    <small class="text-muted">⏳ Faltan por Firmar</small>
+                                    <span class="text-warning" id="contFaltan">0</span>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="metric-box" style="border-color: #00d26a;">
+                                    <small class="text-muted">✅ Ya Firmaron</small>
+                                    <span class="text-success" id="contFirmados">0</span>
+                                </div>
                             </div>
                         </div>
+
                         <div class="table-responsive">
                             <table class="table table-dark table-hover align-middle">
                                 <thead><tr><th>Nombre</th><th>Hora</th><th>Tipo</th><th>Acción</th></tr></thead>
@@ -157,7 +178,7 @@
     </div>
 </div>
 
-<!-- MODAL FICHA TÉCNICA (CRM) -->
+<!-- MODAL FICHA TÉCNICA -->
 <div class="modal fade" id="modalFicha" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #333;">
