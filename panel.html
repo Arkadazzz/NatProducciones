@@ -40,7 +40,7 @@
     <ul class="nav nav-tabs" id="myTab" role="tablist">
         <li class="nav-item" role="presentation"><button class="nav-link active" id="puerta-tab" data-bs-toggle="tab" data-bs-target="#puerta" type="button">📍 Control Puerta</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 Base de Datos</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas y Pagos</button></li>
     </ul>
 
     <div class="tab-content" id="myTabContent">
@@ -101,7 +101,7 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 2: CRM Y BLACKLIST -->
+        <!-- PESTAÑA 2: CRM -->
         <div class="tab-pane fade" id="crm" role="tabpanel">
             <div class="card-panel">
                 <div class="row mb-3">
@@ -117,22 +117,39 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 3: FINANZAS -->
+        <!-- PESTAÑA 3: FINANZAS Y BÓVEDA -->
         <div class="tab-pane fade" id="finanzas" role="tabpanel">
-            <div class="row">
+            <div class="row mb-4">
                 <div class="col-md-6">
-                    <div class="card-panel text-center">
-                        <h4 style="color: #00d26a;">Pagos Diarios (Banco)</h4>
-                        <p class="text-muted">Descarga la nómina masiva del banco Santander para los asistentes del programa activo de hoy.</p>
-                        <button class="btn btn-success w-100 fw-bold py-3" id="btnExcelBanco">🏦 Descargar Nómina Banco Hoy</button>
+                    <div class="card-panel text-center h-100">
+                        <h4 style="color: #00d26a;">🏦 Pagos Diarios Inmediatos</h4>
+                        <p class="text-muted">Descarga la nómina del banco para los asistentes SOLO del programa de hoy.</p>
+                        <button class="btn btn-outline-success w-100 fw-bold py-2 mt-2" id="btnExcelBanco">Descargar Nómina de HOY</button>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="card-panel text-center">
-                        <h4 style="color: #ffcc00;">Cierre Mensual (Contador)</h4>
-                        <p class="text-muted">Genera el archivo I.M.T. con la suma de todos los programas del mes actual.</p>
-                        <button class="btn btn-warning text-dark w-100 fw-bold py-3" id="btnExcelContador">📊 Descargar Reporte Mes Actual</button>
+                    <div class="card-panel text-center h-100">
+                        <h4 style="color: #ffcc00;">📊 Cierre Contable Mensual</h4>
+                        <p class="text-muted">Genera el archivo I.M.T. con la suma de TODOS los programas del mes.</p>
+                        <button class="btn btn-outline-warning text-white w-100 fw-bold py-2 mt-2" id="btnExcelContador">Descargar Reporte del Mes</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- LA BÓVEDA SEMANAL -->
+            <div class="card-panel" style="border: 1px solid #00d26a; background: rgba(0, 210, 106, 0.05);">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h4 style="color: #00d26a; margin-bottom: 0;">💼 Bóveda de Pagos Pendientes (Acumulado)</h4>
+                        <p class="text-muted mb-0">Dinero retenido por programas aún no pagados en la semana.</p>
+                    </div>
+                    <button class="btn btn-success fw-bold px-4 py-3 shadow" id="btnLiquidarSemana">Liquidar Semana y Descargar Banco</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle text-center">
+                        <thead><tr><th>RUT</th><th>Nombre Completo</th><th>Días Asistidos</th><th>Monto Acumulado</th></tr></thead>
+                        <tbody id="tablaDeudas"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -148,11 +165,9 @@
                 <h5 class="modal-title" style="color: #b066ff;">Ficha Técnica</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="contenidoFicha" style="font-size: 0.9em;">
-                <!-- Se llena con JS -->
-            </div>
+            <div class="modal-body" id="contenidoFicha" style="font-size: 0.9em;"></div>
             <div class="modal-footer" style="border-top: 1px solid #333; display: flex; flex-direction: column;">
-                <input type="text" id="motivoBloqueo" class="form-control mb-2" placeholder="Motivo de bloqueo (Ej: Falta grave, no asistió)">
+                <input type="text" id="motivoBloqueo" class="form-control mb-2" placeholder="Motivo de bloqueo">
                 <button type="button" class="btn btn-danger w-100 fw-bold" id="btnBloquear">Bloquear Usuario (Blacklist)</button>
                 <button type="button" class="btn btn-success w-100 fw-bold d-none" id="btnDesbloquear">Desbloquear Usuario</button>
             </div>
