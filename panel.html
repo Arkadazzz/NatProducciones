@@ -54,11 +54,8 @@
             <div class="row">
                 <div class="col-lg-5">
                     <div class="card-panel" id="seccionConfiguracion">
-                        
-                        <!-- NUEVA SECCIÓN MULTI-SALA -->
                         <h5 style="color: #00d26a;">🟢 Salas Activas</h5>
                         <div id="contenedorProgramasActivos" class="mb-4">
-                            <!-- Se llena con JS -->
                             <p class="text-muted" style="font-size: 0.9em;">Cargando...</p>
                         </div>
 
@@ -68,8 +65,7 @@
                         <select id="nombrePrograma" class="form-select mb-3">
                             <option value="">-- Selecciona el Programa --</option>
                             <option value="Dale Play">Dale Play</option>
-                            <option value="Detrás del Muro I/P">Detrás del Muro I/P (Pagados)</option>
-                            <option value="Detrás del Muro Cortesía">Detrás del Muro Cortesía (Invitados)</option>
+                            <option value="Detrás del Muro">Detrás del Muro (I/P + Cortesía)</option>
                         </select>
                         <input type="date" id="fechaPrograma" class="form-control mb-3">
                         <input type="number" id="montoPago" class="form-control mb-3" placeholder="Monto a pagar ($)">
@@ -173,7 +169,7 @@
                 <div class="col-md-6">
                     <div class="card-panel text-center h-100">
                         <h4 style="color: #00d26a;">🏦 Pagos Diarios Inmediatos</h4>
-                        <p style="color: #aaaaaa;">Descarga la nómina del banco para la sala seleccionada HOY.</p>
+                        <p style="color: #aaaaaa;">Descarga la nómina del banco para los asistentes SOLO del programa de hoy.</p>
                         <button class="btn btn-outline-success w-100 fw-bold py-2 mt-2" id="btnExcelBanco">Descargar Nómina de HOY</button>
                     </div>
                 </div>
