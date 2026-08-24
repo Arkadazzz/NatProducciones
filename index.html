@@ -32,7 +32,6 @@
             <p class="text-muted d-none" id="subMsgSinEvento">El equipo de producción aún no ha habilitado programas para hoy.</p>
         </div>
 
-        <!-- NUEVA PANTALLA: SELECCIÓN MULTI-PROGRAMA -->
         <div id="pantallaSeleccion" class="d-none text-center py-4">
             <h5 class="mb-4 text-white fw-bold">¿A qué programa asistes hoy?</h5>
             <div id="botonesProgramas" class="d-flex flex-column gap-3"></div>
@@ -96,20 +95,39 @@
                 <div id="seccionRSVP" class="d-none mt-4 p-4 rounded" style="background: #1a1a1a; border: 1px solid #333;">
                     <h5 class="mb-3 fw-bold" style="color: #b066ff;">Confirmar Asistencia</h5>
                     
-                    <div class="mb-3 d-none" id="divInvitadoPor">
-                        <label class="form-label text-warning fw-bold">¿Qué trabajador te invitó?</label>
-                        <select class="form-select" id="invitadoPor" style="border-color: #ffc107 !important; background-color: #2a2000 !important;">
-                            <option value="">Selecciona su nombre...</option>
-                            <option value="Luis Jorquera">Luis Jorquera</option>
-                            <option value="Agustin Pino">Agustin Pino</option>
-                            <option value="Martina Pino">Martina Pino</option>
-                            <option value="Ariela Rojas">Ariela Rojas</option>
-                            <option value="Javier Rojas">Javier Rojas</option>
-                            <option value="Matias Puentes">Matias Puentes</option>
-                            <option value="Mario Orbenes">Mario Orbenes</option>
-                            <option value="Hana Lizama">Hana Lizama</option>
-                            <option value="Fakundo">Fakundo</option>
-                        </select>
+                    <div id="zonaCortesia" class="d-none">
+                        <div class="mb-3">
+                            <label class="form-label">¿Cómo asistes al programa hoy?</label>
+                            <select class="form-select" id="tipoAsistencia">
+                                <option value="">-- Selecciona una opción --</option>
+                                <option value="Extra">Trabajador I/P (Requiere PIN)</option>
+                                <option value="Cortesía">Invitado de Cortesía</option>
+                            </select>
+                        </div>
+
+                        <!-- EL PIN DE SEGURIDAD (SOLO PARA I/P) -->
+                        <div class="mb-3 d-none" id="divPinSeguridad">
+                            <label class="form-label text-warning fw-bold">🔑 PIN de Acceso (I/P)</label>
+                            <input type="number" id="pinAcceso" class="form-control text-center fw-bold fs-4" placeholder="****" style="border-color: #ffc107 !important; letter-spacing: 5px;">
+                            <small class="text-muted">Si no tienes el PIN, solicítalo al equipo de Producción.</small>
+                        </div>
+
+                        <!-- LISTA DE STAFF (SOLO PARA CORTESÍA) -->
+                        <div class="mb-3 d-none" id="divInvitadoPor">
+                            <label class="form-label text-warning fw-bold">¿Qué trabajador te invitó?</label>
+                            <select class="form-select" id="invitadoPor" style="border-color: #ffc107 !important; background-color: #2a2000 !important;">
+                                <option value="">Selecciona su nombre...</option>
+                                <option value="Luis Jorquera">Luis Jorquera</option>
+                                <option value="Agustin Pino">Agustin Pino</option>
+                                <option value="Martina Pino">Martina Pino</option>
+                                <option value="Ariela Rojas">Ariela Rojas</option>
+                                <option value="Javier Rojas">Javier Rojas</option>
+                                <option value="Matias Puentes">Matias Puentes</option>
+                                <option value="Mario Orbenes">Mario Orbenes</option>
+                                <option value="Hana Lizama">Hana Lizama</option>
+                                <option value="Fakundo">Fakundo</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="form-check mt-4 mb-3">
