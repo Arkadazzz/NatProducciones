@@ -8,16 +8,29 @@
     <style>
         body { background-color: #0a0a0a; color: #ffffff; font-family: 'Segoe UI', system-ui, sans-serif; }
         .navbar { background-color: #141414; border-bottom: 1px solid #2a2a2a; }
-        .card-panel { background: #141414; border-radius: 15px; border: 1px solid #2a2a2a; padding: 25px; margin-bottom: 20px; box-shadow: 0 5px 20px rgba(138, 43, 226, 0.1); }
+        
+        /* Sistema de Pestañas */
+        .nav-tabs { border-bottom: 1px solid #333; margin-bottom: 20px; }
+        .nav-tabs .nav-link { color: #888; font-weight: 500; border: none; padding: 12px 20px; }
+        .nav-tabs .nav-link:hover { color: #b066ff; border-color: transparent; }
+        .nav-tabs .nav-link.active { color: #b066ff; background-color: transparent; border-bottom: 3px solid #b066ff; font-weight: bold; }
+        
+        .card-panel { background: #141414; border-radius: 15px; border: 1px solid #2a2a2a; padding: 25px; margin-bottom: 20px; }
         h4, h5 { color: #b066ff; font-weight: 600; }
         .form-control { background-color: #222222; border: 1px solid #333333; color: #ffffff; border-radius: 8px; }
         .form-control:focus { border-color: #b066ff; background-color: #222222; color: #ffffff; box-shadow: none; }
         .btn-custom { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; font-weight: bold; padding: 12px; border-radius: 8px; color: white; transition: 0.3s; }
-        .btn-custom:hover { background: linear-gradient(135deg, #9d4edd, #7b2cbf); transform: translateY(-2px); color: white; }
-        .btn-danger-custom { background: #ff3b3b; border: none; font-weight: bold; color: white; border-radius: 8px; }
-        .btn-success-custom { background: #00d26a; border: none; font-weight: bold; color: white; border-radius: 8px; padding: 12px; }
+        
+        /* LED Verde Parpadeante */
+        .led-green {
+            width: 12px; height: 12px; background-color: #00ff00; border-radius: 50%; display: inline-block;
+            box-shadow: 0 0 10px #00ff00; margin-right: 8px;
+            animation: blink 1.5s infinite alternate;
+        }
+        @keyframes blink { 0% { opacity: 1; box-shadow: 0 0 15px #00ff00; } 100% { opacity: 0.4; box-shadow: 0 0 2px #00ff00; } }
+        
         canvas#signature-pad { background-color: #ffffff; border-radius: 10px; width: 100%; height: 250px; border: 2px solid #b066ff; touch-action: none; }
-        #reader { width: 100%; border-radius: 10px; overflow: hidden; border: 2px solid #333333; }
+        #reader { width: 100%; border-radius: 10px; border: 2px solid #333333; }
         .table-dark { --bs-table-bg: #141414; --bs-table-border-color: #2a2a2a; }
     </style>
 </head>
@@ -27,69 +40,105 @@
     <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center" href="#">
             <img src="https://arkadazzz.github.io/NatProducciones/NAT_Blanco.png" alt="Nat Logo" style="height: 40px; margin-right: 15px;">
-            <span style="font-size: 1.2em; font-weight: bold; color: #b066ff;">Acreditación</span>
+            <span style="font-size: 1.2em; font-weight: bold; color: #b066ff;">Acreditación y Control</span>
         </a>
         <button class="btn btn-outline-light btn-sm" id="btnCerrarSesion">Cerrar Sesión</button>
     </div>
 </nav>
 
 <div class="container">
-    <div class="row">
-        <!-- COLUMNA IZQ -->
-        <div class="col-lg-5">
-            <div class="card-panel" id="seccionConfiguracion">
-                <h5>1. Datos del Programa</h5>
-                <p class="text-muted" style="font-size: 0.9em;">Define el evento antes de abrir las puertas.</p>
-                <input type="text" id="nombrePrograma" class="form-control mb-3" placeholder="Ej: Matinal VIP - 23 Agosto">
-                <input type="number" id="montoPago" class="form-control mb-3" placeholder="Monto a pagar ($)">
-                <button class="btn btn-custom w-100" id="btnIniciarPuerta">Abrir Puertas (Activar Escáner)</button>
-            </div>
+    <!-- NAVEGACIÓN DE PESTAÑAS -->
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="puerta-tab" data-bs-toggle="tab" data-bs-target="#puerta" type="button">📍 Control de Puerta</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 Base de Datos (CRM)</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas y Pagos</button>
+        </li>
+    </ul>
 
-            <div class="card-panel d-none" id="seccionEscaner">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="mb-0">2. Escáner de Ingreso</h5>
-                    <span class="badge bg-success" id="indicadorActivo">Grabando</span>
+    <!-- CONTENIDO DE LAS PESTAÑAS -->
+    <div class="tab-content" id="myTabContent">
+        
+        <!-- PESTAÑA 1: PUERTA Y ESCÁNER -->
+        <div class="tab-pane fade show active" id="puerta" role="tabpanel">
+            <div class="row">
+                <div class="col-lg-5">
+                    
+                    <!-- MASTER SWITCH: Configura el formulario web a distancia -->
+                    <div class="card-panel" id="seccionConfiguracion">
+                        <h5>1. Activar Programa Web</h5>
+                        <p class="text-muted" style="font-size: 0.85em;">Lo que escribas aquí modificará el formulario del público automáticamente.</p>
+                        <input type="text" id="nombrePrograma" class="form-control mb-3" placeholder="Nombre (Ej: Detrás del muro)">
+                        <input type="date" id="fechaPrograma" class="form-control mb-3">
+                        <input type="number" id="montoPago" class="form-control mb-3" placeholder="Monto a pagar al extra ($)">
+                        <button class="btn btn-custom w-100" id="btnActivarWeb">Publicar Formulario y Abrir Puertas</button>
+                    </div>
+
+                    <div class="card-panel d-none" id="seccionEscaner">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">2. Escáner de Ingreso</h5>
+                            <span class="badge bg-success"><span class="led-green" style="width: 8px; height: 8px;"></span> Grabando</span>
+                        </div>
+                        <div id="reader"></div>
+                        <div id="mensajeEscaneo" class="alert alert-info mt-3 d-none text-center" style="background: #1c103f; border: none; color: #d6b3ff;">Buscando RUT...</div>
+                    </div>
                 </div>
-                <div id="reader"></div>
-                <div id="mensajeEscaneo" class="alert alert-info mt-3 d-none text-center" style="background: #1c103f; border: none; color: #d6b3ff;">Buscando RUT...</div>
-            </div>
-        </div>
 
-        <!-- COLUMNA DER -->
-        <div class="col-lg-7">
-            <div class="card-panel d-none" id="seccionFirma">
-                <h4 class="text-success mb-1">¡Asistente Encontrado!</h4>
-                <h3 id="nombreAsistenteDisplay" class="mb-3 text-white">Juan Pérez</h3>
-                
-                <div id="zonaFirmaPad">
-                    <p class="text-muted mb-2">Firma del trabajador para aceptar Contrato DT y Cesión de Imagen:</p>
-                    <canvas id="signature-pad"></canvas>
-                    <div class="d-flex justify-content-between mt-3">
-                        <button class="btn btn-outline-danger btn-sm" id="btnLimpiarFirma">Borrar Firma</button>
-                        <button class="btn btn-success-custom px-4" id="btnGuardarIngreso">Confirmar y Guardar Asistencia</button>
+                <div class="col-lg-7">
+                    <div class="card-panel d-none" id="seccionFirma">
+                        <h4 class="text-success mb-1">¡Asistente Encontrado!</h4>
+                        <h3 id="nombreAsistenteDisplay" class="mb-1 text-white">Juan Pérez</h3>
+                        <p id="infoInvitado" class="text-warning mb-3 fw-bold"></p> <!-- Aquí dirá si es invitado de alguien -->
+                        
+                        <div id="zonaFirmaPad">
+                            <p class="text-muted mb-2">Firma del trabajador:</p>
+                            <canvas id="signature-pad"></canvas>
+                            <div class="d-flex justify-content-between mt-3">
+                                <button class="btn btn-outline-danger btn-sm" id="btnLimpiarFirma">Borrar Firma</button>
+                                <button class="btn btn-success px-4 fw-bold" id="btnGuardarIngreso">Confirmar Ingreso</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-panel" id="seccionLista">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5><span class="led-green"></span> En Vivo</h5>
+                            <div class="text-end">
+                                <span class="badge bg-secondary">Esperados: <span id="contadorEsperados">0</span></span>
+                                <span class="badge bg-primary fs-6">Adentro: <span id="contadorAsistentes">0</span></span>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-hover align-middle">
+                                <thead><tr><th>Nombre</th><th>Hora</th><th>Tipo</th><th>Acción</th></tr></thead>
+                                <tbody id="tablaAsistentes"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="card-panel" id="seccionLista">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5>Asistentes (<span id="contadorAsistentes">0</span>)</h5>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-success btn-sm fw-bold" id="btnExcelBanco">🏦 Banco (Día)</button>
-                        <button class="btn btn-warning btn-sm fw-bold text-dark" id="btnExcelContador">📊 Contador (Mes)</button>
-                    </div>
-                </div>
-                
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle">
-                        <thead>
-                            <tr><th>Nombre</th><th>Hora</th><th>Tipo</th><th>Acción</th></tr>
-                        </thead>
-                        <tbody id="tablaAsistentes"></tbody>
-                    </table>
-                </div>
+        <!-- PESTAÑA 2: CRM (Fase 2) -->
+        <div class="tab-pane fade" id="crm" role="tabpanel">
+            <div class="card-panel text-center py-5">
+                <h3 class="text-muted">👥 Base de Datos en construcción</h3>
+                <p class="text-muted">Aquí estará la ficha de todos los extras y el botón para bloquearlos (Blacklist).</p>
             </div>
         </div>
+
+        <!-- PESTAÑA 3: FINANZAS (Fase 3) -->
+        <div class="tab-pane fade" id="finanzas" role="tabpanel">
+            <div class="card-panel text-center py-5">
+                <h3 class="text-muted">💰 Bóveda Financiera en construcción</h3>
+                <p class="text-muted">Aquí estarán los botones de pago diario, semanal y contabilidad del mes.</p>
+            </div>
+        </div>
+
     </div>
 </div>
 
