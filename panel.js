@@ -21,42 +21,91 @@ onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.ht
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let rutActual = "";
-let html5QrcodeScanner; let signaturePad;
+let html5QrcodeScanner = null; let signaturePad;
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
 let totalEsperados = 0;
 let totalFirmados = 0;
-window.siguienteTicketAutomatico = 1; // Contador global de números
+window.siguienteTicketAutomatico = 1;
 
+// Precargamos la base de datos de personas
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
 // ==========================================
 // PESTAÑA 1: PUERTA, ESCÁNER Y MONITOREO
 // ==========================================
+
+// 1. SINCRONIZACIÓN MAESTRA: Si cualquier PC abre las puertas, TODOS los PCs se enteran al instante
+onValue(ref(db, '0_estado_sistema/programa_activo'), (snapshot) => {
+    if (snapshot.exists()) {
+        const data = snapshot.val();
+        nombrePrograma = data.nombre;
+        fechaPrograma = data.fecha;
+        montoPago = data.monto;
+
+        // Ocultar configuración y mostrar cámara
+        document.getElementById('seccionConfiguracion').classList.add('d-none');
+        document.getElementById('seccionEscaner').classList.remove('d-none');
+        document.getElementById('seccionLista').classList.remove('d-none');
+
+        // Prender cámara solo si no estaba prendida ya
+        if (!html5QrcodeScanner) {
+            html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+            html5QrcodeScanner.render(onScanSuccess, () => {});
+        }
+
+        // Encender Radares de Monitoreo para este programa
+        activarRadares();
+    } else {
+        // Alguien cerró las puertas, volver a la pantalla de configuración
+        document.getElementById('seccionConfiguracion').classList.remove('d-none');
+        document.getElementById('seccionEscaner').classList.add('d-none');
+        document.getElementById('seccionFirma').classList.add('d-none');
+        
+        // Limpiar tabla visualmente
+        document.getElementById('tablaAsistentes').innerHTML = "";
+        document.getElementById('contEsperados').innerText = "0";
+        document.getElementById('contFirmados').innerText = "0";
+        document.getElementById('contFaltan').innerText = "0";
+
+        // Apagar cámara
+        if (html5QrcodeScanner) {
+            try { html5QrcodeScanner.clear(); } catch(e) {}
+            html5QrcodeScanner = null;
+        }
+    }
+});
+
+// 2. BOTÓN ACTIVAR (Ahora solo envía la orden a la nube, no cambia la pantalla directamente)
 document.getElementById('btnActivarWeb').addEventListener('click', async () => {
-    nombrePrograma = document.getElementById('nombrePrograma').value;
-    fechaPrograma = document.getElementById('fechaPrograma').value;
-    montoPago = document.getElementById('montoPago').value;
-    if (!nombrePrograma || !fechaPrograma) return alert("Selecciona programa y fecha.");
+    const nom = document.getElementById('nombrePrograma').value;
+    const fec = document.getElementById('fechaPrograma').value;
+    const mon = document.getElementById('montoPago').value;
+    if (!nom || !fec) return alert("Selecciona programa y fecha.");
 
-    await set(ref(db, '0_estado_sistema/programa_activo'), { nombre: nombrePrograma, fecha: fechaPrograma, monto: montoPago });
-    document.getElementById('seccionConfiguracion').classList.add('d-none');
-    document.getElementById('seccionEscaner').classList.remove('d-none');
-    
-    html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
-    html5QrcodeScanner.render(onScanSuccess, () => {});
+    await set(ref(db, '0_estado_sistema/programa_activo'), { nombre: nom, fecha: fec, monto: mon });
+});
 
+// 3. BOTÓN CERRAR PUERTAS
+document.getElementById('btnCerrarPuertas').addEventListener('click', async () => {
+    if(confirm("¿Estás seguro de cerrar las puertas?\n\nEl formulario público se apagará y las pantallas del staff volverán al inicio.")) {
+        await remove(ref(db, '0_estado_sistema/programa_activo'));
+    }
+});
+
+function activarRadares() {
+    // Sincronizar Esperados
     onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         totalEsperados = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
         actualizarTablero();
     });
 
+    // Sincronizar Firmados y la Tabla
     onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         const asistencias = snapshot.exists() ? snapshot.val() : {};
         totalFirmados = Object.keys(asistencias).length;
         actualizarTablero();
         
-        // CALCULAR EL NÚMERO MÁS ALTO ASIGNADO HOY
         let maxNumero = 0;
         const tbody = document.getElementById('tablaAsistentes');
         tbody.innerHTML = "";
@@ -65,17 +114,15 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
             const asis = asistencias[rut];
             const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
             const num = parseInt(asis.numero_asignado) || 0;
-            if (num > maxNumero) maxNumero = num; // Buscamos el mayor
+            if (num > maxNumero) maxNumero = num; 
             
             const tr = document.createElement('tr');
             tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td><td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
         }
-        
-        // Guardamos el siguiente número disponible
         window.siguienteTicketAutomatico = maxNumero + 1;
     });
-});
+}
 
 function actualizarTablero() {
     document.getElementById('contEsperados').innerText = totalEsperados;
@@ -108,8 +155,6 @@ async function onScanSuccess(decodedText) {
             } else { infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; }
 
             document.getElementById('seccionFirma').classList.remove('d-none');
-            
-            // ASIGNAR NÚMERO AUTOMÁTICO AL CAMPO VISUAL
             document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
             
             if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad'));
@@ -128,8 +173,6 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
     const firmaBase64 = signaturePad.toDataURL(); 
     const horaActual = new Date().toLocaleTimeString(); 
     const tipo = document.getElementById('infoInvitado').innerText.includes("CORTESÍA") ? "Cortesía" : "Pago";
-    
-    // CAPTURAMOS EL NÚMERO QUE SE AUTO-ASIGNÓ
     const numeroFinal = document.getElementById('numeroAsignado').value;
 
     try {
@@ -141,7 +184,7 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
             hora_ingreso: horaActual, 
             firma_digital: firmaBase64, 
             estado_pago: "Pendiente",
-            numero_asignado: numeroFinal // <-- SE GUARDA EN FIREBASE
+            numero_asignado: numeroFinal
         });
         document.getElementById('seccionFirma').classList.add('d-none');
         signaturePad.clear(); html5QrcodeScanner.resume(); rutActual = "";
