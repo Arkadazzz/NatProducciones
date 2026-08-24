@@ -8,27 +8,17 @@
     <style>
         body { background-color: #0a0a0a; color: #ffffff; font-family: 'Segoe UI', system-ui, sans-serif; }
         .navbar { background-color: #141414; border-bottom: 1px solid #2a2a2a; }
-        
-        /* Sistema de Pestañas */
         .nav-tabs { border-bottom: 1px solid #333; margin-bottom: 20px; }
         .nav-tabs .nav-link { color: #888; font-weight: 500; border: none; padding: 12px 20px; }
         .nav-tabs .nav-link:hover { color: #b066ff; border-color: transparent; }
         .nav-tabs .nav-link.active { color: #b066ff; background-color: transparent; border-bottom: 3px solid #b066ff; font-weight: bold; }
-        
         .card-panel { background: #141414; border-radius: 15px; border: 1px solid #2a2a2a; padding: 25px; margin-bottom: 20px; }
         h4, h5 { color: #b066ff; font-weight: 600; }
         .form-control { background-color: #222222; border: 1px solid #333333; color: #ffffff; border-radius: 8px; }
         .form-control:focus { border-color: #b066ff; background-color: #222222; color: #ffffff; box-shadow: none; }
         .btn-custom { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; font-weight: bold; padding: 12px; border-radius: 8px; color: white; transition: 0.3s; }
-        
-        /* LED Verde Parpadeante */
-        .led-green {
-            width: 12px; height: 12px; background-color: #00ff00; border-radius: 50%; display: inline-block;
-            box-shadow: 0 0 10px #00ff00; margin-right: 8px;
-            animation: blink 1.5s infinite alternate;
-        }
+        .led-green { width: 12px; height: 12px; background-color: #00ff00; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px #00ff00; margin-right: 8px; animation: blink 1.5s infinite alternate; }
         @keyframes blink { 0% { opacity: 1; box-shadow: 0 0 15px #00ff00; } 100% { opacity: 0.4; box-shadow: 0 0 2px #00ff00; } }
-        
         canvas#signature-pad { background-color: #ffffff; border-radius: 10px; width: 100%; height: 250px; border: 2px solid #b066ff; touch-action: none; }
         #reader { width: 100%; border-radius: 10px; border: 2px solid #333333; }
         .table-dark { --bs-table-bg: #141414; --bs-table-border-color: #2a2a2a; }
@@ -47,40 +37,29 @@
 </nav>
 
 <div class="container">
-    <!-- NAVEGACIÓN DE PESTAÑAS -->
     <ul class="nav nav-tabs" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="puerta-tab" data-bs-toggle="tab" data-bs-target="#puerta" type="button">📍 Control de Puerta</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 Base de Datos (CRM)</button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas y Pagos</button>
-        </li>
+        <li class="nav-item" role="presentation"><button class="nav-link active" id="puerta-tab" data-bs-toggle="tab" data-bs-target="#puerta" type="button">📍 Control Puerta</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 Base de Datos</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas</button></li>
     </ul>
 
-    <!-- CONTENIDO DE LAS PESTAÑAS -->
     <div class="tab-content" id="myTabContent">
         
-        <!-- PESTAÑA 1: PUERTA Y ESCÁNER -->
+        <!-- PESTAÑA 1: PUERTA -->
         <div class="tab-pane fade show active" id="puerta" role="tabpanel">
             <div class="row">
                 <div class="col-lg-5">
-                    
-                    <!-- MASTER SWITCH: Configura el formulario web a distancia -->
                     <div class="card-panel" id="seccionConfiguracion">
                         <h5>1. Activar Programa Web</h5>
-                        <p class="text-muted" style="font-size: 0.85em;">Lo que escribas aquí modificará el formulario del público automáticamente.</p>
                         <input type="text" id="nombrePrograma" class="form-control mb-3" placeholder="Nombre (Ej: Detrás del muro)">
                         <input type="date" id="fechaPrograma" class="form-control mb-3">
                         <input type="number" id="montoPago" class="form-control mb-3" placeholder="Monto a pagar al extra ($)">
-                        <button class="btn btn-custom w-100" id="btnActivarWeb">Publicar Formulario y Abrir Puertas</button>
+                        <button class="btn btn-custom w-100" id="btnActivarWeb">Publicar y Abrir Puertas</button>
                     </div>
 
                     <div class="card-panel d-none" id="seccionEscaner">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">2. Escáner de Ingreso</h5>
+                            <h5 class="mb-0">2. Escáner</h5>
                             <span class="badge bg-success"><span class="led-green" style="width: 8px; height: 8px;"></span> Grabando</span>
                         </div>
                         <div id="reader"></div>
@@ -91,11 +70,10 @@
                 <div class="col-lg-7">
                     <div class="card-panel d-none" id="seccionFirma">
                         <h4 class="text-success mb-1">¡Asistente Encontrado!</h4>
-                        <h3 id="nombreAsistenteDisplay" class="mb-1 text-white">Juan Pérez</h3>
-                        <p id="infoInvitado" class="text-warning mb-3 fw-bold"></p> <!-- Aquí dirá si es invitado de alguien -->
+                        <h3 id="nombreAsistenteDisplay" class="mb-1 text-white"></h3>
+                        <p id="infoInvitado" class="text-warning mb-3 fw-bold"></p>
                         
                         <div id="zonaFirmaPad">
-                            <p class="text-muted mb-2">Firma del trabajador:</p>
                             <canvas id="signature-pad"></canvas>
                             <div class="d-flex justify-content-between mt-3">
                                 <button class="btn btn-outline-danger btn-sm" id="btnLimpiarFirma">Borrar Firma</button>
@@ -123,22 +101,62 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 2: CRM (Fase 2) -->
+        <!-- PESTAÑA 2: CRM Y BLACKLIST -->
         <div class="tab-pane fade" id="crm" role="tabpanel">
-            <div class="card-panel text-center py-5">
-                <h3 class="text-muted">👥 Base de Datos en construcción</h3>
-                <p class="text-muted">Aquí estará la ficha de todos los extras y el botón para bloquearlos (Blacklist).</p>
+            <div class="card-panel">
+                <div class="row mb-3">
+                    <div class="col-md-8"><h5>Directorio de Trabajadores</h5></div>
+                    <div class="col-md-4"><input type="text" id="buscadorCRM" class="form-control" placeholder="🔍 Buscar por nombre o RUT..."></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle cursor-pointer">
+                        <thead><tr><th>RUT</th><th>Nombre Completo</th><th>Teléfono</th><th>Estado</th><th>Perfil</th></tr></thead>
+                        <tbody id="tablaCRM"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <!-- PESTAÑA 3: FINANZAS (Fase 3) -->
+        <!-- PESTAÑA 3: FINANZAS -->
         <div class="tab-pane fade" id="finanzas" role="tabpanel">
-            <div class="card-panel text-center py-5">
-                <h3 class="text-muted">💰 Bóveda Financiera en construcción</h3>
-                <p class="text-muted">Aquí estarán los botones de pago diario, semanal y contabilidad del mes.</p>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card-panel text-center">
+                        <h4 style="color: #00d26a;">Pagos Diarios (Banco)</h4>
+                        <p class="text-muted">Descarga la nómina masiva del banco Santander para los asistentes del programa activo de hoy.</p>
+                        <button class="btn btn-success w-100 fw-bold py-3" id="btnExcelBanco">🏦 Descargar Nómina Banco Hoy</button>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card-panel text-center">
+                        <h4 style="color: #ffcc00;">Cierre Mensual (Contador)</h4>
+                        <p class="text-muted">Genera el archivo I.M.T. con la suma de todos los programas del mes actual.</p>
+                        <button class="btn btn-warning text-dark w-100 fw-bold py-3" id="btnExcelContador">📊 Descargar Reporte Mes Actual</button>
+                    </div>
+                </div>
             </div>
         </div>
 
+    </div>
+</div>
+
+<!-- MODAL FICHA TÉCNICA (CRM) -->
+<div class="modal fade" id="modalFicha" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #333;">
+            <div class="modal-header" style="border-bottom: 1px solid #333;">
+                <h5 class="modal-title" style="color: #b066ff;">Ficha Técnica</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contenidoFicha" style="font-size: 0.9em;">
+                <!-- Se llena con JS -->
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #333; display: flex; flex-direction: column;">
+                <input type="text" id="motivoBloqueo" class="form-control mb-2" placeholder="Motivo de bloqueo (Ej: Falta grave, no asistió)">
+                <button type="button" class="btn btn-danger w-100 fw-bold" id="btnBloquear">Bloquear Usuario (Blacklist)</button>
+                <button type="button" class="btn btn-success w-100 fw-bold d-none" id="btnDesbloquear">Desbloquear Usuario</button>
+            </div>
+        </div>
     </div>
 </div>
 
