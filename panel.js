@@ -60,8 +60,10 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
         for (const rut in asistencias) {
             const asis = asistencias[rut];
             const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
+            const numeroMostrado = asis.numero_asignado || '-'; // Si no tiene número guardado, muestra un guion
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
+            // AGREGADA LA COLUMNA CON EL NÚMERO
+            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${numeroMostrado}</span></td><td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
         }
     });
@@ -98,6 +100,8 @@ async function onScanSuccess(decodedText) {
             } else { infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; }
 
             document.getElementById('seccionFirma').classList.remove('d-none');
+            // Limpiamos la firma y el cuadro del número cada vez que escaneamos a alguien nuevo
+            document.getElementById('numeroAsignado').value = "";
             if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad'));
             signaturePad.clear(); document.getElementById('mensajeEscaneo').classList.add('d-none');
         } else {
@@ -110,15 +114,27 @@ async function onScanSuccess(decodedText) {
 document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 
 document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
+    // 1. VALIDAR QUE EL NÚMERO SE HAYA ESCRITO
+    const numeroAsignado = document.getElementById('numeroAsignado').value.trim();
+    if (!numeroAsignado) return alert("Por favor, asígnale un Número de Identificación (Ticket) antes de guardar.");
+    
+    // 2. VALIDAR LA FIRMA
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
+    
     const firmaBase64 = signaturePad.toDataURL(); 
     const horaActual = new Date().toLocaleTimeString(); 
     const tipo = document.getElementById('infoInvitado').innerText.includes("CORTESÍA") ? "Cortesía" : "Pago";
 
     try {
         await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
-            rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), 
-            tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente" 
+            rut: rutActual, 
+            nombre_programa: nombrePrograma, 
+            monto: (tipo === "Pago" ? montoPago : 0), 
+            tipo_ingreso: tipo, 
+            hora_ingreso: horaActual, 
+            firma_digital: firmaBase64, 
+            estado_pago: "Pendiente",
+            numero_asignado: numeroAsignado // <-- GUARDAMOS EL NÚMERO
         });
         document.getElementById('seccionFirma').classList.add('d-none');
         signaturePad.clear(); html5QrcodeScanner.resume(); rutActual = "";
@@ -231,7 +247,6 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
     }
 });
 
-// BOTÓN: LIQUIDAR BÓVEDA SEMANAL
 document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) return alert("No hay plata retenida para liquidar.");
     if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Estás seguro de liquidar TODOS los pagos pendientes?\n\nEsto descargará el archivo del banco y dejará la bóveda en cero.")) return;
@@ -253,29 +268,20 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     } catch (error) { alert("Error al procesar la liquidación."); }
 });
 
-// BOTÓN: PAGO DIARIO (Con Seguro Anti-Pagos Dobles)
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     if (!nombrePrograma) return alert("Ve a la pestaña Puerta y abre un programa primero.");
-    
-    // Seguro para Dale Play
     if (nombrePrograma === "Dale Play") {
         if (!confirm("⚠️ ATENCIÓN: Seleccionaste 'Dale Play'.\n\nEste programa normalmente se acumula en la semana. Si descargas esta nómina diaria, estas personas desaparecerán de la Bóveda del viernes.\n\n¿Estás completamente seguro de pagar 'Dale Play' de forma diaria hoy?")) return;
     } else {
         if (!confirm(`¿Descargar nómina diaria para ${nombrePrograma}?\n\nAl confirmar, los asistentes de HOY se marcarán como PAGADOS y no se irán a la Bóveda Semanal.`)) return;
     }
-
     try {
         const snap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`)));
         if (!snap.exists()) return alert("No hay asistentes hoy.");
-        
         const asistencias = snap.val();
         let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
-        
-        let actualizacionesFirebase = {};
-        let hayPagosNuevos = false;
-
+        let actualizacionesFirebase = {}; let hayPagosNuevos = false;
         for (const r in asistencias) {
-            // Solo sacamos a los que están "Pendientes"
             if (asistencias[r].estado_pago === "Pendiente" && asistencias[r].monto > 0) {
                 hayPagosNuevos = true;
                 const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
@@ -283,22 +289,16 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
                     const rutSin = r.replace(/[^0-9kK]/g, '');
                     csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${asistencias[r].monto};;${tr.email || ''};;${nombrePrograma};PAGO NAT\n`;
                 }
-                // Orden de actualización a "Pagado"
                 actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${r}/estado_pago`] = "Pagado";
             }
         }
-
         if (!hayPagosNuevos) return alert("Todas las personas del programa de hoy ya fueron marcadas como Pagadas anteriormente.");
-
-        // Ejecutar actualización y descarga
         await update(ref(db), actualizacionesFirebase);
         descargarCSV(csv, `Nomina_Banco_DIARIA_${nombrePrograma.replace(/ /g, "_")}_${fechaPrograma}.csv`);
-        
         alert("¡Nómina diaria descargada!\n\nLos asistentes fueron descontados de la Bóveda Semanal para evitar pagos dobles.");
     } catch (e) { alert("Error al generar Excel Diario."); console.error(e); }
 });
 
-// EXCEL MENSUAL (CONTADOR)
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
     const mes = new Date().toISOString().substring(0, 7);
     if (!confirm(`¿Descargar reporte contable de ${mes}?`)) return;
