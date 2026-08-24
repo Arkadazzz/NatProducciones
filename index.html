@@ -9,19 +9,13 @@
     <style>
         body { background-color: #0a0a0a; color: #ffffff; font-family: 'Segoe UI', system-ui, sans-serif; }
         .card-registro { background: #141414; border: 1px solid #2a2a2a; border-radius: 15px; padding: 30px; margin-top: 30px; margin-bottom: 30px; box-shadow: 0 5px 20px rgba(138, 43, 226, 0.1); }
-        
-        /* CORRECCIÓN DE CONTRASTES PARA CAJAS DE TEXTO Y LABELS */
         .form-label { color: #dddddd; font-weight: 500; }
         .text-muted { color: #aaaaaa !important; }
-        
         .form-control, .form-select { background-color: #222222 !important; border: 1px solid #444444 !important; color: #ffffff !important; border-radius: 8px; }
         .form-control:focus, .form-select:focus { border-color: #b066ff !important; box-shadow: 0 0 8px rgba(176, 102, 255, 0.5) !important; background-color: #222222 !important; color: #ffffff !important;}
         .form-control::placeholder { color: #999999 !important; opacity: 1; }
-        
-        /* BOTONES MÁS BRILLANTES */
         .btn-primary { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; padding: 12px; font-weight: bold; text-transform: uppercase; color: white; }
         .btn-primary:hover { background: linear-gradient(135deg, #9d4edd, #7b2cbf); transform: translateY(-2px); transition: 0.3s; color: white; }
-        
         .alert-custom { background: #1a1a1a; border: 1px solid #b066ff; color: #ffffff; }
     </style>
 </head>
@@ -33,17 +27,13 @@
             <h4 id="encabezadoFormulario" style="color: #b066ff; font-weight: bold;">Acreditación</h4>
         </div>
 
-        <!-- Pantalla de Espera -->
         <div id="pantallaSinEvento" class="text-center py-4">
             <div class="spinner-border mb-3" style="color: #b066ff;" role="status" id="spinnerCarga"></div>
             <h5 class="text-warning fw-bold d-none" id="msgSinEvento">Inscripciones Cerradas</h5>
-            <p class="text-muted d-none" id="subMsgSinEvento">El equipo de producción aún no ha habilitado un programa para hoy. Espera instrucciones.</p>
+            <p class="text-muted d-none" id="subMsgSinEvento">El equipo de producción aún no ha habilitado un programa para hoy.</p>
         </div>
 
-        <!-- Formulario Principal -->
         <div id="formularioPrincipal" class="d-none">
-            
-            <!-- Banner Mágico -->
             <div class="alert alert-custom text-center mb-4">
                 <span class="badge bg-success mb-2 fs-6">Inscripciones Abiertas</span>
                 <h5 class="mb-1 text-white fw-bold" id="lblProgramaActivo">CARGANDO...</h5>
@@ -59,12 +49,10 @@
                     </div>
                 </div>
 
-                <!-- DATOS PERSONALES -->
                 <div id="camposExtras" class="d-none">
                     <div class="alert alert-warning py-2 mb-3 mt-3 fw-bold text-center" style="font-size: 0.9em; background: #2a2000; border: 1px solid #ffcc00; color: #ffcc00;">
-                        Vemos que es tu primera vez. Completa tus datos de pago (Solo se pedirán esta vez).
+                        Primera vez: Completa tus datos de pago (Solo se pedirán esta vez).
                     </div>
-                    
                     <div class="row mt-3">
                         <div class="col-md-6 mb-3"><label class="form-label">Nombres</label><input type="text" class="form-control" id="nombres"></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Apellidos</label><input type="text" class="form-control" id="apellidos"></div>
@@ -77,10 +65,10 @@
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3"><label class="form-label">Dirección Completa</label><input type="text" class="form-control" id="direccion" placeholder="Ej: Ernesto Hevia 5880, La Reina"></div>
+                    <div class="mb-3"><label class="form-label">Dirección Completa</label><input type="text" class="form-control" id="direccion"></div>
                     <div class="row">
                         <div class="col-md-6 mb-3"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="telefono" placeholder="+569..."></div>
-                        <div class="col-md-6 mb-3"><label class="form-label">Correo Electrónico</label><input type="email" class="form-control" id="email" placeholder="ejemplo@correo.com"></div>
+                        <div class="col-md-6 mb-3"><label class="form-label">Correo Electrónico</label><input type="email" class="form-control" id="email"></div>
                     </div>
                     <h5 class="mt-4 mb-3" style="color: #d6b3ff; border-bottom: 1px solid #333; padding-bottom: 10px; font-weight: bold;">Contratación y Pago</h5>
                     <div class="row">
@@ -110,40 +98,30 @@
                     </div>
                 </div>
 
-                <!-- SECCIÓN DE ASISTENCIA -->
+                <!-- SECCIÓN DE ASISTENCIA AUTOMATIZADA -->
                 <div id="seccionRSVP" class="d-none mt-4 p-4 rounded" style="background: #1a1a1a; border: 1px solid #333;">
-                    <h5 class="mb-3 fw-bold" style="color: #b066ff;">Confirma tu Asistencia</h5>
+                    <h5 class="mb-3 fw-bold" style="color: #b066ff;">Confirmar Asistencia</h5>
                     
-                    <div id="zonaCortesia" class="d-none">
-                        <div class="mb-3">
-                            <label class="form-label">¿Cómo asistes al programa hoy?</label>
-                            <select class="form-select" id="tipoAsistencia">
-                                <option value="Extra">Vengo a trabajar (Staff / Extra)</option>
-                                <option value="Cortesía">Soy invitado de cortesía</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3 d-none" id="divInvitadoPor">
-                            <label class="form-label text-warning fw-bold">¿Qué trabajador te invitó?</label>
-                            <select class="form-select" id="invitadoPor" style="border-color: #ffc107 !important;">
-                                <option value="">Selecciona su nombre...</option>
-                                <option value="Luis Jorquera">Luis Jorquera</option>
-                                <option value="Agustin Pino">Agustin Pino</option>
-                                <option value="Martina Pino">Martina Pino</option>
-                                <option value="Ariela Rojas">Ariela Rojas</option>
-                                <option value="Javier Rojas">Javier Rojas</option>
-                                <option value="Matias Puentes">Matias Puentes</option>
-                                <option value="Mario Orbenes">Mario Orbenes</option>
-                                <option value="Hana Lizama">Hana Lizama</option>
-                                <option value="Fakundo">Fakundo</option>
-                            </select>
-                        </div>
+                    <div class="mb-3 d-none" id="divInvitadoPor">
+                        <label class="form-label text-warning fw-bold">¿Qué trabajador te invitó?</label>
+                        <select class="form-select" id="invitadoPor" style="border-color: #ffc107 !important; background-color: #2a2000 !important;">
+                            <option value="">Selecciona su nombre...</option>
+                            <option value="Luis Jorquera">Luis Jorquera</option>
+                            <option value="Agustin Pino">Agustin Pino</option>
+                            <option value="Martina Pino">Martina Pino</option>
+                            <option value="Ariela Rojas">Ariela Rojas</option>
+                            <option value="Javier Rojas">Javier Rojas</option>
+                            <option value="Matias Puentes">Matias Puentes</option>
+                            <option value="Mario Orbenes">Mario Orbenes</option>
+                            <option value="Hana Lizama">Hana Lizama</option>
+                            <option value="Fakundo">Fakundo</option>
+                        </select>
                     </div>
 
                     <div class="form-check mt-4 mb-3">
                         <input class="form-check-input" type="checkbox" id="aceptoTerminos">
                         <label class="form-check-label text-muted" for="aceptoTerminos" style="font-size: 0.85em;">
-                            Confirmo mi asistencia al programa y acepto el uso de mis datos para fines de acreditación y remuneraciones.
+                            Confirmo mi asistencia al programa y acepto el uso de mis datos.
                         </label>
                     </div>
 
