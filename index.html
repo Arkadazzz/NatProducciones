@@ -13,7 +13,6 @@
         .text-muted { color: #aaaaaa !important; }
         .form-control, .form-select { background-color: #222222 !important; border: 1px solid #444444 !important; color: #ffffff !important; border-radius: 8px; }
         .form-control:focus, .form-select:focus { border-color: #b066ff !important; box-shadow: 0 0 8px rgba(176, 102, 255, 0.5) !important; background-color: #222222 !important; color: #ffffff !important;}
-        .form-control::placeholder { color: #999999 !important; opacity: 1; }
         .btn-primary { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; padding: 12px; font-weight: bold; text-transform: uppercase; color: white; }
         .btn-primary:hover { background: linear-gradient(135deg, #9d4edd, #7b2cbf); transform: translateY(-2px); transition: 0.3s; color: white; }
         .alert-custom { background: #1a1a1a; border: 1px solid #b066ff; color: #ffffff; }
@@ -30,7 +29,13 @@
         <div id="pantallaSinEvento" class="text-center py-4">
             <div class="spinner-border mb-3" style="color: #b066ff;" role="status" id="spinnerCarga"></div>
             <h5 class="text-warning fw-bold d-none" id="msgSinEvento">Inscripciones Cerradas</h5>
-            <p class="text-muted d-none" id="subMsgSinEvento">El equipo de producción aún no ha habilitado un programa para hoy.</p>
+            <p class="text-muted d-none" id="subMsgSinEvento">El equipo de producción aún no ha habilitado programas para hoy.</p>
+        </div>
+
+        <!-- NUEVA PANTALLA: SELECCIÓN MULTI-PROGRAMA -->
+        <div id="pantallaSeleccion" class="d-none text-center py-4">
+            <h5 class="mb-4 text-white fw-bold">¿A qué programa asistes hoy?</h5>
+            <div id="botonesProgramas" class="d-flex flex-column gap-3"></div>
         </div>
 
         <div id="formularioPrincipal" class="d-none">
@@ -60,9 +65,7 @@
                     <div class="row">
                         <div class="col-md-6 mb-3"><label class="form-label">Fecha de Nacimiento</label><input type="date" class="form-control" id="fechaNacimiento"></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Sexo</label>
-                            <select class="form-select" id="sexo">
-                                <option value="">Selecciona...</option><option value="M">Masculino</option><option value="F">Femenino</option>
-                            </select>
+                            <select class="form-select" id="sexo"><option value="">Selecciona...</option><option value="M">Masculino</option><option value="F">Femenino</option></select>
                         </div>
                     </div>
                     <div class="mb-3"><label class="form-label">Dirección Completa</label><input type="text" class="form-control" id="direccion"></div>
@@ -73,32 +76,23 @@
                     <h5 class="mt-4 mb-3" style="color: #d6b3ff; border-bottom: 1px solid #333; padding-bottom: 10px; font-weight: bold;">Contratación y Pago</h5>
                     <div class="row">
                         <div class="col-md-6 mb-3"><label class="form-label">AFP</label>
-                            <select class="form-select" id="afp">
-                                <option value="">Selecciona...</option><option value="CAPITAL">Capital</option><option value="CUPRUM">Cuprum</option><option value="HABITAT">Habitat</option><option value="MODELO">Modelo</option><option value="PLANVITAL">PlanVital</option><option value="PROVIDA">ProVida</option><option value="UNO">Uno</option>
-                            </select>
+                            <select class="form-select" id="afp"><option value="">Selecciona...</option><option value="CAPITAL">Capital</option><option value="CUPRUM">Cuprum</option><option value="HABITAT">Habitat</option><option value="MODELO">Modelo</option><option value="PLANVITAL">PlanVital</option><option value="PROVIDA">ProVida</option><option value="UNO">Uno</option></select>
                         </div>
                         <div class="col-md-6 mb-3"><label class="form-label">Salud</label>
-                            <select class="form-select" id="salud">
-                                <option value="">Selecciona...</option><option value="FONASA">Fonasa</option><option value="BANMEDICA">Banmédica</option><option value="COLMENA">Colmena</option><option value="CONSALUD">Consalud</option><option value="CRUZBLANCA">Cruz Blanca</option><option value="NUEVAMASVIDA">Nueva Masvida</option><option value="VIDATRES">Vida Tres</option>
-                            </select>
+                            <select class="form-select" id="salud"><option value="">Selecciona...</option><option value="FONASA">Fonasa</option><option value="BANMEDICA">Banmédica</option><option value="COLMENA">Colmena</option><option value="CONSALUD">Consalud</option><option value="CRUZBLANCA">Cruz Blanca</option><option value="NUEVAMASVIDA">Nueva Masvida</option><option value="VIDATRES">Vida Tres</option></select>
                         </div>
                     </div>
                     <div class="mb-3"><label class="form-label">Banco</label>
-                        <select class="form-select" id="banco">
-                            <option value="">Selecciona...</option><option value="ESTADO">Banco Estado</option><option value="CHILE">Banco de Chile</option><option value="BCI">BCI</option><option value="SANTANDER">Santander</option><option value="ITAU">Itaú</option><option value="SCOTIABANK">Scotiabank</option><option value="FALABELLA">Falabella</option><option value="BICE">BICE</option><option value="SECURITY">Security</option><option value="CONSORCIO">Consorcio</option><option value="RIPLEY">Ripley</option>
-                        </select>
+                        <select class="form-select" id="banco"><option value="">Selecciona...</option><option value="ESTADO">Banco Estado</option><option value="CHILE">Banco de Chile</option><option value="BCI">BCI</option><option value="SANTANDER">Santander</option><option value="ITAU">Itaú</option><option value="SCOTIABANK">Scotiabank</option><option value="FALABELLA">Falabella</option><option value="BICE">BICE</option><option value="SECURITY">Security</option><option value="CONSORCIO">Consorcio</option><option value="RIPLEY">Ripley</option></select>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3"><label class="form-label">Tipo de Cuenta</label>
-                            <select class="form-select" id="tipoCuenta">
-                                <option value="">Selecciona...</option><option value="CUENTA_RUT">Cuenta RUT</option><option value="CUENTA_CORRIENTE">Cuenta Corriente</option><option value="CUENTA_VISTA">Cuenta Vista / Ahorro</option>
-                            </select>
+                            <select class="form-select" id="tipoCuenta"><option value="">Selecciona...</option><option value="CUENTA_RUT">Cuenta RUT</option><option value="CUENTA_CORRIENTE">Cuenta Corriente</option><option value="CUENTA_VISTA">Cuenta Vista / Ahorro</option></select>
                         </div>
                         <div class="col-md-6 mb-3"><label class="form-label">N° de Cuenta</label><input type="text" class="form-control" id="numeroCuenta"></div>
                     </div>
                 </div>
 
-                <!-- SECCIÓN DE ASISTENCIA AUTOMATIZADA -->
                 <div id="seccionRSVP" class="d-none mt-4 p-4 rounded" style="background: #1a1a1a; border: 1px solid #333;">
                     <h5 class="mb-3 fw-bold" style="color: #b066ff;">Confirmar Asistencia</h5>
                     
@@ -136,7 +130,7 @@
             <p class="text-muted">Muestra este código en la puerta del canal:</p>
             <div id="codigoQR" class="d-inline-block bg-white p-3 rounded shadow mb-3"></div>
             <br>
-            <button class="btn btn-outline-light fw-bold px-4 py-2 mt-2" onclick="window.location.reload()">Registrar a otra persona</button>
+            <button class="btn btn-outline-light fw-bold px-4 py-2 mt-2" onclick="window.location.reload()">Volver al Inicio</button>
         </div>
     </div>
 </div>
