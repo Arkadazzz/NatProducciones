@@ -24,8 +24,15 @@ let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let rutActua
 let html5QrcodeScanner; let signaturePad;
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
+// Variables para los contadores sincronizados
+let totalEsperados = 0;
+let totalFirmados = 0;
+
+// Precargar el CRM al iniciar (para tener los nombres en la tabla en vivo)
+get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
+
 // ==========================================
-// PESTAÑA 1: PUERTA Y ESCÁNER
+// PESTAÑA 1: PUERTA, ESCÁNER Y MONITOREO
 // ==========================================
 document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     nombrePrograma = document.getElementById('nombrePrograma').value.trim();
@@ -40,25 +47,52 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
     html5QrcodeScanner.render(onScanSuccess, () => {});
 
+    // SINCRONIZACIÓN 1: Cuántos han llenado el formulario hoy (RSVP)
     onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
-        document.getElementById('contadorEsperados').innerText = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+        totalEsperados = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+        actualizarTablero();
+    });
+
+    // SINCRONIZACIÓN 2: Cuántos ya firmaron y entraron (Asistencias)
+    onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
+        const asistencias = snapshot.exists() ? snapshot.val() : {};
+        totalFirmados = Object.keys(asistencias).length;
+        actualizarTablero();
+        
+        // Redibujar la tabla automáticamente para todos los computadores
+        const tbody = document.getElementById('tablaAsistentes');
+        tbody.innerHTML = "";
+        for (const rut in asistencias) {
+            const asis = asistencias[rut];
+            const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
+            tbody.appendChild(tr);
+        }
     });
 });
+
+function actualizarTablero() {
+    document.getElementById('contEsperados').innerText = totalEsperados;
+    document.getElementById('contFirmados').innerText = totalFirmados;
+    let faltan = totalEsperados - totalFirmados;
+    document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
+}
 
 async function onScanSuccess(decodedText) {
     html5QrcodeScanner.pause(); document.getElementById('mensajeEscaneo').classList.remove('d-none');
     rutActual = decodedText; 
 
     try {
-        const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
+        const blacklistSnap = await get(child(ref(db, `4_blacklist/${rutActual}`)));
         if (blacklistSnap.exists()) {
             alert(`⛔ ACCESO DENEGADO ⛔\nMotivo: ${blacklistSnap.val().motivo}`);
             html5QrcodeScanner.resume(); document.getElementById('mensajeEscaneo').classList.add('d-none');
             return;
         }
 
-        const reservaSnap = await get(child(ref(db), `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`));
-        const snapshot = await get(child(ref(db), `1_trabajadores/${rutActual}`));
+        const reservaSnap = await get(child(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`)));
+        const snapshot = await get(child(ref(db, `1_trabajadores/${rutActual}`)));
         
         if (snapshot.exists()) {
             const datos = snapshot.val();
@@ -87,20 +121,23 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
     const tipo = document.getElementById('infoInvitado').innerText.includes("CORTESÍA") ? "Cortesía" : "Pago";
 
     try {
-        // AGREGAMOS estado_pago: 'Pendiente' para la bóveda semanal
         await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
             rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), 
             tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente" 
         });
-        const tr = document.createElement('tr'); tr.id = `fila-${rutActual}`;
-        tr.innerHTML = `<td>${document.getElementById('nombreAsistenteDisplay').innerText}</td><td>${horaActual}</td><td><span class="badge ${tipo === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${tipo}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rutActual}')">X</button></td>`;
-        document.getElementById('tablaAsistentes').appendChild(tr);
-        document.getElementById('contadorAsistentes').innerText = parseInt(document.getElementById('contadorAsistentes').innerText) + 1;
+        
+        // Ya no agregamos la fila manualmente aquí, porque el 'onValue' de arriba detectará el cambio y lo dibujará para TODOS.
         document.getElementById('seccionFirma').classList.add('d-none');
         signaturePad.clear(); html5QrcodeScanner.resume(); rutActual = "";
     } catch (error) { alert("Error al guardar."); }
 });
-window.anularAsistencia = function(rut) { if(confirm("¿Anular?")) { document.getElementById(`fila-${rut}`).remove(); document.getElementById('contadorAsistentes').innerText = parseInt(document.getElementById('contadorAsistentes').innerText) - 1; } }
+
+window.anularAsistencia = async function(rut) { 
+    if(confirm("¿Seguro que deseas anular esta asistencia?")) { 
+        await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); 
+        // El 'onValue' automáticamente quitará la fila de la tabla en todas las pantallas.
+    } 
+}
 
 // ==========================================
 // PESTAÑA 2: CRM Y BLACKLIST
@@ -173,38 +210,26 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 // ==========================================
 // PESTAÑA 3: FINANZAS Y BÓVEDA
 // ==========================================
-
-// CARGAR LA BÓVEDA SEMANAL AL ENTRAR A LA PESTAÑA FINANZAS
 document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias'));
     if (!snap.exists()) return;
-    
-    // Obtenemos los datos de CRM para cruzar los nombres
     if(Object.keys(listaGlobalCRM).length === 0) {
         const trabSnap = await get(ref(db, '1_trabajadores'));
         if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     }
-
-    let deudas = {};
-    const todas = snap.val();
-    
-    // Recorrer toda la base buscando pagos "Pendientes"
+    let deudas = {}; const todas = snap.val();
     for (const fecha in todas) {
         for (const prog in todas[fecha]) {
             for (const r in todas[fecha][prog]) {
                 const asis = todas[fecha][prog][r];
                 if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
                     if (!deudas[r]) deudas[r] = { monto: 0, dias: 0, rutas_bd: [] };
-                    deudas[r].monto += parseInt(asis.monto);
-                    deudas[r].dias += 1;
-                    deudas[r].rutas_bd.push(`2_asistencias/${fecha}/${prog}/${r}`); // Guardamos la ruta para marcarlo como pagado después
+                    deudas[r].monto += parseInt(asis.monto); deudas[r].dias += 1; deudas[r].rutas_bd.push(`2_asistencias/${fecha}/${prog}/${r}`);
                 }
             }
         }
     }
-    
-    window.deudasGlobales = deudas; // Lo guardamos global para el botón de liquidar
-    
+    window.deudasGlobales = deudas;
     const tbody = document.getElementById('tablaDeudas'); tbody.innerHTML = "";
     for (const r in deudas) {
         const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
@@ -214,44 +239,27 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
     }
 });
 
-// BOTÓN: LIQUIDAR SEMANA (El corazón de la bóveda)
 document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) return alert("No hay plata retenida para liquidar.");
-    
-    if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Estás seguro de liquidar TODOS los pagos pendientes?\n\nEsto descargará el archivo del banco y marcará todas estas deudas como 'Pagadas', dejando la bóveda en cero.")) return;
-
+    if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Estás seguro de liquidar TODOS los pagos pendientes?\n\nEsto descargará el archivo del banco y dejará la bóveda en cero.")) return;
     const fechaHoy = new Date().toISOString().split('T')[0];
     let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
     let actualizacionesFirebase = {};
-
     for (const r in window.deudasGlobales) {
-        const deuda = window.deudasGlobales[r];
-        const tr = listaGlobalCRM[r];
+        const deuda = window.deudasGlobales[r]; const tr = listaGlobalCRM[r];
         if (tr) {
             const rutSin = r.replace(/[^0-9kK]/g, '');
             csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT\n`;
         }
-        
-        // Preparar las órdenes para decirle a la base de datos "Ya se le pagó"
-        for (const ruta of deuda.rutas_bd) {
-            actualizacionesFirebase[`${ruta}/estado_pago`] = "Pagado";
-        }
+        for (const ruta of deuda.rutas_bd) { actualizacionesFirebase[`${ruta}/estado_pago`] = "Pagado"; }
     }
-
     try {
-        // Ejecutar todas las actualizaciones juntas
         await update(ref(db), actualizacionesFirebase);
-        
-        // Descargar el archivo
         descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`);
-        
-        alert("¡Liquidación exitosa! La bóveda ha quedado vacía y el archivo de transferencias ha sido descargado.");
-        document.getElementById('tablaDeudas').innerHTML = ""; // Limpiar visualmente
-        window.deudasGlobales = {};
+        alert("¡Liquidación exitosa!"); document.getElementById('tablaDeudas').innerHTML = ""; window.deudasGlobales = {};
     } catch (error) { alert("Error al procesar la liquidación."); }
 });
 
-// EXCEL DIARIO
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     if (!nombrePrograma) return alert("Ve a la pestaña Puerta y abre un programa primero.");
     try {
@@ -270,7 +278,6 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     } catch (e) { alert("Error al generar Excel."); }
 });
 
-// EXCEL MENSUAL (CONTADOR)
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
     const mes = new Date().toISOString().substring(0, 7);
     if (!confirm(`¿Descargar reporte contable de ${mes}?`)) return;
