@@ -55,12 +55,12 @@
                 <div class="col-lg-5">
                     <div class="card-panel" id="seccionConfiguracion">
                         <h5>1. Activar Programa Web</h5>
-                        <p style="color: #aaaaaa; font-size: 0.85em;">Selecciona el programa. Las reglas del formulario se adaptarán solas.</p>
                         
                         <select id="nombrePrograma" class="form-select mb-3">
                             <option value="">-- Selecciona el Programa --</option>
                             <option value="Dale Play">Dale Play</option>
-                            <option value="Detrás del Muro">Detrás del Muro</option>
+                            <option value="Detrás del Muro I/P">Detrás del Muro I/P (Pagados)</option>
+                            <option value="Detrás del Muro Cortesía">Detrás del Muro Cortesía (Invitados)</option>
                         </select>
                         
                         <input type="date" id="fechaPrograma" class="form-control mb-3">
@@ -125,6 +125,12 @@
                                     <span class="text-success" id="contFirmados">0</span>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- NUEVA ZONA: CONTEO DE INVITADOS -->
+                        <div id="seccionConteoInvitados" class="d-none mb-4 p-3 rounded" style="background: #1a1400; border: 1px solid #ffcc00;">
+                            <h6 style="color: #ffcc00; font-weight: bold; margin-bottom: 10px;">🏆 Llegadas de Cortesía (Por Staff)</h6>
+                            <div id="listaConteoInvitados" class="d-flex flex-wrap gap-2"></div>
                         </div>
 
                         <div class="table-responsive">
