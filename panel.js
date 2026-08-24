@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getDatabase, ref, get, set, remove, child, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+import { getDatabase, ref, get, set, remove, child, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
@@ -46,19 +46,15 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
 });
 
 async function onScanSuccess(decodedText) {
-    html5QrcodeScanner.pause();
-    document.getElementById('mensajeEscaneo').classList.remove('d-none');
+    html5QrcodeScanner.pause(); document.getElementById('mensajeEscaneo').classList.remove('d-none');
     rutActual = decodedText; 
 
     try {
-        // SEGURIDAD: Revisar Blacklist Primero
         const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
         if (blacklistSnap.exists()) {
-            const motivo = blacklistSnap.val().motivo;
-            alert(`⛔ ACCESO DENEGADO ⛔\n\nEste RUT está bloqueado.\nMotivo: ${motivo}`);
-            html5QrcodeScanner.resume(); 
-            document.getElementById('mensajeEscaneo').classList.add('d-none');
-            return; // Bloquea el flujo aquí
+            alert(`⛔ ACCESO DENEGADO ⛔\nMotivo: ${blacklistSnap.val().motivo}`);
+            html5QrcodeScanner.resume(); document.getElementById('mensajeEscaneo').classList.add('d-none');
+            return;
         }
 
         const reservaSnap = await get(child(ref(db), `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`));
@@ -67,7 +63,6 @@ async function onScanSuccess(decodedText) {
         if (snapshot.exists()) {
             const datos = snapshot.val();
             document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
-            
             const infoInvitado = document.getElementById('infoInvitado');
             if (reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía") {
                 infoInvitado.innerText = `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})`;
@@ -75,8 +70,7 @@ async function onScanSuccess(decodedText) {
 
             document.getElementById('seccionFirma').classList.remove('d-none');
             if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad'));
-            signaturePad.clear(); 
-            document.getElementById('mensajeEscaneo').classList.add('d-none');
+            signaturePad.clear(); document.getElementById('mensajeEscaneo').classList.add('d-none');
         } else {
             alert("RUT no encontrado en la base de datos.");
             html5QrcodeScanner.resume(); document.getElementById('mensajeEscaneo').classList.add('d-none');
@@ -93,7 +87,11 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
     const tipo = document.getElementById('infoInvitado').innerText.includes("CORTESÍA") ? "Cortesía" : "Pago";
 
     try {
-        await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64 });
+        // AGREGAMOS estado_pago: 'Pendiente' para la bóveda semanal
+        await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
+            rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), 
+            tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente" 
+        });
         const tr = document.createElement('tr'); tr.id = `fila-${rutActual}`;
         tr.innerHTML = `<td>${document.getElementById('nombreAsistenteDisplay').innerText}</td><td>${horaActual}</td><td><span class="badge ${tipo === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${tipo}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rutActual}')">X</button></td>`;
         document.getElementById('tablaAsistentes').appendChild(tr);
@@ -117,13 +115,10 @@ document.getElementById('crm-tab').addEventListener('click', async () => {
 function renderCRM(datos) {
     const tbody = document.getElementById('tablaCRM'); tbody.innerHTML = "";
     for (const rut in datos) {
-        const p = datos[rut];
-        const bloqueado = blacklistGlobal[rut] ? true : false;
+        const p = datos[rut]; const bloqueado = blacklistGlobal[rut] ? true : false;
         const estadoBadge = bloqueado ? '<span class="badge bg-danger">Bloqueado</span>' : '<span class="badge bg-success">Activo</span>';
-        
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${rut}</td><td>${p.nombres} ${p.apellidos}</td><td>${p.telefono || '-'}</td><td>${estadoBadge}</td>
-                        <td><button class="btn btn-outline-info btn-sm" onclick="verPerfil('${rut}')">Ver Ficha</button></td>`;
+        tr.innerHTML = `<td>${rut}</td><td>${p.nombres} ${p.apellidos}</td><td>${p.telefono || '-'}</td><td>${estadoBadge}</td><td><button class="btn btn-outline-info btn-sm" onclick="verPerfil('${rut}')">Ver Ficha</button></td>`;
         tbody.appendChild(tr);
     }
 }
@@ -140,30 +135,20 @@ document.getElementById('buscadorCRM').addEventListener('input', (e) => {
 
 let rutPerfilActual = "";
 window.verPerfil = function(rut) {
-    rutPerfilActual = rut;
-    const p = listaGlobalCRM[rut];
+    rutPerfilActual = rut; const p = listaGlobalCRM[rut];
     document.getElementById('contenidoFicha').innerHTML = `
         <p><strong>Nombres:</strong> ${p.nombres} ${p.apellidos}</p>
         <p><strong>Fecha Nacimiento:</strong> ${p.fechaNacimiento || '-'} | <strong>Sexo:</strong> ${p.sexo || '-'}</p>
         <p><strong>RUT:</strong> ${p.rut} | <strong>Tel:</strong> ${p.telefono || '-'}</p>
-        <p><strong>Dirección:</strong> ${p.direccion || '-'}</p>
-        <hr style="border-color: #333;">
+        <p><strong>Dirección:</strong> ${p.direccion || '-'}</p><hr style="border-color: #333;">
         <p><strong>Banco:</strong> ${p.banco || '-'} | <strong>Cuenta:</strong> ${p.tipoCuenta || '-'}</p>
-        <p><strong>N°:</strong> ${p.numeroCuenta || '-'}</p>
-        <p><strong>AFP:</strong> ${p.afp || '-'} | <strong>Salud:</strong> ${p.salud || '-'}</p>
-    `;
+        <p><strong>N°:</strong> ${p.numeroCuenta || '-'}</p><p><strong>AFP:</strong> ${p.afp || '-'} | <strong>Salud:</strong> ${p.salud || '-'}</p>`;
     
     if (blacklistGlobal[rut]) {
-        document.getElementById('motivoBloqueo').classList.add('d-none');
-        document.getElementById('btnBloquear').classList.add('d-none');
-        document.getElementById('btnDesbloquear').classList.remove('d-none');
+        document.getElementById('motivoBloqueo').classList.add('d-none'); document.getElementById('btnBloquear').classList.add('d-none'); document.getElementById('btnDesbloquear').classList.remove('d-none');
     } else {
-        document.getElementById('motivoBloqueo').classList.remove('d-none');
-        document.getElementById('motivoBloqueo').value = "";
-        document.getElementById('btnBloquear').classList.remove('d-none');
-        document.getElementById('btnDesbloquear').classList.add('d-none');
+        document.getElementById('motivoBloqueo').classList.remove('d-none'); document.getElementById('motivoBloqueo').value = ""; document.getElementById('btnBloquear').classList.remove('d-none'); document.getElementById('btnDesbloquear').classList.add('d-none');
     }
-
     if(!modalFichaInstance) modalFichaInstance = new bootstrap.Modal(document.getElementById('modalFicha'));
     modalFichaInstance.show();
 }
@@ -179,16 +164,94 @@ document.getElementById('btnBloquear').addEventListener('click', async () => {
 });
 
 document.getElementById('btnDesbloquear').addEventListener('click', async () => {
-    if(confirm("¿Quitar de la lista negra y permitirle trabajar de nuevo?")) {
-        await remove(ref(db, `4_blacklist/${rutPerfilActual}`));
-        delete blacklistGlobal[rutPerfilActual];
+    if(confirm("¿Quitar de la lista negra?")) {
+        await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); delete blacklistGlobal[rutPerfilActual];
         modalFichaInstance.hide(); renderCRM(listaGlobalCRM); alert("Usuario desbloqueado.");
     }
 });
 
 // ==========================================
-// PESTAÑA 3: FINANZAS (Banco y Contador)
+// PESTAÑA 3: FINANZAS Y BÓVEDA
 // ==========================================
+
+// CARGAR LA BÓVEDA SEMANAL AL ENTRAR A LA PESTAÑA FINANZAS
+document.getElementById('finanzas-tab').addEventListener('click', async () => {
+    const snap = await get(ref(db, '2_asistencias'));
+    if (!snap.exists()) return;
+    
+    // Obtenemos los datos de CRM para cruzar los nombres
+    if(Object.keys(listaGlobalCRM).length === 0) {
+        const trabSnap = await get(ref(db, '1_trabajadores'));
+        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
+    }
+
+    let deudas = {};
+    const todas = snap.val();
+    
+    // Recorrer toda la base buscando pagos "Pendientes"
+    for (const fecha in todas) {
+        for (const prog in todas[fecha]) {
+            for (const r in todas[fecha][prog]) {
+                const asis = todas[fecha][prog][r];
+                if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
+                    if (!deudas[r]) deudas[r] = { monto: 0, dias: 0, rutas_bd: [] };
+                    deudas[r].monto += parseInt(asis.monto);
+                    deudas[r].dias += 1;
+                    deudas[r].rutas_bd.push(`2_asistencias/${fecha}/${prog}/${r}`); // Guardamos la ruta para marcarlo como pagado después
+                }
+            }
+        }
+    }
+    
+    window.deudasGlobales = deudas; // Lo guardamos global para el botón de liquidar
+    
+    const tbody = document.getElementById('tablaDeudas'); tbody.innerHTML = "";
+    for (const r in deudas) {
+        const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+        const fila = document.createElement('tr');
+        fila.innerHTML = `<td>${r}</td><td>${tr.nombres} ${tr.apellidos}</td><td><span class="badge bg-secondary">${deudas[r].dias} días</span></td><td class="text-success fw-bold fs-5">$${deudas[r].monto}</td>`;
+        tbody.appendChild(fila);
+    }
+});
+
+// BOTÓN: LIQUIDAR SEMANA (El corazón de la bóveda)
+document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
+    if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) return alert("No hay plata retenida para liquidar.");
+    
+    if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Estás seguro de liquidar TODOS los pagos pendientes?\n\nEsto descargará el archivo del banco y marcará todas estas deudas como 'Pagadas', dejando la bóveda en cero.")) return;
+
+    const fechaHoy = new Date().toISOString().split('T')[0];
+    let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
+    let actualizacionesFirebase = {};
+
+    for (const r in window.deudasGlobales) {
+        const deuda = window.deudasGlobales[r];
+        const tr = listaGlobalCRM[r];
+        if (tr) {
+            const rutSin = r.replace(/[^0-9kK]/g, '');
+            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT\n`;
+        }
+        
+        // Preparar las órdenes para decirle a la base de datos "Ya se le pagó"
+        for (const ruta of deuda.rutas_bd) {
+            actualizacionesFirebase[`${ruta}/estado_pago`] = "Pagado";
+        }
+    }
+
+    try {
+        // Ejecutar todas las actualizaciones juntas
+        await update(ref(db), actualizacionesFirebase);
+        
+        // Descargar el archivo
+        descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`);
+        
+        alert("¡Liquidación exitosa! La bóveda ha quedado vacía y el archivo de transferencias ha sido descargado.");
+        document.getElementById('tablaDeudas').innerHTML = ""; // Limpiar visualmente
+        window.deudasGlobales = {};
+    } catch (error) { alert("Error al procesar la liquidación."); }
+});
+
+// EXCEL DIARIO
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     if (!nombrePrograma) return alert("Ve a la pestaña Puerta y abre un programa primero.");
     try {
@@ -196,7 +259,6 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
         if (!snap.exists()) return alert("No hay asistentes hoy.");
         const asistencias = snap.val();
         let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
-
         for (const r in asistencias) {
             const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
             if (tr) {
@@ -208,9 +270,10 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     } catch (e) { alert("Error al generar Excel."); }
 });
 
+// EXCEL MENSUAL (CONTADOR)
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
     const mes = new Date().toISOString().substring(0, 7);
-    if (!confirm(`¿Descargar reporte de ${mes}?`)) return;
+    if (!confirm(`¿Descargar reporte contable de ${mes}?`)) return;
     try {
         const snap = await get(ref(db, '2_asistencias'));
         if (!snap.exists()) return alert("No hay asistencias.");
