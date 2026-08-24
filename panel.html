@@ -54,27 +54,32 @@
             <div class="row">
                 <div class="col-lg-5">
                     <div class="card-panel" id="seccionConfiguracion">
-                        <h5>1. Activar Programa Web</h5>
                         
+                        <!-- NUEVA SECCIÓN MULTI-SALA -->
+                        <h5 style="color: #00d26a;">🟢 Salas Activas</h5>
+                        <div id="contenedorProgramasActivos" class="mb-4">
+                            <!-- Se llena con JS -->
+                            <p class="text-muted" style="font-size: 0.9em;">Cargando...</p>
+                        </div>
+
+                        <hr style="border-color: #333;">
+
+                        <h5>➕ Abrir Nuevo Programa</h5>
                         <select id="nombrePrograma" class="form-select mb-3">
                             <option value="">-- Selecciona el Programa --</option>
                             <option value="Dale Play">Dale Play</option>
                             <option value="Detrás del Muro I/P">Detrás del Muro I/P (Pagados)</option>
                             <option value="Detrás del Muro Cortesía">Detrás del Muro Cortesía (Invitados)</option>
                         </select>
-                        
                         <input type="date" id="fechaPrograma" class="form-control mb-3">
-                        <input type="number" id="montoPago" class="form-control mb-3" placeholder="Monto a pagar al extra ($)">
+                        <input type="number" id="montoPago" class="form-control mb-3" placeholder="Monto a pagar ($)">
                         <button class="btn btn-custom w-100" id="btnActivarWeb">Publicar y Abrir Puertas</button>
                     </div>
 
                     <div class="card-panel d-none" id="seccionEscaner">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">2. Escáner</h5>
-                            <div>
-                                <span class="badge bg-success"><span class="led-green" style="width: 8px; height: 8px;"></span> Grabando</span>
-                                <button class="btn btn-outline-danger btn-sm ms-2 fw-bold" id="btnCerrarPuertas">Cerrar Puertas</button>
-                            </div>
+                            <h5 class="mb-0 text-white" id="tituloEscaner">Cargando...</h5>
+                            <button class="btn btn-outline-warning btn-sm ms-2 fw-bold" id="btnVolverMenu">🔙 Volver</button>
                         </div>
                         <div id="reader"></div>
                         <div id="mensajeEscaneo" class="alert mt-3 d-none text-center fw-bold" style="background: #2d1b4e; border: 1px solid #b066ff; color: #ffffff;">Buscando RUT...</div>
@@ -103,7 +108,7 @@
                         </div>
                     </div>
 
-                    <div class="card-panel" id="seccionLista">
+                    <div class="card-panel d-none" id="seccionLista">
                         <h5 class="mb-4"><span class="led-green"></span> Monitoreo en Vivo</h5>
                         
                         <div class="row mb-4">
@@ -127,7 +132,6 @@
                             </div>
                         </div>
 
-                        <!-- NUEVA ZONA: CONTEO DE INVITADOS -->
                         <div id="seccionConteoInvitados" class="d-none mb-4 p-3 rounded" style="background: #1a1400; border: 1px solid #ffcc00;">
                             <h6 style="color: #ffcc00; font-weight: bold; margin-bottom: 10px;">🏆 Llegadas de Cortesía (Por Staff)</h6>
                             <div id="listaConteoInvitados" class="d-flex flex-wrap gap-2"></div>
@@ -162,11 +166,14 @@
 
         <!-- PESTAÑA 3: FINANZAS Y BÓVEDA -->
         <div class="tab-pane fade" id="finanzas" role="tabpanel">
+            <div class="alert alert-info" style="background: #1c103f; border-color: #b066ff; color: white;">
+                <b>Nota:</b> Para usar los botones diarios, primero debes unirte a una "Sala Activa" en la pestaña de Control Puerta.
+            </div>
             <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card-panel text-center h-100">
                         <h4 style="color: #00d26a;">🏦 Pagos Diarios Inmediatos</h4>
-                        <p style="color: #aaaaaa;">Descarga la nómina del banco para los asistentes SOLO del programa de hoy.</p>
+                        <p style="color: #aaaaaa;">Descarga la nómina del banco para la sala seleccionada HOY.</p>
                         <button class="btn btn-outline-success w-100 fw-bold py-2 mt-2" id="btnExcelBanco">Descargar Nómina de HOY</button>
                     </div>
                 </div>
