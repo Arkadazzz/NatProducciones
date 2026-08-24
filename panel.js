@@ -24,89 +24,63 @@ let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let rutActua
 let html5QrcodeScanner = null; let signaturePad;
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
-let totalEsperados = 0;
-let totalFirmados = 0;
-window.siguienteTicketAutomatico = 1;
+let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico = 1;
 
-// Precargamos la base de datos de personas
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
 // ==========================================
 // PESTAÑA 1: PUERTA, ESCÁNER Y MONITOREO
 // ==========================================
-
-// 1. SINCRONIZACIÓN MAESTRA: Si cualquier PC abre las puertas, TODOS los PCs se enteran al instante
 onValue(ref(db, '0_estado_sistema/programa_activo'), (snapshot) => {
     if (snapshot.exists()) {
         const data = snapshot.val();
-        nombrePrograma = data.nombre;
-        fechaPrograma = data.fecha;
-        montoPago = data.monto;
+        nombrePrograma = data.nombre; fechaPrograma = data.fecha; montoPago = data.monto;
 
-        // Ocultar configuración y mostrar cámara
         document.getElementById('seccionConfiguracion').classList.add('d-none');
         document.getElementById('seccionEscaner').classList.remove('d-none');
         document.getElementById('seccionLista').classList.remove('d-none');
 
-        // Prender cámara solo si no estaba prendida ya
         if (!html5QrcodeScanner) {
             html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
             html5QrcodeScanner.render(onScanSuccess, () => {});
         }
-
-        // Encender Radares de Monitoreo para este programa
         activarRadares();
     } else {
-        // Alguien cerró las puertas, volver a la pantalla de configuración
         document.getElementById('seccionConfiguracion').classList.remove('d-none');
         document.getElementById('seccionEscaner').classList.add('d-none');
         document.getElementById('seccionFirma').classList.add('d-none');
-        
-        // Limpiar tabla visualmente
+        document.getElementById('seccionLista').classList.add('d-none');
         document.getElementById('tablaAsistentes').innerHTML = "";
-        document.getElementById('contEsperados').innerText = "0";
-        document.getElementById('contFirmados').innerText = "0";
-        document.getElementById('contFaltan').innerText = "0";
-
-        // Apagar cámara
-        if (html5QrcodeScanner) {
-            try { html5QrcodeScanner.clear(); } catch(e) {}
-            html5QrcodeScanner = null;
-        }
+        
+        if (html5QrcodeScanner) { try { html5QrcodeScanner.clear(); } catch(e) {} html5QrcodeScanner = null; }
     }
 });
 
-// 2. BOTÓN ACTIVAR (Ahora solo envía la orden a la nube, no cambia la pantalla directamente)
 document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
     if (!nom || !fec) return alert("Selecciona programa y fecha.");
-
     await set(ref(db, '0_estado_sistema/programa_activo'), { nombre: nom, fecha: fec, monto: mon });
 });
 
-// 3. BOTÓN CERRAR PUERTAS
 document.getElementById('btnCerrarPuertas').addEventListener('click', async () => {
-    if(confirm("¿Estás seguro de cerrar las puertas?\n\nEl formulario público se apagará y las pantallas del staff volverán al inicio.")) {
-        await remove(ref(db, '0_estado_sistema/programa_activo'));
-    }
+    if(confirm("¿Cerrar puertas y volver al inicio?")) await remove(ref(db, '0_estado_sistema/programa_activo'));
 });
 
 function activarRadares() {
-    // Sincronizar Esperados
     onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         totalEsperados = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
         actualizarTablero();
     });
 
-    // Sincronizar Firmados y la Tabla
     onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         const asistencias = snapshot.exists() ? snapshot.val() : {};
         totalFirmados = Object.keys(asistencias).length;
         actualizarTablero();
         
         let maxNumero = 0;
+        const conteoStaff = {}; // <- AQUI SE GUARDA EL RANKING DE INVITADOS
         const tbody = document.getElementById('tablaAsistentes');
         tbody.innerHTML = "";
         
@@ -115,12 +89,29 @@ function activarRadares() {
             const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
             const num = parseInt(asis.numero_asignado) || 0;
             if (num > maxNumero) maxNumero = num; 
+
+            // Sumatoria automática de invitados por Staff
+            if (asis.tipo_ingreso === "Cortesía" && asis.invitado_por) {
+                conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
+            }
             
             const tr = document.createElement('tr');
             tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td><td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
         }
         window.siguienteTicketAutomatico = maxNumero + 1;
+
+        // DIBUJAR EL RANKING SOLO SI ES PROGRAMA DE CORTESÍA
+        if (nombrePrograma === "Detrás del Muro Cortesía") {
+            document.getElementById('seccionConteoInvitados').classList.remove('d-none');
+            let htmlConteo = "";
+            for(const staff in conteoStaff) {
+                htmlConteo += `<span class="badge bg-dark border border-warning fs-6 text-white">${staff}: <b class="text-warning fs-5 ms-1">${conteoStaff[staff]}</b></span>`;
+            }
+            document.getElementById('listaConteoInvitados').innerHTML = htmlConteo || "<small style='color: #aaaaaa;'>Aún no cruza la puerta ningún invitado.</small>";
+        } else {
+            document.getElementById('seccionConteoInvitados').classList.add('d-none');
+        }
     });
 }
 
@@ -150,9 +141,12 @@ async function onScanSuccess(decodedText) {
             const datos = snapshot.val();
             document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
+            
             if (reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía") {
                 infoInvitado.innerText = `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})`;
-            } else { infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; }
+            } else { 
+                infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; 
+            }
 
             document.getElementById('seccionFirma').classList.remove('d-none');
             document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
@@ -172,19 +166,21 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     const firmaBase64 = signaturePad.toDataURL(); 
     const horaActual = new Date().toLocaleTimeString(); 
-    const tipo = document.getElementById('infoInvitado').innerText.includes("CORTESÍA") ? "Cortesía" : "Pago";
     const numeroFinal = document.getElementById('numeroAsignado').value;
+
+    // EXTRACCIÓN INTELIGENTE DEL STAFF QUE LO INVITÓ
+    const textoInfo = document.getElementById('infoInvitado').innerText;
+    const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
+    let invitadoPor = "";
+    if (tipo === "Cortesía" && textoInfo.includes("Por: ")) {
+        invitadoPor = textoInfo.split("Por: ")[1].replace(")", "");
+    }
 
     try {
         await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
-            rut: rutActual, 
-            nombre_programa: nombrePrograma, 
-            monto: (tipo === "Pago" ? montoPago : 0), 
-            tipo_ingreso: tipo, 
-            hora_ingreso: horaActual, 
-            firma_digital: firmaBase64, 
-            estado_pago: "Pendiente",
-            numero_asignado: numeroFinal
+            rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), 
+            tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente",
+            numero_asignado: numeroFinal, invitado_por: invitadoPor // <-- SE GUARDA EN FIREBASE PARA EL RANKING
         });
         document.getElementById('seccionFirma').classList.add('d-none');
         signaturePad.clear(); html5QrcodeScanner.resume(); rutActual = "";
@@ -192,9 +188,7 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
 });
 
 window.anularAsistencia = async function(rut) { 
-    if(confirm("¿Seguro que deseas anular esta asistencia?")) { 
-        await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); 
-    } 
+    if(confirm("¿Seguro que deseas anular esta asistencia?")) await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); 
 }
 
 // ==========================================
@@ -217,7 +211,6 @@ function renderCRM(datos) {
         tbody.appendChild(tr);
     }
 }
-
 document.getElementById('buscadorCRM').addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     const filtrados = Object.keys(listaGlobalCRM).reduce((acc, rut) => {
@@ -238,7 +231,6 @@ window.verPerfil = function(rut) {
         <p><strong>Dirección:</strong> ${p.direccion || '-'}</p><hr style="border-color: #333;">
         <p><strong>Banco:</strong> ${p.banco || '-'} | <strong>Cuenta:</strong> ${p.tipoCuenta || '-'}</p>
         <p><strong>N°:</strong> ${p.numeroCuenta || '-'}</p><p><strong>AFP:</strong> ${p.afp || '-'} | <strong>Salud:</strong> ${p.salud || '-'}</p>`;
-    
     if (blacklistGlobal[rut]) {
         document.getElementById('motivoBloqueo').classList.add('d-none'); document.getElementById('btnBloquear').classList.add('d-none'); document.getElementById('btnDesbloquear').classList.remove('d-none');
     } else {
@@ -247,7 +239,6 @@ window.verPerfil = function(rut) {
     if(!modalFichaInstance) modalFichaInstance = new bootstrap.Modal(document.getElementById('modalFicha'));
     modalFichaInstance.show();
 }
-
 document.getElementById('btnBloquear').addEventListener('click', async () => {
     const motivo = document.getElementById('motivoBloqueo').value.trim();
     if(!motivo) return alert("Debes escribir un motivo.");
@@ -257,7 +248,6 @@ document.getElementById('btnBloquear').addEventListener('click', async () => {
         modalFichaInstance.hide(); renderCRM(listaGlobalCRM); alert("Usuario bloqueado con éxito.");
     }
 });
-
 document.getElementById('btnDesbloquear').addEventListener('click', async () => {
     if(confirm("¿Quitar de la lista negra?")) {
         await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); delete blacklistGlobal[rutPerfilActual];
@@ -321,9 +311,9 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     if (!nombrePrograma) return alert("Ve a la pestaña Puerta y abre un programa primero.");
     if (nombrePrograma === "Dale Play") {
-        if (!confirm("⚠️ ATENCIÓN: Seleccionaste 'Dale Play'.\n\nEste programa normalmente se acumula en la semana. Si descargas esta nómina diaria, estas personas desaparecerán de la Bóveda del viernes.\n\n¿Estás completamente seguro de pagar 'Dale Play' de forma diaria hoy?")) return;
+        if (!confirm("⚠️ ATENCIÓN: Seleccionaste 'Dale Play'.\n\nEste programa normalmente se acumula en la semana. Si descargas esta nómina diaria, estas personas desaparecerán de la Bóveda del viernes.\n\n¿Estás seguro?")) return;
     } else {
-        if (!confirm(`¿Descargar nómina diaria para ${nombrePrograma}?\n\nAl confirmar, los asistentes de HOY se marcarán como PAGADOS y no se irán a la Bóveda Semanal.`)) return;
+        if (!confirm(`¿Descargar nómina diaria para ${nombrePrograma}?\n\nAl confirmar, los asistentes de HOY se marcarán como PAGADOS.`)) return;
     }
     try {
         const snap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`)));
@@ -342,10 +332,13 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
                 actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${r}/estado_pago`] = "Pagado";
             }
         }
-        if (!hayPagosNuevos) return alert("Todas las personas del programa de hoy ya fueron marcadas como Pagadas anteriormente.");
+        if (!hayPagosNuevos) return alert("Las personas de hoy ya fueron marcadas como Pagadas.");
         await update(ref(db), actualizacionesFirebase);
-        descargarCSV(csv, `Nomina_Banco_DIARIA_${nombrePrograma.replace(/ /g, "_")}_${fechaPrograma}.csv`);
-        alert("¡Nómina diaria descargada!\n\nLos asistentes fueron descontados de la Bóveda Semanal para evitar pagos dobles.");
+        
+        // Evitar que un "/" en el nombre del archivo rompa la descarga en Windows/Mac
+        const nombreArchivoLimpio = nombrePrograma.replace(/[ \/]/g, "_");
+        descargarCSV(csv, `Nomina_Banco_DIARIA_${nombreArchivoLimpio}_${fechaPrograma}.csv`);
+        alert("¡Nómina diaria descargada con éxito!");
     } catch (e) { alert("Error al generar Excel Diario."); console.error(e); }
 });
 
