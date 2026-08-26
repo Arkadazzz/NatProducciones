@@ -13,6 +13,7 @@
         .text-muted { color: #aaaaaa !important; }
         .form-control, .form-select { background-color: #222222 !important; border: 1px solid #444444 !important; color: #ffffff !important; border-radius: 8px; }
         .form-control:focus, .form-select:focus { border-color: #b066ff !important; box-shadow: 0 0 8px rgba(176, 102, 255, 0.5) !important; background-color: #222222 !important; color: #ffffff !important;}
+        .form-control:invalid { border-color: #ff3333 !important; } /* Borde rojo si el formato está mal */
         .btn-primary { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; padding: 12px; font-weight: bold; text-transform: uppercase; color: white; }
         .btn-primary:hover { background: linear-gradient(135deg, #9d4edd, #7b2cbf); transform: translateY(-2px); transition: 0.3s; color: white; }
         .alert-custom { background: #1a1a1a; border: 1px solid #b066ff; color: #ffffff; }
@@ -48,7 +49,7 @@
                 <div class="mb-3">
                     <label class="form-label text-muted" style="font-size: 0.9em;">Ingresa tu RUT (Sin puntos, con guion)</label>
                     <div class="input-group">
-                        <input type="text" class="form-control" id="rut" required placeholder="Ej: 12345678-9">
+                        <input type="text" class="form-control" id="rut" required placeholder="Ej: 12345678-9" pattern="^[0-9]+-[0-9kK]{1}$" title="Debe ser sin puntos y con guion. Ej: 12345678-9">
                         <button type="button" class="btn btn-outline-light fw-bold" id="btnVerificarRut">Continuar</button>
                     </div>
                 </div>
@@ -69,7 +70,8 @@
                     </div>
                     <div class="mb-3"><label class="form-label">Dirección Completa</label><input type="text" class="form-control" id="direccion"></div>
                     <div class="row">
-                        <div class="col-md-6 mb-3"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="telefono" placeholder="+569..."></div>
+                        <!-- FORMATO ESTRICTO DE TELÉFONO -->
+                        <div class="col-md-6 mb-3"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="telefono" placeholder="+569..." pattern="^\+569[0-9]{8}$" title="Debe empezar con +569 seguido de 8 números"></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Correo Electrónico</label><input type="email" class="form-control" id="email"></div>
                     </div>
                     <h5 class="mt-4 mb-3" style="color: #d6b3ff; border-bottom: 1px solid #333; padding-bottom: 10px; font-weight: bold;">Contratación y Pago</h5>
@@ -88,7 +90,8 @@
                         <div class="col-md-6 mb-3"><label class="form-label">Tipo de Cuenta</label>
                             <select class="form-select" id="tipoCuenta"><option value="">Selecciona...</option><option value="CUENTA_RUT">Cuenta RUT</option><option value="CUENTA_CORRIENTE">Cuenta Corriente</option><option value="CUENTA_VISTA">Cuenta Vista / Ahorro</option></select>
                         </div>
-                        <div class="col-md-6 mb-3"><label class="form-label">N° de Cuenta</label><input type="text" class="form-control" id="numeroCuenta"></div>
+                        <!-- FORMATO ESTRICTO DE CUENTA -->
+                        <div class="col-md-6 mb-3"><label class="form-label">N° de Cuenta</label><input type="text" class="form-control" id="numeroCuenta" pattern="^[0-9]+$" title="Solo números, sin guiones ni espacios"></div>
                     </div>
                 </div>
 
@@ -105,14 +108,12 @@
                             </select>
                         </div>
 
-                        <!-- EL PIN DE SEGURIDAD (SOLO PARA I/P) -->
                         <div class="mb-3 d-none" id="divPinSeguridad">
                             <label class="form-label text-warning fw-bold">🔑 PIN de Acceso (I/P)</label>
                             <input type="number" id="pinAcceso" class="form-control text-center fw-bold fs-4" placeholder="****" style="border-color: #ffc107 !important; letter-spacing: 5px;">
                             <small class="text-muted">Si no tienes el PIN, solicítalo al equipo de Producción.</small>
                         </div>
 
-                        <!-- LISTA DE STAFF (SOLO PARA CORTESÍA) -->
                         <div class="mb-3 d-none" id="divInvitadoPor">
                             <label class="form-label text-warning fw-bold">¿Qué trabajador te invitó?</label>
                             <select class="form-select" id="invitadoPor" style="border-color: #ffc107 !important; background-color: #2a2000 !important;">
