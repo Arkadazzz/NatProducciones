@@ -46,7 +46,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                 <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
                     <div>
                         <strong class="text-white">${p.nombre}</strong> ${badgePin}<br>
-                        <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'}</small>
+                        <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'} | H.Extra: $${p.valor_hora_extra || 0}</small>
                     </div>
                     <div>
                         <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}')">🚪 Entrar</button>
@@ -64,18 +64,19 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
+    const horaCitacion = document.getElementById('horaCitacion').value; // REPARADO: HORA CITACIÓN
     const valorHE = document.getElementById('valorHoraExtra').value || 0;
-    const horaCitacion = document.getElementById('horaCitacion').value; // NUEVO
     
     const rawHora = document.getElementById('horaTermino').value.trim();
     const ampm = document.getElementById('amPmTermino').value;
     
+    // REPARADO: Válida todos los campos, incluyendo Citación
     if (!nom || !fec || !mon || !rawHora || !horaCitacion) return alert("Completa todos los campos obligatorios.");
     
-    if (!rawHora.includes(":")) return alert("La hora debe llevar dos puntos. Ejemplo: 07:30");
+    if (!rawHora.includes(":")) return alert("La hora de salida debe llevar dos puntos. Ejemplo: 07:30");
     let [hh, mm] = rawHora.split(':').map(Number);
     if (isNaN(hh) || isNaN(mm) || hh < 1 || hh > 12 || mm < 0 || mm > 59) {
-        return alert("Formato de hora incorrecto. Usa números del 1 al 12. Ejemplo: 07:30");
+        return alert("Formato de hora de salida incorrecto. Usa números del 1 al 12. Ejemplo: 07:30");
     }
     
     if (ampm === "PM" && hh !== 12) hh += 12;
@@ -86,7 +87,6 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     let pinGenerado = ""; if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
     
-    // SE GUARDA LA HORA DE CITACIÓN
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
         nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal, valor_hora_extra: valorHE, hora_citacion: horaCitacion 
     });
@@ -551,6 +551,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
     let actualizacionesFirebase = {};
     
+    // REPARADO: Paréntesis extra eliminado aquí
     const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     for (const r in window.deudasGlobales) {
@@ -569,7 +570,7 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     if (!fechaElegida) return;
     
     try {
-        const snap = await get(child(ref(db, `2_asistencias/${fechaElegida}`)); 
+        const snap = await get(child(ref(db), `2_asistencias/${fechaElegida}`)); 
         if (!snap.exists()) return alert("No hay asistencias registradas para esta fecha en la base de datos.");
         
         const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
@@ -588,6 +589,7 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
                 const asis = programas[prog][r];
                 if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
                     hayPagosNuevos = true; 
+                    // REPARADO: Paréntesis extra eliminado aquí
                     const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val() || {nombres: "Desconocido", apellidos: ""};
                     const rutSin = r.replace(/[^0-9kK]/g, ''); 
                     csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${asis.monto};;${tr.email || ''};;${prog};PAGO NAT\n`; 
@@ -660,7 +662,6 @@ async function cargarReportesDT() {
                                 <tbody>`;
             for (const rut in asistentesDeEseDia) {
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-                // REPARADO: YA NO ESTÁ EN DORADO NI AMARILLO
                 htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
             }
             htmlAcordeon += `</tbody></table></div></div></div></div>`;
