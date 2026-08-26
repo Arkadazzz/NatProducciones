@@ -90,13 +90,19 @@ document.getElementById('tipoAsistencia').addEventListener('change', (e) => {
 
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
-    // VALIDACIÓN ESTRICTA DEL RUT
     const rutRegex = /^[0-9]+-[0-9kK]{1}$/;
     if (!rutRegex.test(rut)) {
         return alert("⚠️ FORMATO INCORRECTO ⚠️\nEl RUT debe ser ingresado SIN PUNTOS y CON GUION.\nEjemplo: 12345678-9");
     }
 
     try {
+        // FILTRO LISTA NEGRA DESDE EL CELULAR
+        const blacklistSnap = await get(child(ref(db), `4_blacklist/${rut}`));
+        if (blacklistSnap.exists()) {
+            const motivo = blacklistSnap.val().motivo || "Decisión de producción";
+            return alert(`⛔ ESTÁS BLOQUEADO(A) DEL SISTEMA ⛔\n\nNo puedes inscribirte para participar en los programas.\nMotivo: ${motivo}`);
+        }
+
         const snapshot = await get(child(ref(db), `1_trabajadores/${rut}`));
         document.getElementById('btnVerificarRut').classList.add('d-none');
         document.getElementById('rut').readOnly = true; 
