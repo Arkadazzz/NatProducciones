@@ -84,16 +84,24 @@
                         <input type="date" id="fechaPrograma" class="form-control mb-3 fw-bold text-center" style="font-size: 1.3em; padding: 15px; color: #d6b3ff !important; border: 2px solid #b066ff !important;">
                         
                         <div class="row">
-                            <div class="col-4 mb-3">
+                            <div class="col-md-4 mb-3">
                                 <label class="text-muted" style="font-size:0.85em;">Base ($)</label>
                                 <input type="number" id="montoPago" class="form-control fw-bold text-center" placeholder="20000" style="font-size: 1.1em; padding: 10px;">
                             </div>
-                            <!-- HORA DE TEXTO GIGANTE -->
-                            <div class="col-4 mb-3">
+                            
+                            <!-- NUEVO: SELECTOR AM/PM INTELIGENTE -->
+                            <div class="col-md-4 mb-3">
                                 <label class="text-muted" style="font-size:0.85em;">Salida Estimada</label>
-                                <input type="text" id="horaTermino" class="form-control fw-bold text-center text-warning" placeholder="Ej: 19:30" style="font-size: 1.1em; padding: 10px;">
+                                <div class="input-group">
+                                    <input type="text" id="horaTermino" class="form-control fw-bold text-center text-warning" placeholder="07:30" style="font-size: 1.1em; padding: 10px;">
+                                    <select id="amPmTermino" class="form-select fw-bold bg-dark text-warning" style="font-size: 1.1em; padding: 10px; max-width: 80px;">
+                                        <option value="PM" selected>PM</option>
+                                        <option value="AM">AM</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="col-4 mb-3">
+                            
+                            <div class="col-md-4 mb-3">
                                 <label class="text-muted" style="font-size:0.85em;">Valor H.Extra</label>
                                 <input type="number" id="valorHoraExtra" class="form-control fw-bold text-center" placeholder="3000" style="font-size: 1.1em; padding: 10px;">
                             </div>
