@@ -249,7 +249,7 @@ let rutPerfilActual = "";
 window.verPerfil = function(rut) {
     rutPerfilActual = rut; const p = listaGlobalCRM[rut];
     
-    // FORMULARIO ACTUALIZADO CON FECHA DE NACIMIENTO Y CORREO
+    // AHORA SÍ INCLUYE FECHA DE NACIMIENTO Y CORREO ELECTRÓNICO
     document.getElementById('contenidoFicha').innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
