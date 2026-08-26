@@ -21,7 +21,7 @@ onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.ht
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
-let html5QrcodeScanner = null; let signaturePad; let rutActual = "";
+let html5QrcodeScanner = null; let signaturePad; let rutActual = ""; let claveActual = "";
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
 let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico = 1;
@@ -71,7 +71,7 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
 });
 
 window.unirseASala = function(clave, nom, fec, mon, pin, horaSal) {
-    nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; pinActivo = pin || ""; horaTerminoGeneral = horaSal || "";
+    claveActual = clave; nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; pinActivo = pin || ""; horaTerminoGeneral = horaSal || "";
     let titulo = `Sala: ${nom}`; if (pinActivo) titulo += ` <span class="badge bg-warning text-dark ms-2">PIN: ${pinActivo}</span>`;
     document.getElementById('tituloEscaner').innerHTML = titulo;
     document.getElementById('seccionConfiguracion').classList.add('d-none');
@@ -88,9 +88,19 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
+// NUEVO: BOTÓN "ES UN DÍA"
+document.getElementById('btnEsUnDia').addEventListener('click', async () => {
+    if (!claveActual) return;
+    if (confirm("🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Estás seguro de que quieres CERRAR LA JORNADA de este programa?\n\nEsto hará que desaparezca de la web para el público.\n(Asegúrate de haberle marcado la salida a todos los que hicieron horas extras).\n\nSi aprietas Aceptar, daremos por terminado el evento.")) {
+        await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
+        alert("¡Jornada terminada con éxito! Gran trabajo hoy.");
+        salirDeSala();
+    }
+});
+
 document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
 function salirDeSala() {
-    nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = ""; horaTerminoGeneral = "";
+    claveActual = ""; nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = ""; horaTerminoGeneral = "";
     document.getElementById('seccionConfiguracion').classList.remove('d-none');
     document.getElementById('seccionEscaner').classList.add('d-none');
     document.getElementById('seccionFirma').classList.add('d-none');
@@ -120,7 +130,6 @@ function activarRadares() {
             if (asis.hora_salida) {
                 btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
             } else { 
-                // AQUÍ ESTÁ LA MAGIA DEL PARCHE (LE PASAMOS EL TIPO DE INGRESO Y SU MONTO ACTUAL)
                 btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
             }
             
@@ -145,24 +154,19 @@ function actualizarTablero() {
     document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
 }
 
-// MOTOR DE SALIDA REPARADO A PRUEBA DE CORTESÍAS
 window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     const horaSalida = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     let bonoExtra = 0;
     
-    // Si la persona es de cortesía, NO LE PREGUNTAMOS POR PLATA y no sumamos nada.
     if (tipoIngreso === "Cortesía") {
         if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
     } else {
-        // Si es extra pagado, le preguntamos si hay horas extras
         let respuesta = prompt(`Salida: ${horaSalida}. Salida estipulada: ${horaTerminoGeneral}.\n\nSi hizo horas extra, ingresa el bono en pesos (sino, pon 0):`);
         if (respuesta === null) return; 
         bonoExtra = parseInt(respuesta) || 0;
     }
     
-    // Su nuevo monto es el que YA TENÍA asignado al entrar + el bono extra (si aplica)
     const nuevoMontoTotal = parseInt(montoBaseActual) + bonoExtra;
-    
     try {
         await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
             hora_salida: horaSalida, 
@@ -172,9 +176,6 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     } catch (error) { alert("Error al marcar salida."); }
 }
 
-// ==========================================
-// BUSCADOR DE RUT MANUAL DE EMERGENCIA
-// ==========================================
 document.getElementById('btnIngresoManual').addEventListener('click', () => {
     const rutIngresado = document.getElementById('rutManual').value.trim();
     if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
@@ -242,9 +243,6 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
 
 window.anularAsistencia = async function(rut) { if(confirm("¿Seguro que deseas anular esta asistencia?")) await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); }
 
-// ==========================================
-// REDACCIÓN EXACTA DEL CONTRATO LEGAL 
-// ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
@@ -263,7 +261,7 @@ function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
 
     const textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por doña Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, de nacionalidad Chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '__________________________________'}, domiciliado/a en calle ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
 
-PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
+PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la production "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
 SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
@@ -308,9 +306,6 @@ Correo electrónico: ${trab.email || '_______________________'}
     doc.setFontSize(8); const lineasNotas = doc.splitTextToSize(notasTexto, 175); doc.text(lineasNotas, 20, y);
 }
 
-// ==========================================
-// PESTAÑA 2: CRM (EDICIÓN Y BORRADO)
-// ==========================================
 document.getElementById('crm-tab').addEventListener('click', async () => {
     const [trabSnap, blackSnap] = await Promise.all([ get(ref(db, '1_trabajadores')), get(ref(db, '4_blacklist')) ]);
     listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; renderCRM(listaGlobalCRM);
@@ -364,16 +359,11 @@ window.verPerfil = function(rut) {
 document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
-            nombres: document.getElementById('editNombres').value, 
-            apellidos: document.getElementById('editApellidos').value,
-            fechaNacimiento: document.getElementById('editNacimiento').value,
-            telefono: document.getElementById('editTel').value, 
-            email: document.getElementById('editEmail').value,
-            direccion: document.getElementById('editDir').value,
-            banco: document.getElementById('editBanco').value, 
-            numeroCuenta: document.getElementById('editCuenta').value,
-            afp: document.getElementById('editAfp').value, 
-            salud: document.getElementById('editSalud').value
+            nombres: document.getElementById('editNombres').value, apellidos: document.getElementById('editApellidos').value,
+            fechaNacimiento: document.getElementById('editNacimiento').value, telefono: document.getElementById('editTel').value, 
+            email: document.getElementById('editEmail').value, direccion: document.getElementById('editDir').value,
+            banco: document.getElementById('editBanco').value, numeroCuenta: document.getElementById('editCuenta').value,
+            afp: document.getElementById('editAfp').value, salud: document.getElementById('editSalud').value
         });
         alert("Datos actualizados correctamente."); 
         listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db), `1_trabajadores/${rutPerfilActual}`))).val();
@@ -382,7 +372,7 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
 });
 
 document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
-    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre. Si vuelve, tendrá que rellenar el formulario de nuevo.")) {
+    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; renderCRM(listaGlobalCRM); modalFichaInstance.hide(); alert("Trabajador eliminado.");
     }
@@ -401,9 +391,6 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
     }
 });
 
-// ==========================================
-// PESTAÑA 3: FINANZAS Y BÓVEDA
-// ==========================================
 document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return;
     if(Object.keys(listaGlobalCRM).length === 0) { const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); }
@@ -480,9 +467,6 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
-// ==========================================
-// PESTAÑA 4: REPORTES DT (CON MEMORIA DE ACORDEÓN)
-// ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarDT');
@@ -526,9 +510,6 @@ async function cargarReportesDT() {
 document.getElementById('dt-tab').addEventListener('click', cargarReportesDT);
 document.getElementById('btnRefrescarDT').addEventListener('click', cargarReportesDT);
 
-// ==========================================
-// PESTAÑA 5: MANTENIMIENTO Y EMPAQUETADO ZIP
-// ==========================================
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return alert("No hay datos de asistencias.");
