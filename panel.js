@@ -29,7 +29,6 @@ let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico 
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
-// Memoria Inicial
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
 // ==========================================
@@ -47,7 +46,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                 <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
                     <div>
                         <strong class="text-white">${p.nombre}</strong> ${badgePin}<br>
-                        <small style="color: #d6b3ff;">${p.fecha} | Base: $${p.monto} | Salida: ${p.hora_termino || 'No definida'} | H.Extra: $${p.valor_hora_extra || 0}</small>
+                        <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'}</small>
                     </div>
                     <div>
                         <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}')">🚪 Entrar</button>
@@ -66,11 +65,12 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
     const valorHE = document.getElementById('valorHoraExtra').value || 0;
+    const horaCitacion = document.getElementById('horaCitacion').value; // NUEVO
     
     const rawHora = document.getElementById('horaTermino').value.trim();
     const ampm = document.getElementById('amPmTermino').value;
     
-    if (!nom || !fec || !mon || !rawHora) return alert("Completa todos los campos obligatorios.");
+    if (!nom || !fec || !mon || !rawHora || !horaCitacion) return alert("Completa todos los campos obligatorios.");
     
     if (!rawHora.includes(":")) return alert("La hora debe llevar dos puntos. Ejemplo: 07:30");
     let [hh, mm] = rawHora.split(':').map(Number);
@@ -86,8 +86,9 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     let pinGenerado = ""; if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
     
+    // SE GUARDA LA HORA DE CITACIÓN
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
-        nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal, valor_hora_extra: valorHE 
+        nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal, valor_hora_extra: valorHE, hora_citacion: horaCitacion 
     });
     window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE);
 });
@@ -324,7 +325,6 @@ async function onScanSuccess(decodedText) {
         
         if (snapshot.exists()) {
             const datos = snapshot.val(); 
-            // NUEVO: ACTUALIZAMOS LA MEMORIA EN VIVO PARA QUE LA TABLA NO MUESTRE "DESCONOCIDO"
             listaGlobalCRM[rutActual] = datos; 
 
             document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
@@ -527,8 +527,6 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 
 document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return;
-    
-    // NUEVO: REFRESCO DE MEMORIA OBLIGATORIO AL ENTRAR A FINANZAS
     const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     let deudas = {}; const todas = snap.val();
@@ -553,12 +551,10 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
     let actualizacionesFirebase = {};
     
-    // NUEVO: OTRA CAPA MÁS DE REFRESCO ANTES DE IMPRIMIR EL EXCEL
     const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        // NUEVO: RESCATE ABSOLUTO SI AÚN NO EXISTE EN MEMORIA
         const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
         
         if (tr) { const rutSin = r.replace(/[^0-9kK]/g, ''); csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT\n`; }
@@ -573,10 +569,9 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     if (!fechaElegida) return;
     
     try {
-        const snap = await get(child(ref(db), `2_asistencias/${fechaElegida}`)); 
+        const snap = await get(child(ref(db, `2_asistencias/${fechaElegida}`)); 
         if (!snap.exists()) return alert("No hay asistencias registradas para esta fecha en la base de datos.");
         
-        // REFRESCO PREVENTIVO
         const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
         
         const programas = snap.val();
@@ -680,7 +675,7 @@ document.getElementById('btnRefrescarDT').addEventListener('click', cargarReport
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return alert("No hay datos de asistencias.");
-        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); // REFRESH CACHE
+        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         let csv = "\uFEFFFecha;Programa;RUT;Nombres;Apellidos;Monto Final;Tipo Ingreso;Hora Ingreso;Hora Salida;Bono Extra;Estado Pago;Invitado Por\n";
         const todas = snap.val();
@@ -697,7 +692,7 @@ document.getElementById('btnRespaldoPDFs').addEventListener('click', async () =>
     try {
         btn.innerText = "⏳ Empaquetando PDFs... (Espera)"; btn.disabled = true;
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) { alert("No hay contratos."); resetBtnZip(btn); return; }
-        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); // REFRESH CACHE
+        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         const todas = snap.val(); const zip = new JSZip(); let pdfsGenerados = 0; const { jsPDF } = window.jspdf;
         for (const fecha in todas) { for (const prog in todas[fecha]) {
