@@ -203,9 +203,6 @@ window.marcarSalida = async function(rut) {
     }
 }
 
-// ----------------------------------------------------
-// GENERADOR DE PDF: CONTRATO OFICIAL NAT PRODUCCIONES
-// ----------------------------------------------------
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut];
     const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
@@ -214,21 +211,17 @@ window.generarContratoPDF = async function(rut) {
     const asis = asisSnap.val();
     const { jsPDF } = window.jspdf;
     
-    // Usamos formato Oficio (Legal) que es el estándar chileno para contratos, y márgenes estrechos.
     const doc = new jsPDF({ format: 'legal' });
-    let y = 15; // Cursor de altura
+    let y = 15; 
 
-    // TÍTULO
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text("CONTRATO DE TRABAJO A TRATO POR JORNADA EXTRAORDINARIA", 105, y, null, null, "center");
     y += 15;
 
-    // TEXTO BASE (Tu contrato real)
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     
-    // Formatear Fecha
     const mesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const [yearF, monthF, dayF] = fechaPrograma.split('-');
     const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} del ${yearF}`;
@@ -250,14 +243,11 @@ SEXTO: Las partes dejan expresa constancia de que, de conformidad a la Ley N° 1
 
 SÉPTIMO: Para todos los efectos derivados del presente contrato, las partes fijan su domicilio en la ciudad y comuna de Santiago y se someten a la jurisdicción de sus Tribunales de Justicia.`;
 
-    // Imprimir el texto justificado
-    const lineas = doc.splitTextToSize(textoContrato, 175); // 175mm de ancho para que queden márgenes de 20mm
+    const lineas = doc.splitTextToSize(textoContrato, 175); 
     doc.text(lineas, 20, y);
     
-    // FIRMAS
-    y += (lineas.length * 5) + 30; // Bajamos el cursor según el largo del texto
+    y += (lineas.length * 5) + 30; 
     
-    // Empleador (Izquierda)
     doc.setFont("helvetica", "bold");
     doc.text("_________________________________", 50, y, null, null, "center");
     doc.text("AGUSTÍN PINO LORCA", 50, y + 5, null, null, "center");
@@ -265,10 +255,8 @@ SÉPTIMO: Para todos los efectos derivados del presente contrato, las partes fij
     doc.text("NAT PRODUCCIONES SpA.", 50, y + 10, null, null, "center");
     doc.text("RUT: 77.200.730-8", 50, y + 15, null, null, "center");
 
-    // Trabajador (Derecha)
     doc.setFont("helvetica", "bold");
     if (asis.firma_digital) {
-        // Estampar firma arriba de la línea
         doc.addImage(asis.firma_digital, 'PNG', 115, y - 30, 80, 30);
     }
     doc.text("_________________________________", 155, y, null, null, "center");
@@ -277,7 +265,9 @@ SÉPTIMO: Para todos los efectos derivados del presente contrato, las partes fij
     doc.text(`RUT: ${rut}`, 155, y + 10, null, null, "center");
     doc.text("EL TRABAJADOR", 155, y + 15, null, null, "center");
 
-    doc.save(`Contrato_NatProducciones_${rut}.pdf`);
+    // Reemplazar espacios del nombre por guiones bajos para el archivo
+    const nombreLimpio = nombrePrograma.replace(/[ \/]/g, "_");
+    doc.save(`Contrato_${nombreLimpio}_${rut}.pdf`);
 }
 
 async function onScanSuccess(decodedText) {
@@ -529,3 +519,63 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 });
 
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
+
+// ==========================================
+// PESTAÑA 4: MANTENIMIENTO
+// ==========================================
+document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
+    try {
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) return alert("No hay datos de asistencias en la nube para respaldar.");
+        
+        let csv = "\uFEFFFecha;Programa;RUT;Nombres;Apellidos;Monto Final;Tipo Ingreso;Hora Ingreso;Hora Salida;Bono Extra;Estado Pago;Invitado Por\n";
+        const todas = snap.val();
+        
+        for (const fecha in todas) {
+            for (const prog in todas[fecha]) {
+                for (const r in todas[fecha][prog]) {
+                    const asis = todas[fecha][prog][r];
+                    const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+                    
+                    csv += `${fecha};${prog};${r};${trab.nombres};${trab.apellidos};${asis.monto || 0};${asis.tipo_ingreso || ''};${asis.hora_ingreso || ''};${asis.hora_salida || ''};${asis.bono_horas_extras || 0};${asis.estado_pago || ''};${asis.invitado_por || ''}\n`;
+                }
+            }
+        }
+        descargarCSV(csv, `Respaldo_Maestro_Asistencias_${new Date().toISOString().split('T')[0]}.csv`);
+        alert("¡Excel Maestro descargado con éxito!");
+    } catch (error) {
+        alert("Error al generar el respaldo maestro.");
+    }
+});
+
+// Lógica del Input de Confirmación para borrar
+const inputConfirmar = document.getElementById('inputConfirmarLimpieza');
+const btnEjecutar = document.getElementById('btnEjecutarLimpieza');
+
+inputConfirmar.addEventListener('input', (e) => {
+    if (e.target.value === "LIMPIAR") {
+        btnEjecutar.disabled = false;
+    } else {
+        btnEjecutar.disabled = true;
+    }
+});
+
+btnEjecutar.addEventListener('click', async () => {
+    try {
+        await remove(ref(db, '2_asistencias'));
+        await remove(ref(db, '3_reservas'));
+        
+        alert("✅ Nube limpiada con éxito. \nEl espacio ha sido liberado para el próximo mes.");
+        
+        // Cerrar modal automáticamente
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalLimpieza'));
+        modal.hide();
+        inputConfirmar.value = "";
+        btnEjecutar.disabled = true;
+        
+        // Refrescar para limpiar las tablas
+        window.location.reload();
+    } catch (error) {
+        alert("Error al limpiar la base de datos.");
+    }
+});
