@@ -29,6 +29,32 @@ let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico 
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
+// ==========================================
+// GENERADOR AUTOMÁTICO DE HORAS (INTERVALOS DE 15 MIN)
+// ==========================================
+function poblarSelectoresHora() {
+    let opcionesHTML = '<option value="">-- Selecciona --</option>';
+    for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 15) {
+            let hh24 = h.toString().padStart(2, '0');
+            let mm = m.toString().padStart(2, '0');
+            let ampm = h >= 12 ? 'PM' : 'AM';
+            let h12 = h % 12;
+            if (h12 === 0) h12 = 12;
+            let hh12 = h12.toString().padStart(2, '0');
+            
+            // value = formato matemático (19:30) | Texto = formato visual (07:30 PM)
+            opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm} ${ampm}</option>`;
+        }
+    }
+    const selectCitacion = document.getElementById('horaCitacion');
+    const selectTermino = document.getElementById('horaTermino');
+    if (selectCitacion) selectCitacion.innerHTML = opcionesHTML;
+    if (selectTermino) selectTermino.innerHTML = opcionesHTML;
+}
+poblarSelectoresHora();
+
+// Memoria Inicial
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
 // ==========================================
@@ -64,25 +90,13 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
-    const horaCitacion = document.getElementById('horaCitacion').value; // REPARADO: HORA CITACIÓN
     const valorHE = document.getElementById('valorHoraExtra').value || 0;
     
-    const rawHora = document.getElementById('horaTermino').value.trim();
-    const ampm = document.getElementById('amPmTermino').value;
+    // REPARADO: Ahora lee directamente del menú desplegable y no pide escribir nada
+    const horaCitacion = document.getElementById('horaCitacion').value; 
+    const horaSal = document.getElementById('horaTermino').value;
     
-    // REPARADO: Válida todos los campos, incluyendo Citación
-    if (!nom || !fec || !mon || !rawHora || !horaCitacion) return alert("Completa todos los campos obligatorios.");
-    
-    if (!rawHora.includes(":")) return alert("La hora de salida debe llevar dos puntos. Ejemplo: 07:30");
-    let [hh, mm] = rawHora.split(':').map(Number);
-    if (isNaN(hh) || isNaN(mm) || hh < 1 || hh > 12 || mm < 0 || mm > 59) {
-        return alert("Formato de hora de salida incorrecto. Usa números del 1 al 12. Ejemplo: 07:30");
-    }
-    
-    if (ampm === "PM" && hh !== 12) hh += 12;
-    if (ampm === "AM" && hh === 12) hh = 0;
-    
-    const horaSal = `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`;
+    if (!nom || !fec || !mon || !horaSal || !horaCitacion) return alert("Completa todos los campos obligatorios.");
 
     let pinGenerado = ""; if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
@@ -551,7 +565,6 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
     let actualizacionesFirebase = {};
     
-    // REPARADO: Paréntesis extra eliminado aquí
     const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     for (const r in window.deudasGlobales) {
@@ -589,7 +602,6 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
                 const asis = programas[prog][r];
                 if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
                     hayPagosNuevos = true; 
-                    // REPARADO: Paréntesis extra eliminado aquí
                     const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val() || {nombres: "Desconocido", apellidos: ""};
                     const rutSin = r.replace(/[^0-9kK]/g, ''); 
                     csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${asis.monto};;${tr.email || ''};;${prog};PAGO NAT\n`; 
