@@ -96,7 +96,6 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
     }
 
     try {
-        // FILTRO LISTA NEGRA DESDE EL CELULAR
         const blacklistSnap = await get(child(ref(db), `4_blacklist/${rut}`));
         if (blacklistSnap.exists()) {
             const motivo = blacklistSnap.val().motivo || "Decisión de producción";
@@ -164,6 +163,17 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
         if (tipoAsis === "Cortesía") textoResumen += ` (Invitado de ${invitadoPor})`;
         if (tipoAsis === "Extra") textoResumen += ` (I/P Autorizado)`;
         document.getElementById('resumenProgramaQR').innerText = textoResumen;
+        
+        // INYECTAR MENSAJE PERSONALIZADO
+        const partesF = eventoActivo.fecha.split('-');
+        const fechaBonita = `${partesF[2]}-${partesF[1]}-${partesF[0]}`;
+        const horaCitacionMsg = eventoActivo.hora_citacion || "la hora indicada por producción";
+        
+        document.getElementById('instruccionesQR').innerHTML = `
+            Recuerda guardar este QR (tómale pantallazo) para poder ingresar al canal.<br><br>
+            <span class="text-warning">Tienes que estar el día <b>${fechaBonita}</b> a las <b>${horaCitacionMsg} hrs</b> en el canal.</span><br><br>
+            ¡Te esperamos para que puedas disfrutar de <b>${eventoActivo.nombre}</b>!
+        `;
         
         document.getElementById('codigoQR').innerHTML = ""; 
         new QRCode(document.getElementById("codigoQR"), { text: rut, width: 200, height: 200, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H });
