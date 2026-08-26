@@ -514,7 +514,7 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
             if (!deudas[r]) deudas[r] = { monto: 0, dias: 0, rutas_bd: [] };
             deudas[r].monto += parseInt(asis.monto); deudas[r].dias += 1; deudas[r].rutas_bd.push(`2_asistencias/${fecha}/${prog}/${r}`);
         }
-    }}}
+    } } }
     window.deudasGlobales = deudas; const tbody = document.getElementById('tablaDeudas'); tbody.innerHTML = "";
     for (const r in deudas) {
         const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; const fila = document.createElement('tr');
@@ -565,7 +565,7 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
         let tot = {}; const todas = snap.val();
         for (const f in todas) { if (f.startsWith(mes)) { for (const prog in todas[f]) { for (const r in todas[f][prog]) {
             if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; tot[r].monto += parseInt(todas[f][prog][r].monto) || 0;
-        }}}}
+        } } } }
         let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
         for (const r in tot) {
             const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
@@ -580,6 +580,9 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
+// ==========================================
+// PESTAÑA 4: REPORTES DT (CON COLUMNA TELÉFONO)
+// ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarDT');
@@ -601,7 +604,6 @@ async function cargarReportesDT() {
             const isOpen = (idAbierto === `collapseDT_${index}`) ? 'show' : '';
             const isCollapsed = (idAbierto === `collapseDT_${index}`) ? '' : 'collapsed';
 
-            // AQUI SE AGREGA LA COLUMNA TELÉFONO
             htmlAcordeon += `
             <div class="accordion-item">
                 <h2 class="accordion-header"><button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span></button></h2>
@@ -613,7 +615,6 @@ async function cargarReportesDT() {
                                 <tbody>`;
             for (const rut in asistentesDeEseDia) {
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-                // AQUI SE INYECTA EL DATO DEL TELÉFONO
                 htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
             }
             htmlAcordeon += `</tbody></table></div></div></div></div>`;
@@ -625,6 +626,9 @@ async function cargarReportesDT() {
 document.getElementById('dt-tab').addEventListener('click', cargarReportesDT);
 document.getElementById('btnRefrescarDT').addEventListener('click', cargarReportesDT);
 
+// ==========================================
+// PESTAÑA 5: MANTENIMIENTO Y EMPAQUETADO ZIP
+// ==========================================
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return alert("No hay datos de asistencias.");
