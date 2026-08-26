@@ -248,12 +248,16 @@ document.getElementById('buscadorCRM').addEventListener('input', (e) => {
 let rutPerfilActual = "";
 window.verPerfil = function(rut) {
     rutPerfilActual = rut; const p = listaGlobalCRM[rut];
+    
+    // FORMULARIO ACTUALIZADO CON FECHA DE NACIMIENTO Y CORREO
     document.getElementById('contenidoFicha').innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">RUT</label><input type="text" class="form-control bg-secondary text-white" value="${p.rut}" readonly></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Fecha Nacimiento</label><input type="date" class="form-control bg-dark text-white" id="editNacimiento" value="${p.fechaNacimiento || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
             <div class="col-12 mb-2"><label class="text-muted small">Dirección</label><input type="text" class="form-control bg-dark text-white" id="editDir" value="${p.direccion || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Banco</label><input type="text" class="form-control bg-dark text-white" id="editBanco" value="${p.banco || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">N° Cuenta</label><input type="text" class="form-control bg-dark text-white" id="editCuenta" value="${p.numeroCuenta || ''}"></div>
@@ -273,10 +277,16 @@ window.verPerfil = function(rut) {
 document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
-            nombres: document.getElementById('editNombres').value, apellidos: document.getElementById('editApellidos').value,
-            telefono: document.getElementById('editTel').value, direccion: document.getElementById('editDir').value,
-            banco: document.getElementById('editBanco').value, numeroCuenta: document.getElementById('editCuenta').value,
-            afp: document.getElementById('editAfp').value, salud: document.getElementById('editSalud').value
+            nombres: document.getElementById('editNombres').value, 
+            apellidos: document.getElementById('editApellidos').value,
+            fechaNacimiento: document.getElementById('editNacimiento').value,
+            telefono: document.getElementById('editTel').value, 
+            email: document.getElementById('editEmail').value,
+            direccion: document.getElementById('editDir').value,
+            banco: document.getElementById('editBanco').value, 
+            numeroCuenta: document.getElementById('editCuenta').value,
+            afp: document.getElementById('editAfp').value, 
+            salud: document.getElementById('editSalud').value
         });
         alert("Datos actualizados correctamente."); 
         listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db), `1_trabajadores/${rutPerfilActual}`))).val();
@@ -389,10 +399,7 @@ function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { ty
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarDT');
-    
-    // Guardar qué acordeón estaba abierto para no cerrarlo al actualizar
-    let idAbierto = null;
-    const acordeonAbierto = document.querySelector('#acordeonDT .accordion-collapse.show');
+    let idAbierto = null; const acordeonAbierto = document.querySelector('#acordeonDT .accordion-collapse.show');
     if (acordeonAbierto) idAbierto = acordeonAbierto.id;
 
     btnRefresh.innerText = "⏳ Cargando..."; btnRefresh.disabled = true;
@@ -402,26 +409,17 @@ async function cargarReportesDT() {
     if (!asisSnap.exists()) { contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros de asistencia.</p>"; return; }
     
     const todasLasAsistencias = asisSnap.val(); const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-    let htmlAcordeon = ""; let index = 0; 
-    const fechasOrdenadas = Object.keys(todasLasAsistencias).sort().reverse();
+    let htmlAcordeon = ""; let index = 0; const fechasOrdenadas = Object.keys(todasLasAsistencias).sort().reverse();
 
     for (const fecha of fechasOrdenadas) {
         for (const prog in todasLasAsistencias[fecha]) {
-            index++; 
-            const asistentesDeEseDia = todasLasAsistencias[fecha][prog]; 
-            const cantidad = Object.keys(asistentesDeEseDia).length;
-            
-            // Lógica para mantener abierto el que estábamos mirando
+            index++; const asistentesDeEseDia = todasLasAsistencias[fecha][prog]; const cantidad = Object.keys(asistentesDeEseDia).length;
             const isOpen = (idAbierto === `collapseDT_${index}`) ? 'show' : '';
             const isCollapsed = (idAbierto === `collapseDT_${index}`) ? '' : 'collapsed';
 
             htmlAcordeon += `
             <div class="accordion-item">
-                <h2 class="accordion-header">
-                    <button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">
-                        📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span>
-                    </button>
-                </h2>
+                <h2 class="accordion-header"><button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span></button></h2>
                 <div id="collapseDT_${index}" class="accordion-collapse collapse ${isOpen}" data-bs-parent="#acordeonDT">
                     <div class="accordion-body">
                         <div class="table-responsive">
