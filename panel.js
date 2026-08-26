@@ -203,6 +203,9 @@ window.marcarSalida = async function(rut) {
     }
 }
 
+// ----------------------------------------------------
+// PDF: CONTRATO INDIVIDUAL (BOTÓN AZUL DE LA TABLA)
+// ----------------------------------------------------
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut];
     const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
@@ -210,10 +213,16 @@ window.generarContratoPDF = async function(rut) {
     
     const asis = asisSnap.val();
     const { jsPDF } = window.jspdf;
-    
     const doc = new jsPDF({ format: 'legal' });
-    let y = 15; 
+    
+    dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma);
+    
+    const nombreLimpio = nombrePrograma.replace(/[ \/]/g, "_");
+    doc.save(`Contrato_${nombreLimpio}_${rut}.pdf`);
+}
 
+function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
+    let y = 15; 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.text("CONTRATO DE TRABAJO A TRATO POR JORNADA EXTRAORDINARIA", 105, y, null, null, "center");
@@ -223,14 +232,14 @@ window.generarContratoPDF = async function(rut) {
     doc.setFontSize(10);
     
     const mesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    const [yearF, monthF, dayF] = fechaPrograma.split('-');
+    const [yearF, monthF, dayF] = fechaProg.split('-');
     const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} del ${yearF}`;
 
-    const textoContrato = `En SANTIAGO, a ${fechaTexto}, entre NAT PRODUCCIONES SpA., RUT 77.200.730-8, representada por don Agustín Pino Lorca, Cédula de Identidad Nº 21.037.108-9, ambos con domicilio en Avenida Vicuña Mackenna 1370, comuna de Ñuñoa, ciudad de Santiago, que en adelante se denominará “el Empleador”, y don(ña) ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, Cédula de Identidad Nº ${rut}, de Nacionalidad Chilena, nacido(a) el ${trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________'}, domiciliado(a) en ${trab.direccion.toUpperCase() || '_______________________'}, que en adelante se denominará “el Trabajador”, se ha convenido el siguiente Contrato de Trabajo a Trato:
+    const textoContrato = `En SANTIAGO, a ${fechaTexto}, entre NAT PRODUCCIONES SpA., RUT 77.200.730-8, representada por don Agustín Pino Lorca, Cédula de Identidad Nº 21.037.108-9, ambos con domicilio en Avenida Vicuña Mackenna 1370, comuna de Ñuñoa, ciudad de Santiago, que en adelante se denominará “el Empleador”, y don(ña) ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, Cédula de Identidad Nº ${rut}, de Nacionalidad Chilena, nacido(a) el ${trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________'}, domiciliado(a) en ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, que en adelante se denominará “el Trabajador”, se ha convenido el siguiente Contrato de Trabajo a Trato:
 
-PRIMERO: El Empleador contrata los servicios del Trabajador para que se desempeñe en calidad de Extra de Televisión. Las partes dejan constancia que la relación laboral se desarrollará en las dependencias de los estudios de grabación que el empleador determine o en locaciones exteriores según sea el requerimiento del programa "${nombrePrograma}".
+PRIMERO: El Empleador contrata los servicios del Trabajador para que se desempeñe en calidad de Extra de Televisión. Las partes dejan constancia que la relación laboral se desarrollará en las dependencias de los estudios de grabación que el empleador determine o en locaciones exteriores según sea el requerimiento del programa "${nombreProg}".
 
-SEGUNDO: Por acuerdo entre las partes, el presente contrato se pacta por una jornada extraordinaria específica que iniciará a las ${asis.hora_ingreso} horas y finalizará a las ${asis.hora_salida || horaTerminoGeneral} horas del día de la fecha. Las partes acuerdan, de conformidad a lo establecido en el Artículo 22 del Código del Trabajo, que dada la naturaleza de los servicios prestados, este contrato no está sujeto a control de asistencia tradicional, rigiéndose estrictamente por los horarios pactados para la grabación o evento.
+SEGUNDO: Por acuerdo entre las partes, el presente contrato se pacta por una jornada extraordinaria específica que iniciará a las ${asis.hora_ingreso} horas y finalizará a las ${asis.hora_salida || '____'} horas del día de la fecha. Las partes acuerdan, de conformidad a lo establecido en el Artículo 22 del Código del Trabajo, que dada la naturaleza de los servicios prestados, este contrato no está sujeto a control de asistencia tradicional, rigiéndose estrictamente por los horarios pactados para la grabación o evento.
 
 TERCERO: Como remuneración a trato por los servicios prestados durante la jornada señalada en la cláusula segunda (incluyendo eventuales extensiones u horas extra que fuesen requeridas y autorizadas por el Productor a cargo), el Empleador pagará al Trabajador la suma bruta/líquida (según corresponda) de $${asis.monto} (pesos chilenos). 
 Dicho pago se realizará mediante transferencia electrónica a la cuenta bancaria del trabajador (Banco: ${trab.banco || '______'}, Cuenta: ${trab.numeroCuenta || '______'}) en los plazos estipulados por las políticas de remuneración de la Productora.
@@ -264,10 +273,6 @@ SÉPTIMO: Para todos los efectos derivados del presente contrato, las partes fij
     doc.setFont("helvetica", "normal");
     doc.text(`RUT: ${rut}`, 155, y + 10, null, null, "center");
     doc.text("EL TRABAJADOR", 155, y + 15, null, null, "center");
-
-    // Reemplazar espacios del nombre por guiones bajos para el archivo
-    const nombreLimpio = nombrePrograma.replace(/[ \/]/g, "_");
-    doc.save(`Contrato_${nombreLimpio}_${rut}.pdf`);
 }
 
 async function onScanSuccess(decodedText) {
@@ -521,7 +526,7 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
 // ==========================================
-// PESTAÑA 4: MANTENIMIENTO
+// PESTAÑA 4: MANTENIMIENTO Y EMPAQUETADO ZIP
 // ==========================================
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
@@ -536,28 +541,89 @@ document.getElementById('btnRespaldoMaestro').addEventListener('click', async ()
                 for (const r in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][r];
                     const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
-                    
                     csv += `${fecha};${prog};${r};${trab.nombres};${trab.apellidos};${asis.monto || 0};${asis.tipo_ingreso || ''};${asis.hora_ingreso || ''};${asis.hora_salida || ''};${asis.bono_horas_extras || 0};${asis.estado_pago || ''};${asis.invitado_por || ''}\n`;
                 }
             }
         }
         descargarCSV(csv, `Respaldo_Maestro_Asistencias_${new Date().toISOString().split('T')[0]}.csv`);
         alert("¡Excel Maestro descargado con éxito!");
+    } catch (error) { alert("Error al generar el respaldo maestro."); }
+});
+
+// NUEVO: EMPAQUETADOR DE PDFs EN ZIP
+document.getElementById('btnRespaldoPDFs').addEventListener('click', async () => {
+    const btn = document.getElementById('btnRespaldoPDFs');
+    try {
+        btn.innerText = "⏳ Empaquetando PDFs... (Espera)";
+        btn.disabled = true;
+
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) {
+            alert("No hay contratos para descargar.");
+            resetBtnZip(btn); return;
+        }
+
+        const todas = snap.val();
+        const zip = new JSZip();
+        let pdfsGenerados = 0;
+        const { jsPDF } = window.jspdf;
+
+        // Recorrer todas las fechas y programas
+        for (const fecha in todas) {
+            for (const prog in todas[fecha]) {
+                const carpetaPrograma = zip.folder(`${fecha}_${prog.replace(/[ \/]/g, "_")}`);
+                
+                for (const r in todas[fecha][prog]) {
+                    const asis = todas[fecha][prog][r];
+                    const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+
+                    // Generar PDF solo si existe la firma digital guardada
+                    if (asis.firma_digital) {
+                        const doc = new jsPDF({ format: 'legal' });
+                        dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog);
+                        
+                        // En vez de descargar, lo guardamos como Blob para el archivo .ZIP
+                        const pdfBlob = doc.output('blob');
+                        carpetaPrograma.file(`Contrato_${r}.pdf`, pdfBlob);
+                        pdfsGenerados++;
+                    }
+                }
+            }
+        }
+
+        if (pdfsGenerados === 0) {
+            alert("No se encontraron firmas digitales para generar contratos.");
+            resetBtnZip(btn); return;
+        }
+
+        // Descargar el archivo ZIP compilado
+        const zipContent = await zip.generateAsync({type:"blob"});
+        const a = document.createElement("a"); 
+        a.href = URL.createObjectURL(zipContent); 
+        a.download = `Respaldo_Contratos_PDF_${new Date().toISOString().split('T')[0]}.zip`; 
+        a.click();
+
+        alert(`¡Éxito! Se empaquetaron ${pdfsGenerados} contratos legales en tu archivo ZIP.\nYa puedes subir este archivo a Dropbox.`);
+        resetBtnZip(btn);
+
     } catch (error) {
-        alert("Error al generar el respaldo maestro.");
+        console.error(error);
+        alert("Error al empaquetar los PDFs. Revisa tu conexión a internet.");
+        resetBtnZip(btn);
     }
 });
 
-// Lógica del Input de Confirmación para borrar
+function resetBtnZip(btn) {
+    btn.innerText = "🗂️ Descargar ZIP de Contratos";
+    btn.disabled = false;
+}
+
+// Lógica de Limpieza
 const inputConfirmar = document.getElementById('inputConfirmarLimpieza');
 const btnEjecutar = document.getElementById('btnEjecutarLimpieza');
 
 inputConfirmar.addEventListener('input', (e) => {
-    if (e.target.value === "LIMPIAR") {
-        btnEjecutar.disabled = false;
-    } else {
-        btnEjecutar.disabled = true;
-    }
+    btnEjecutar.disabled = (e.target.value !== "LIMPIAR");
 });
 
 btnEjecutar.addEventListener('click', async () => {
@@ -566,16 +632,9 @@ btnEjecutar.addEventListener('click', async () => {
         await remove(ref(db, '3_reservas'));
         
         alert("✅ Nube limpiada con éxito. \nEl espacio ha sido liberado para el próximo mes.");
-        
-        // Cerrar modal automáticamente
         const modal = bootstrap.Modal.getInstance(document.getElementById('modalLimpieza'));
         modal.hide();
-        inputConfirmar.value = "";
-        btnEjecutar.disabled = true;
-        
-        // Refrescar para limpiar las tablas
+        inputConfirmar.value = ""; btnEjecutar.disabled = true;
         window.location.reload();
-    } catch (error) {
-        alert("Error al limpiar la base de datos.");
-    }
+    } catch (error) { alert("Error al limpiar la base de datos."); }
 });
