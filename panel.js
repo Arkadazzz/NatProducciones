@@ -21,10 +21,12 @@ onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.ht
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
+let valorHoraExtraGlobal = 0;
 let html5QrcodeScanner = null; let signaturePad; let rutActual = ""; let claveActual = "";
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
 let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico = 1;
+window.asistentesSinSalida = 0; // Para el escudo del cierre
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
@@ -44,10 +46,10 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                 <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
                     <div>
                         <strong class="text-white">${p.nombre}</strong> ${badgePin}<br>
-                        <small style="color: #d6b3ff;">${p.fecha} | Base: $${p.monto} | Salida: ${p.hora_termino || 'No definida'}</small>
+                        <small style="color: #d6b3ff;">${p.fecha} | Base: $${p.monto} | Salida: ${p.hora_termino || 'No definida'} | H.Extra: $${p.valor_hora_extra || 0}</small>
                     </div>
                     <div>
-                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}')">🚪 Entrar</button>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}')">🚪 Entrar</button>
                         <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
                     </div>
                 </div>`;
@@ -63,15 +65,22 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
     const horaSal = document.getElementById('horaTermino').value;
-    if (!nom || !fec || !mon || !horaSal) return alert("Completa todos los campos.");
+    const valorHE = document.getElementById('valorHoraExtra').value || 0;
+    
+    if (!nom || !fec || !mon || !horaSal) return alert("Completa todos los campos obligatorios.");
     let pinGenerado = ""; if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
-    await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal });
-    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal);
+    
+    await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
+        nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal, valor_hora_extra: valorHE 
+    });
+    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE);
 });
 
-window.unirseASala = function(clave, nom, fec, mon, pin, horaSal) {
-    claveActual = clave; nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; pinActivo = pin || ""; horaTerminoGeneral = horaSal || "";
+window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE) {
+    claveActual = clave; nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; 
+    pinActivo = pin || ""; horaTerminoGeneral = horaSal || ""; valorHoraExtraGlobal = parseInt(valorHE) || 0;
+    
     let titulo = `Sala: ${nom}`; if (pinActivo) titulo += ` <span class="badge bg-warning text-dark ms-2">PIN: ${pinActivo}</span>`;
     document.getElementById('tituloEscaner').innerHTML = titulo;
     document.getElementById('seccionConfiguracion').classList.add('d-none');
@@ -88,19 +97,26 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
-// NUEVO: BOTÓN "ES UN DÍA"
+// ==========================================
+// NUEVO: ESCUDO "CERRAR JORNADA"
+// ==========================================
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
-    if (confirm("🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Estás seguro de que quieres CERRAR LA JORNADA de este programa?\n\nEsto hará que desaparezca de la web para el público.\n(Asegúrate de haberle marcado la salida a todos los que hicieron horas extras).\n\nSi aprietas Aceptar, daremos por terminado el evento.")) {
-        await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
-        alert("¡Jornada terminada con éxito! Gran trabajo hoy.");
-        salirDeSala();
+    
+    if (window.asistentesSinSalida > 0) {
+        if(!confirm(`⚠️ ADVERTENCIA ⚠️\n\nFaltan ${window.asistentesSinSalida} personas por marcarles la salida.\nSi cierras la jornada ahora, no podrás calcular sus horas extras automáticamente.\n\n(No te preocupes, sus pagos base ya están guardados).\n\n¿Cerrar jornada de todas formas?`)) return;
+    } else {
+        if(!confirm("🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Estás seguro de que quieres CERRAR LA JORNADA de este programa?\nDesaparecerá de la web para el público.")) return;
     }
+    
+    await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
+    alert("¡Jornada terminada con éxito! Gran trabajo hoy.");
+    salirDeSala();
 });
 
 document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
 function salirDeSala() {
-    claveActual = ""; nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = ""; horaTerminoGeneral = "";
+    claveActual = ""; nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = ""; horaTerminoGeneral = ""; valorHoraExtraGlobal = 0;
     document.getElementById('seccionConfiguracion').classList.remove('d-none');
     document.getElementById('seccionEscaner').classList.add('d-none');
     document.getElementById('seccionFirma').classList.add('d-none');
@@ -119,8 +135,12 @@ function activarRadares() {
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         const asistencias = snapshot.exists() ? snapshot.val() : {};
         totalFirmados = Object.keys(asistencias).length; actualizarTablero();
+        
         let maxNumero = 0; const conteoStaff = {}; 
+        window.asistentesSinSalida = 0; // Reiniciamos el contador del escudo
+        
         const tbody = document.getElementById('tablaAsistentes'); tbody.innerHTML = "";
+        
         for (const rut in asistencias) {
             const asis = asistencias[rut]; const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
             const num = parseInt(asis.numero_asignado) || 0; if (num > maxNumero) maxNumero = num; 
@@ -130,11 +150,19 @@ function activarRadares() {
             if (asis.hora_salida) {
                 btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
             } else { 
+                window.asistentesSinSalida++; // Contamos a los que faltan
                 btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
             }
             
+            // NUEVO: BOTÓN DE EDICIÓN DE PAGO INDIVIDUAL
+            const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}', ${asis.monto}, '${trab.nombres}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
+
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td><td>${trab.nombres} ${trab.apellidos}<br><small class="text-success">$${asis.monto}</small></td><td>${asis.hora_ingreso}</td><td>${btnSalidaContrato}</td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
+            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td>
+                            <td>${trab.nombres} ${trab.apellidos}<br>${btnEditarPago}</td>
+                            <td>${asis.hora_ingreso}</td>
+                            <td>${btnSalidaContrato}</td>
+                            <td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
         }
         window.siguienteTicketAutomatico = maxNumero + 1;
@@ -154,14 +182,55 @@ function actualizarTablero() {
     document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
 }
 
+// ==========================================
+// NUEVO: EDICIÓN DE SUELDO INDIVIDUAL EN VIVO
+// ==========================================
+window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
+    let nuevoMonto = prompt(`¿Cuánto será el NUEVO PAGO TOTAL de ${nombrePersona} para la jornada de hoy?\n(Monto actual: $${montoActual})`, montoActual);
+    if (nuevoMonto === null || nuevoMonto === "") return;
+    
+    nuevoMonto = parseInt(nuevoMonto);
+    if (isNaN(nuevoMonto)) return alert("Por favor ingresa solo números.");
+    
+    try {
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { monto: nuevoMonto });
+    } catch (e) { alert("Error al actualizar el pago."); }
+}
+
+// ==========================================
+// NUEVO: CÁLCULO DE HORAS EXTRAS AUTOMÁTICO
+// ==========================================
 window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
-    const horaSalida = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const now = new Date();
+    // Forzamos formato 24 hrs estricto (Ej: "19:30")
+    const horaSalida = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     let bonoExtra = 0;
     
     if (tipoIngreso === "Cortesía") {
         if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
     } else {
-        let respuesta = prompt(`Salida: ${horaSalida}. Salida estipulada: ${horaTerminoGeneral}.\n\nSi hizo horas extra, ingresa el bono en pesos (sino, pon 0):`);
+        let bonoSugerido = 0;
+        // Calculadora Matemática de minutos
+        if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
+            let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
+            let [hR, mR] = horaSalida.split(':').map(Number);
+            let minE = hE * 60 + mE;
+            let minR = hR * 60 + mR;
+            let diff = minR - minE;
+            
+            // Si salió después de la hora estimada, calculamos el bono proporcional por minuto y lo redondeamos
+            if (diff > 0) {
+                bonoSugerido = Math.round((diff / 60) * valorHoraExtraGlobal);
+            }
+        }
+        
+        let msj = `Salida actual: ${horaSalida}\nSalida estipulada: ${horaTerminoGeneral || 'No definida'}.\n\nSi le darás un bono por horas extra, ingresa el monto en pesos (si no, pon 0):`;
+        
+        if (bonoSugerido > 0) {
+            msj = `¡ATENCIÓN! La persona se pasó de la hora.\n\nSalida estimada: ${horaTerminoGeneral}\nSalida real: ${horaSalida}\n\n🤖 CÁLCULO AUTOMÁTICO: $${bonoSugerido}\n\nPuedes aceptar este bono sugerido o escribir otro valor:`;
+        }
+        
+        let respuesta = prompt(msj, bonoSugerido);
         if (respuesta === null) return; 
         bonoExtra = parseInt(respuesta) || 0;
     }
@@ -230,7 +299,11 @@ async function onScanSuccess(decodedText) {
 document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
-    const firmaBase64 = signaturePad.toDataURL(); const horaActual = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); const numeroFinal = document.getElementById('numeroAsignado').value;
+    const firmaBase64 = signaturePad.toDataURL(); 
+    const now = new Date();
+    const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    const numeroFinal = document.getElementById('numeroAsignado').value;
+    
     const textoInfo = document.getElementById('infoInvitado').innerText; const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
     let invitadoPor = ""; if (tipo === "Cortesía" && textoInfo.includes("Por: ")) invitadoPor = textoInfo.split("Por: ")[1].replace(")", "");
     try {
@@ -261,7 +334,7 @@ function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
 
     const textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por doña Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, de nacionalidad Chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '__________________________________'}, domiciliado/a en calle ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
 
-PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la production "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
+PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
 SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
@@ -359,11 +432,16 @@ window.verPerfil = function(rut) {
 document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
-            nombres: document.getElementById('editNombres').value, apellidos: document.getElementById('editApellidos').value,
-            fechaNacimiento: document.getElementById('editNacimiento').value, telefono: document.getElementById('editTel').value, 
-            email: document.getElementById('editEmail').value, direccion: document.getElementById('editDir').value,
-            banco: document.getElementById('editBanco').value, numeroCuenta: document.getElementById('editCuenta').value,
-            afp: document.getElementById('editAfp').value, salud: document.getElementById('editSalud').value
+            nombres: document.getElementById('editNombres').value, 
+            apellidos: document.getElementById('editApellidos').value,
+            fechaNacimiento: document.getElementById('editNacimiento').value,
+            telefono: document.getElementById('editTel').value, 
+            email: document.getElementById('editEmail').value,
+            direccion: document.getElementById('editDir').value,
+            banco: document.getElementById('editBanco').value, 
+            numeroCuenta: document.getElementById('editCuenta').value,
+            afp: document.getElementById('editAfp').value, 
+            salud: document.getElementById('editSalud').value
         });
         alert("Datos actualizados correctamente."); 
         listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db), `1_trabajadores/${rutPerfilActual}`))).val();
@@ -372,7 +450,7 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
 });
 
 document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
-    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
+    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre. Si vuelve, tendrá que rellenar el formulario de nuevo.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; renderCRM(listaGlobalCRM); modalFichaInstance.hide(); alert("Trabajador eliminado.");
     }
