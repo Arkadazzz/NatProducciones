@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Control | Nat Producciones</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- LIBRERÍAS PARA PDF Y ZIP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { background-color: #0a0a0a; color: #ffffff; font-family: 'Segoe UI', system-ui, sans-serif; }
         .navbar { background-color: #141414; border-bottom: 1px solid #2a2a2a; }
@@ -213,22 +215,34 @@
         <!-- PESTAÑA 4: MANTENIMIENTO -->
         <div class="tab-pane fade" id="mantenimiento" role="tabpanel">
             <div class="alert alert-warning text-center fw-bold" style="background: #2a2000; border: 1px solid #ffcc00; color: #ffcc00;">
-                ⚠️ ZONA DE ADMINISTRACIÓN AVANZADA ⚠️
+                ⚠️ PROCEDIMIENTO OFICIAL DE CIERRE MENSUAL ⚠️
             </div>
             
             <div class="row">
-                <div class="col-md-6 mb-4">
-                    <div class="card-panel h-100" style="border-color: #00d26a;">
-                        <h4 style="color: #00d26a;">1. Respaldar Datos</h4>
-                        <p style="color: #aaaaaa;">Descarga un archivo Excel Maestro con TODO el historial de asistencias (Todas las fechas y todos los programas) antes de limpiar la nube.</p>
-                        <button class="btn btn-outline-success w-100 fw-bold py-3 mt-2" id="btnRespaldoMaestro">📥 Descargar Excel Maestro</button>
+                <!-- PASO 1 -->
+                <div class="col-md-4 mb-4">
+                    <div class="card-panel h-100 text-center" style="border-color: #00d26a;">
+                        <h4 style="color: #00d26a;">1. Respaldo Excel</h4>
+                        <p style="color: #aaaaaa;">Descarga el historial completo en formato CSV (Nombres, montos y horas).</p>
+                        <button class="btn btn-outline-success w-100 fw-bold py-3 mt-auto" id="btnRespaldoMaestro">📥 Excel Maestro</button>
                     </div>
                 </div>
-                <div class="col-md-6 mb-4">
-                    <div class="card-panel h-100" style="border-color: #ff3333; background: rgba(255, 51, 51, 0.05);">
-                        <h4 style="color: #ff3333;">2. Limpieza de Nube</h4>
-                        <p style="color: #aaaaaa;">Borra el historial de asistencias y reservas para liberar espacio en el servidor de Firebase. <b>Tus trabajadores y Blacklist quedarán intactos.</b></p>
-                        <button class="btn btn-danger w-100 fw-bold py-3 mt-2" data-bs-toggle="modal" data-bs-target="#modalLimpieza">🗑️ Vaciar Nube (Liberar Espacio)</button>
+                
+                <!-- PASO 2 (NUEVO) -->
+                <div class="col-md-4 mb-4">
+                    <div class="card-panel h-100 text-center" style="border-color: #b066ff;">
+                        <h4 style="color: #b066ff;">2. Respaldo PDFs</h4>
+                        <p style="color: #aaaaaa;">Empaqueta todos los contratos legales firmados en un solo archivo .ZIP.</p>
+                        <button class="btn btn-outline-primary w-100 fw-bold py-3 mt-auto" id="btnRespaldoPDFs" style="border-color: #b066ff; color: #d6b3ff;">🗂️ Descargar ZIP de Contratos</button>
+                    </div>
+                </div>
+
+                <!-- PASO 3 -->
+                <div class="col-md-4 mb-4">
+                    <div class="card-panel h-100 text-center" style="border-color: #ff3333; background: rgba(255, 51, 51, 0.05);">
+                        <h4 style="color: #ff3333;">3. Limpieza de Nube</h4>
+                        <p style="color: #aaaaaa;">Borra todo para liberar espacio. ¡Hazlo solo después de descargar el Excel y el ZIP!</p>
+                        <button class="btn btn-danger w-100 fw-bold py-3 mt-auto" data-bs-toggle="modal" data-bs-target="#modalLimpieza">🗑️ Vaciar Nube</button>
                     </div>
                 </div>
             </div>
@@ -237,7 +251,7 @@
     </div>
 </div>
 
-<!-- MODAL FICHA TÉCNICA -->
+<!-- Modal para CRM -->
 <div class="modal fade" id="modalFicha" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #444;">
