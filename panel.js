@@ -115,10 +115,15 @@ function activarRadares() {
             const asis = asistencias[rut]; const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
             const num = parseInt(asis.numero_asignado) || 0; if (num > maxNumero) maxNumero = num; 
             if (asis.tipo_ingreso === "Cortesía" && asis.invitado_por) conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
+            
             let btnSalidaContrato = "";
             if (asis.hora_salida) {
                 btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
-            } else { btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}')">Marcar Salida</button>`; }
+            } else { 
+                // AQUÍ ESTÁ LA MAGIA DEL PARCHE (LE PASAMOS EL TIPO DE INGRESO Y SU MONTO ACTUAL)
+                btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
+            }
+            
             const tr = document.createElement('tr');
             tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td><td>${trab.nombres} ${trab.apellidos}<br><small class="text-success">$${asis.monto}</small></td><td>${asis.hora_ingreso}</td><td>${btnSalidaContrato}</td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
@@ -140,19 +145,35 @@ function actualizarTablero() {
     document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
 }
 
-window.marcarSalida = async function(rut) {
+// MOTOR DE SALIDA REPARADO A PRUEBA DE CORTESÍAS
+window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     const horaSalida = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    let bonoExtra = prompt(`Salida: ${horaSalida}. Salida estipulada: ${horaTerminoGeneral}.\n\nSi hizo horas extra, ingresa el bono en pesos (sino, pon 0):`);
-    if (bonoExtra === null) return; 
-    bonoExtra = parseInt(bonoExtra) || 0;
-    const nuevoMontoTotal = parseInt(montoPago) + bonoExtra;
+    let bonoExtra = 0;
+    
+    // Si la persona es de cortesía, NO LE PREGUNTAMOS POR PLATA y no sumamos nada.
+    if (tipoIngreso === "Cortesía") {
+        if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
+    } else {
+        // Si es extra pagado, le preguntamos si hay horas extras
+        let respuesta = prompt(`Salida: ${horaSalida}. Salida estipulada: ${horaTerminoGeneral}.\n\nSi hizo horas extra, ingresa el bono en pesos (sino, pon 0):`);
+        if (respuesta === null) return; 
+        bonoExtra = parseInt(respuesta) || 0;
+    }
+    
+    // Su nuevo monto es el que YA TENÍA asignado al entrar + el bono extra (si aplica)
+    const nuevoMontoTotal = parseInt(montoBaseActual) + bonoExtra;
+    
     try {
-        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: bonoExtra, monto: nuevoMontoTotal });
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
+            hora_salida: horaSalida, 
+            bono_horas_extras: bonoExtra, 
+            monto: nuevoMontoTotal 
+        });
     } catch (error) { alert("Error al marcar salida."); }
 }
 
 // ==========================================
-// NUEVO: BUSCADOR DE RUT MANUAL DE EMERGENCIA
+// BUSCADOR DE RUT MANUAL DE EMERGENCIA
 // ==========================================
 document.getElementById('btnIngresoManual').addEventListener('click', () => {
     const rutIngresado = document.getElementById('rutManual').value.trim();
@@ -460,7 +481,7 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
 // ==========================================
-// PESTAÑA 4: REPORTES DT 
+// PESTAÑA 4: REPORTES DT (CON MEMORIA DE ACORDEÓN)
 // ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
