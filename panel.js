@@ -97,9 +97,6 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
-// ==========================================
-// NUEVO: CIERRE DE JORNADA MASIVO (CHECKOUT AUTOMÁTICO)
-// ==========================================
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
     
@@ -111,7 +108,6 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!confirm(mensajeAlerta)) return;
 
     try {
-        // 1. Leemos a todos los que están adentro
         const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
         
         if (snap.exists()) {
@@ -119,15 +115,12 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
             let actualizacionesFirebase = {};
             let procesados = 0;
 
-            // Recorremos a cada persona
             for (const rut in asistencias) {
                 const asis = asistencias[rut];
                 
-                // Si la persona AÚN NO tiene marcada la salida
                 if (!asis.hora_salida) {
                     let bonoExtra = 0;
                     
-                    // Calculamos matemáticamente sus horas extras (solo si no es cortesía)
                     if (asis.tipo_ingreso !== "Cortesía" && horaTerminoGeneral && valorHoraExtraGlobal > 0) {
                         let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
                         let [hR, mR] = horaSalidaMasiva.split(':').map(Number);
@@ -142,7 +135,6 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
                     
                     const nuevoMontoTotal = parseInt(asis.monto) + bonoExtra;
                     
-                    // Armamos el paquete de actualización para Firebase
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoExtra;
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = nuevoMontoTotal;
@@ -151,14 +143,12 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
                 }
             }
 
-            // Enviamos el guardado masivo a Firebase en 1 segundo
             if (Object.keys(actualizacionesFirebase).length > 0) {
                 await update(ref(db), actualizacionesFirebase);
                 alert(`✅ Checkout Masivo Exitoso.\nSe le marcó la salida automática y se calculó el pago a ${procesados} personas.`);
             }
         }
 
-        // 2. Cerramos la puerta pública
         await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
         alert("¡Jornada terminada con éxito! Gran trabajo hoy.");
         salirDeSala();
@@ -611,6 +601,7 @@ async function cargarReportesDT() {
             const isOpen = (idAbierto === `collapseDT_${index}`) ? 'show' : '';
             const isCollapsed = (idAbierto === `collapseDT_${index}`) ? '' : 'collapsed';
 
+            // AQUI SE AGREGA LA COLUMNA TELÉFONO
             htmlAcordeon += `
             <div class="accordion-item">
                 <h2 class="accordion-header"><button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span></button></h2>
@@ -618,11 +609,12 @@ async function cargarReportesDT() {
                     <div class="accordion-body">
                         <div class="table-responsive">
                             <table class="table table-dark table-hover table-sm text-center align-middle" style="font-size: 0.85em;">
-                                <thead style="color: #b066ff;"><tr><th>RUT</th><th>Nombre Completo</th><th>Dirección</th><th>AFP</th><th>Salud</th><th>Banco</th><th>Cuenta</th></tr></thead>
+                                <thead style="color: #b066ff;"><tr><th>RUT</th><th>Nombre Completo</th><th>Teléfono</th><th>Dirección</th><th>AFP</th><th>Salud</th><th>Banco</th><th>Cuenta</th></tr></thead>
                                 <tbody>`;
             for (const rut in asistentesDeEseDia) {
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-                htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
+                // AQUI SE INYECTA EL DATO DEL TELÉFONO
+                htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
             }
             htmlAcordeon += `</tbody></table></div></div></div></div>`;
         }
