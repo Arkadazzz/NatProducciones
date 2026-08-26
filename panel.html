@@ -29,7 +29,6 @@
         .metric-box small { color: #dddddd !important; font-size: 1em; font-weight: 500; }
         .metric-box span { display: block; font-size: 2.2em; font-weight: bold; line-height: 1; margin-top: 5px; }
         
-        /* ESTILOS PARA EL ACORDEÓN DT */
         .accordion-button { background-color: #1a1a1a; color: #b066ff; font-weight: bold; border: 1px solid #333; }
         .accordion-button:not(.collapsed) { background-color: #2d1b4e; color: #ffffff; box-shadow: none; border-color: #b066ff; }
         .accordion-item { background-color: #141414; border: 1px solid #333; margin-bottom: 10px; border-radius: 8px !important; overflow: hidden; }
@@ -218,14 +217,19 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 4: REPORTES DT (NUEVA) -->
+        <!-- PESTAÑA 4: REPORTES DT (MODIFICADA PARA TIEMPO REAL) -->
         <div class="tab-pane fade" id="reportesdt" role="tabpanel">
             <div class="card-panel">
-                <h5>📋 Asistencias por Fecha y Programa (Para copiar a la DT)</h5>
-                <p class="text-muted">Abre la flecha del programa para ver todos los datos personales de quienes asistieron ese día.</p>
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h5 class="mb-1">📋 Asistencias por Fecha y Programa (DT)</h5>
+                        <p class="text-muted mb-0" style="font-size: 0.9em;">Abre el programa en vivo. Para ver a los nuevos asistentes que llegan, presiona el botón de actualizar.</p>
+                    </div>
+                    <button class="btn btn-outline-success fw-bold px-4" id="btnRefrescarDT">🔄 Actualizar Lista en Vivo</button>
+                </div>
+                
                 <div class="accordion mt-4" id="acordeonDT">
-                    <!-- JS rellena esto -->
-                    <p class="text-center text-muted mt-3">Cargando historiales...</p>
+                    <p class="text-center text-muted mt-3">Haz clic en Actualizar para cargar...</p>
                 </div>
             </div>
         </div>
@@ -266,7 +270,7 @@
     </div>
 </div>
 
-<!-- MODAL EDICIÓN Y FICHA TÉCNICA (NUEVO DISEÑO PARA CORREGIR ERRORES) -->
+<!-- MODAL EDICIÓN Y FICHA TÉCNICA -->
 <div class="modal fade" id="modalFicha" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #444;">
@@ -274,17 +278,12 @@
                 <h5 class="modal-title" style="color: #b066ff; font-weight: bold;">Editar Datos del Trabajador</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="contenidoFicha" style="font-size: 0.95em;">
-                <!-- Formulario inyectado por JS -->
-            </div>
+            <div class="modal-body" id="contenidoFicha" style="font-size: 0.95em;"></div>
             <div class="modal-footer" style="border-top: 1px solid #333; display: flex; flex-wrap: wrap; justify-content: space-between;">
                 <div class="w-100 mb-3" style="border-bottom: 1px dashed #333; padding-bottom: 10px;">
                     <button type="button" class="btn btn-success fw-bold w-100" id="btnGuardarEdicion">💾 Guardar Cambios Correctivos</button>
                 </div>
-                
-                <!-- ZONA DE PELIGRO -->
                 <div class="w-100 text-center mb-2"><small class="text-danger fw-bold">ZONA DE RESTRICCIÓN</small></div>
-                
                 <div class="input-group mb-2">
                     <input type="text" id="motivoBloqueo" class="form-control bg-dark border-danger text-white" placeholder="Motivo de bloqueo">
                     <button type="button" class="btn btn-warning fw-bold" id="btnBloquear">Bloquear (Blacklist)</button>
