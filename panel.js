@@ -20,7 +20,8 @@ const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "1
 onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
-let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let rutActual = ""; let pinActivo = "";
+// Variables de la SALA ACTUAL
+let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
 let html5QrcodeScanner = null; let signaturePad;
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
@@ -46,10 +47,10 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                 <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
                     <div>
                         <strong class="text-white">${p.nombre}</strong> ${badgePin}<br>
-                        <small style="color: #d6b3ff;">${p.fecha} | $${p.monto}</small>
+                        <small style="color: #d6b3ff;">${p.fecha} | Base: $${p.monto} | Salida: ${p.hora_termino || 'No definida'}</small>
                     </div>
                     <div>
-                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}')">🚪 Entrar</button>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}')">🚪 Entrar</button>
                         <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
                     </div>
                 </div>
@@ -65,22 +66,20 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
-    if (!nom || !fec) return alert("Selecciona programa y fecha.");
+    const horaSal = document.getElementById('horaTermino').value;
+    if (!nom || !fec || !mon || !horaSal) return alert("Completa todos los campos (incluyendo el Monto y la Hora de Salida).");
     
-    // GENERADOR DE PIN ALEATORIO SI ES EL MURO
     let pinGenerado = "";
-    if (nom === "Detrás del Muro") {
-        pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
-    }
+    if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     
     const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
-    await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { nombre: nom, fecha: fec, monto: mon, pin: pinGenerado });
+    await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal });
     
-    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado);
+    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal);
 });
 
-window.unirseASala = function(clave, nom, fec, mon, pin) {
-    nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; pinActivo = pin || "";
+window.unirseASala = function(clave, nom, fec, mon, pin, horaSal) {
+    nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; pinActivo = pin || ""; horaTerminoGeneral = horaSal || "";
     
     let titulo = `Sala: ${nom}`;
     if (pinActivo) titulo += ` <span class="badge bg-warning text-dark ms-2">PIN I/P: ${pinActivo}</span>`;
@@ -106,7 +105,7 @@ window.cerrarProgramaGlobal = async function(clave) {
 document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
 
 function salirDeSala() {
-    nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = "";
+    nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = ""; horaTerminoGeneral = "";
     document.getElementById('seccionConfiguracion').classList.remove('d-none');
     document.getElementById('seccionEscaner').classList.add('d-none');
     document.getElementById('seccionFirma').classList.add('d-none');
@@ -147,8 +146,20 @@ function activarRadares() {
                 conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
             }
             
+            // BOTONES DE SALIDA Y CONTRATO
+            let btnSalidaContrato = "";
+            if (asis.hora_salida) {
+                btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
+            } else {
+                btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}')">Marcar Salida</button>`;
+            }
+
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td><td>${trab.nombres} ${trab.apellidos}</td><td>${asis.hora_ingreso}</td><td><span class="badge ${asis.tipo_ingreso === 'Pago' ? 'bg-success' : 'bg-warning text-dark'}">${asis.tipo_ingreso}</span></td><td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
+            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td>
+                            <td>${trab.nombres} ${trab.apellidos}<br><small class="text-success">$${asis.monto}</small></td>
+                            <td>${asis.hora_ingreso}</td>
+                            <td>${btnSalidaContrato}</td>
+                            <td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
         }
         window.siguienteTicketAutomatico = maxNumero + 1;
@@ -171,6 +182,82 @@ function actualizarTablero() {
     document.getElementById('contFirmados').innerText = totalFirmados;
     let faltan = totalEsperados - totalFirmados;
     document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
+}
+
+// ----------------------------------------------------
+// NUEVA FUNCIÓN: MARCAR SALIDA Y CALCULAR HORAS EXTRAS
+// ----------------------------------------------------
+window.marcarSalida = async function(rut) {
+    const horaSalida = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    
+    // Preguntamos al productor si quiere agregar un bono por horas extras
+    let bonoExtra = prompt(`La hora de salida es ${horaSalida}.\nLa salida estimada era a las ${horaTerminoGeneral}.\n\nSi el extra acumuló horas extra, ingresa el monto adicional a sumarle a su pago base de $${montoPago}:\n(Si no hay bono, deja en 0)`);
+    
+    if (bonoExtra === null) return; // Si apretó cancelar
+    
+    bonoExtra = parseInt(bonoExtra) || 0;
+    const nuevoMontoTotal = parseInt(montoPago) + bonoExtra;
+    
+    try {
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), {
+            hora_salida: horaSalida,
+            bono_horas_extras: bonoExtra,
+            monto: nuevoMontoTotal
+        });
+        if(bonoExtra > 0) alert(`Se sumaron $${bonoExtra} por horas extra. Monto final: $${nuevoMontoTotal}`);
+    } catch (error) {
+        alert("Error al marcar salida.");
+    }
+}
+
+// ----------------------------------------------------
+// NUEVA FUNCIÓN: GENERADOR DE PDF LEGAL
+// ----------------------------------------------------
+window.generarContratoPDF = async function(rut) {
+    const trab = listaGlobalCRM[rut];
+    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
+    if (!trab || !asisSnap.exists()) return alert("Faltan datos para generar el PDF.");
+    
+    const asis = asisSnap.val();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Configuración de texto
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("CONTRATO DE PRESTACIÓN DE SERVICIOS DIARIOS", 105, 30, null, null, "center");
+    
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    
+    const textoLegal = `En Santiago de Chile, a ${fechaPrograma}, se celebra el presente contrato de prestación de servicios entre NAT PRODUCCIONES, en adelante "La Productora", y don/doña ${trab.nombres} ${trab.apellidos}, RUT ${rut}, con domicilio en ${trab.direccion || '__________________'}, en adelante "El Trabajador/a".
+
+PRIMERO: El Trabajador prestará servicios eventuales y transitorios como ${asis.tipo_ingreso} para la realización del programa de televisión denominado "${nombrePrograma}".
+
+SEGUNDO: La jornada de prestación de servicios se fija para el día de la fecha, comenzando su registro de ingreso a las ${asis.hora_ingreso} hrs, y su salida a las ${asis.hora_salida || horaTerminoGeneral} hrs.
+
+TERCERO: Como honorario único y total por los servicios prestados en esta jornada (incluyendo recargos u horas extra si correspondiesen), La Productora pagará la suma líquida de $${asis.monto} pesos. Este monto será depositado en la cuenta bancaria proporcionada por El Trabajador (Banco ${trab.banco || '_____'}, Cuenta N° ${trab.numeroCuenta || '_____'}).
+
+CUARTO: El Trabajador declara que se encuentra afiliado a la AFP ${trab.afp || '_____'} y al sistema de salud ${trab.salud || '_____'}.
+
+QUINTO: Para constancia y en señal de conformidad, el trabajador firma de manera electrónica el presente documento.`;
+
+    // Imprimir texto con saltos de línea automáticos
+    const lineas = doc.splitTextToSize(textoLegal, 170);
+    doc.text(lineas, 20, 50);
+    
+    // Imprimir Firma Digital
+    if (asis.firma_digital) {
+        doc.setFont("helvetica", "bold");
+        doc.text("FIRMA DEL TRABAJADOR:", 105, 170, null, null, "center");
+        // Ajustamos la imagen de la firma centrada
+        doc.addImage(asis.firma_digital, 'PNG', 55, 180, 100, 50);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${trab.nombres} ${trab.apellidos}`, 105, 235, null, null, "center");
+        doc.text(`RUT: ${rut}`, 105, 242, null, null, "center");
+    }
+
+    doc.save(`Contrato_${nombrePrograma}_${rut}.pdf`);
 }
 
 async function onScanSuccess(decodedText) {
@@ -216,7 +303,7 @@ document.getElementById('btnLimpiarFirma').addEventListener('click', () => signa
 document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     const firmaBase64 = signaturePad.toDataURL(); 
-    const horaActual = new Date().toLocaleTimeString(); 
+    const horaActual = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); 
     const numeroFinal = document.getElementById('numeroAsignado').value;
 
     const textoInfo = document.getElementById('infoInvitado').innerText;
