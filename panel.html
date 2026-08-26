@@ -82,32 +82,32 @@
                         
                         <input type="date" id="fechaPrograma" class="form-control mb-3 fw-bold text-center" style="font-size: 1.3em; padding: 15px; color: #d6b3ff !important; border: 2px solid #b066ff !important;">
                         
-                        <div class="row">
-                            <div class="col-md-3 mb-3">
-                                <label class="text-muted" style="font-size:0.85em;">Base ($)</label>
-                                <input type="number" id="montoPago" class="form-control fw-bold text-center" placeholder="20000" style="font-size: 1em; padding: 10px;">
+                        <!-- FILA CON ALINEACIÓN ESTRICTA Y ALTURAS FIJAS -->
+                        <div class="row align-items-end mb-4">
+                            <div class="col-6 col-md-3 mb-2">
+                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Base ($)</label>
+                                <input type="number" id="montoPago" class="form-control fw-bold text-center" placeholder="20000" style="height: 48px; font-size: 1.1em;">
                             </div>
                             
-                            <!-- NUEVO: HORA DE CITACIÓN -->
-                            <div class="col-md-3 mb-3">
-                                <label class="text-muted" style="font-size:0.85em;">Citación (Llegada)</label>
-                                <input type="time" id="horaCitacion" class="form-control fw-bold text-center text-info" style="font-size: 1em; padding: 10px;">
+                            <div class="col-6 col-md-3 mb-2">
+                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Citación</label>
+                                <input type="time" id="horaCitacion" class="form-control fw-bold text-center text-info" style="height: 48px; font-size: 1.1em;">
                             </div>
 
-                            <div class="col-md-3 mb-3">
-                                <label class="text-muted" style="font-size:0.85em;">Salida Estimada</label>
-                                <div class="input-group">
-                                    <input type="text" id="horaTermino" class="form-control fw-bold text-center text-warning" placeholder="07:30" style="font-size: 1em; padding: 10px;">
-                                    <select id="amPmTermino" class="form-select fw-bold bg-dark text-warning px-1" style="font-size: 0.9em;">
+                            <div class="col-6 col-md-3 mb-2">
+                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Salida</label>
+                                <div class="input-group" style="height: 48px;">
+                                    <input type="text" id="horaTermino" class="form-control fw-bold text-center text-warning" placeholder="07:30" style="font-size: 1.1em; height: 100%;">
+                                    <select id="amPmTermino" class="form-select fw-bold bg-dark text-warning px-1" style="font-size: 0.9em; max-width: 65px; height: 100%;">
                                         <option value="PM" selected>PM</option>
                                         <option value="AM">AM</option>
                                     </select>
                                 </div>
                             </div>
                             
-                            <div class="col-md-3 mb-3">
-                                <label class="text-muted" style="font-size:0.85em;">Valor H.Extra</label>
-                                <input type="number" id="valorHoraExtra" class="form-control fw-bold text-center" placeholder="3000" style="font-size: 1em; padding: 10px;">
+                            <div class="col-6 col-md-3 mb-2">
+                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">H. Extra ($)</label>
+                                <input type="number" id="valorHoraExtra" class="form-control fw-bold text-center" placeholder="3000" style="height: 48px; font-size: 1.1em;">
                             </div>
                         </div>
                         <button class="btn btn-custom w-100 fs-5" id="btnActivarWeb">📢 Publicar Formulario de Inscripción</button>
