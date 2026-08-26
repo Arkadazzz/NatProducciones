@@ -21,7 +21,7 @@ onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.ht
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
-let html5QrcodeScanner = null; let signaturePad;
+let html5QrcodeScanner = null; let signaturePad; let rutActual = "";
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
 let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico = 1;
@@ -151,6 +151,79 @@ window.marcarSalida = async function(rut) {
     } catch (error) { alert("Error al marcar salida."); }
 }
 
+// ==========================================
+// NUEVO: BUSCADOR DE RUT MANUAL DE EMERGENCIA
+// ==========================================
+document.getElementById('btnIngresoManual').addEventListener('click', () => {
+    const rutIngresado = document.getElementById('rutManual').value.trim();
+    if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
+    onScanSuccess(rutIngresado);
+    document.getElementById('rutManual').value = "";
+});
+
+async function onScanSuccess(decodedText) {
+    try { if(html5QrcodeScanner) html5QrcodeScanner.pause(); } catch(e) {} 
+    document.getElementById('mensajeEscaneo').classList.remove('d-none'); 
+    rutActual = decodedText; 
+    
+    try {
+        const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
+        if (blacklistSnap.exists()) { 
+            alert(`⛔ ACCESO DENEGADO ⛔\nMotivo: ${blacklistSnap.val().motivo}`); 
+            try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+            return; 
+        }
+        
+        const reservaSnap = await get(child(ref(db), `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`));
+        const snapshot = await get(child(ref(db), `1_trabajadores/${rutActual}`));
+        
+        if (snapshot.exists()) {
+            const datos = snapshot.val(); 
+            document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
+            const infoInvitado = document.getElementById('infoInvitado');
+            
+            if (reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía") { 
+                infoInvitado.innerText = `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})`; 
+            } else { 
+                infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; 
+            }
+            
+            document.getElementById('seccionFirma').classList.remove('d-none'); 
+            document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
+            
+            if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad')); 
+            signaturePad.clear(); 
+            document.getElementById('mensajeEscaneo').classList.add('d-none');
+        } else { 
+            alert("RUT no encontrado en la base de datos de los trabajadores. La persona debe llenar el formulario web primero."); 
+            try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+        }
+    } catch (error) { 
+        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+    }
+}
+
+document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
+document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
+    if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
+    const firmaBase64 = signaturePad.toDataURL(); const horaActual = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); const numeroFinal = document.getElementById('numeroAsignado').value;
+    const textoInfo = document.getElementById('infoInvitado').innerText; const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
+    let invitadoPor = ""; if (tipo === "Cortesía" && textoInfo.includes("Por: ")) invitadoPor = textoInfo.split("Por: ")[1].replace(")", "");
+    try {
+        await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente", numero_asignado: numeroFinal, invitado_por: invitadoPor });
+        document.getElementById('seccionFirma').classList.add('d-none'); signaturePad.clear(); 
+        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+        rutActual = "";
+    } catch (error) { alert("Error al guardar."); }
+});
+
+window.anularAsistencia = async function(rut) { if(confirm("¿Seguro que deseas anular esta asistencia?")) await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); }
+
+// ==========================================
+// REDACCIÓN EXACTA DEL CONTRATO LEGAL 
+// ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
@@ -159,22 +232,12 @@ window.generarContratoPDF = async function(rut) {
     doc.save(`Contrato_${nombrePrograma.replace(/[ \/]/g, "_")}_${rut}.pdf`);
 }
 
-// ==========================================
-// REDACCIÓN EXACTA DEL CONTRATO LEGAL 
-// ==========================================
 function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
-    let y = 15; 
-    doc.setFont("helvetica", "bold"); 
-    doc.setFontSize(11);
-    doc.text("Contrato de Trabajo Extras Público (Televisión)", 105, y, null, null, "center"); 
-    y += 15;
-    
-    doc.setFont("helvetica", "normal"); 
-    doc.setFontSize(10);
-    
+    let y = 15; doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+    doc.text("Contrato de Trabajo Extras Público (Televisión)", 105, y, null, null, "center"); y += 15;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
     const mesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    const [yearF, monthF, dayF] = fechaProg.split('-'); 
-    const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} de ${yearF}`;
+    const [yearF, monthF, dayF] = fechaProg.split('-'); const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} de ${yearF}`;
     const fechaNac = trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________';
 
     const textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por doña Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, de nacionalidad Chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '__________________________________'}, domiciliado/a en calle ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
@@ -201,27 +264,15 @@ DÉCIMO. El presente contrato se firma en dos ejemplares del mismo tenor y fecha
 
 UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple. El trazo digital plasmado por el Trabajador asociado a su RUT y validado a través del sistema de acreditación de la Productora, tiene plena validez legal.`;
 
-    const lineas = doc.splitTextToSize(textoContrato, 175); 
-    doc.text(lineas, 20, y);
-    y += (lineas.length * 4.5) + 20; 
+    const lineas = doc.splitTextToSize(textoContrato, 175); doc.text(lineas, 20, y); y += (lineas.length * 4.5) + 20; 
+
+    doc.setFont("helvetica", "bold"); doc.text("_________________________________", 50, y, null, null, "center"); doc.text("Firma Empleador", 50, y + 5, null, null, "center"); doc.setFont("helvetica", "normal"); doc.text("CAMILA FEVRE SEGUEL", 50, y + 10, null, null, "center"); 
 
     doc.setFont("helvetica", "bold"); 
-    doc.text("_________________________________", 50, y, null, null, "center"); 
-    doc.text("Firma Empleador", 50, y + 5, null, null, "center"); 
-    doc.setFont("helvetica", "normal"); 
-    doc.text("CAMILA FEVRE SEGUEL", 50, y + 10, null, null, "center"); 
-
-    doc.setFont("helvetica", "bold"); 
-    if (asis.firma_digital) {
-        doc.addImage(asis.firma_digital, 'PNG', 115, y - 25, 80, 25);
-    }
-    doc.text("_________________________________", 155, y, null, null, "center"); 
-    doc.text("Firma Trabajador", 155, y + 5, null, null, "center"); 
-    doc.setFont("helvetica", "normal"); 
-    doc.text(`${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}`, 155, y + 10, null, null, "center"); 
+    if (asis.firma_digital) doc.addImage(asis.firma_digital, 'PNG', 115, y - 25, 80, 25);
+    doc.text("_________________________________", 155, y, null, null, "center"); doc.text("Firma Trabajador", 155, y + 5, null, null, "center"); doc.setFont("helvetica", "normal"); doc.text(`${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}`, 155, y + 10, null, null, "center"); 
     
     y += 25;
-    
     const notasTexto = `NOTAS: 
 (1) Ley N°21.327 Firma electrónica Modernización de la Dirección del Trabajo. Se agregó en el numeral 2 del inciso primero del artículo 10, del Contrato de Trabajo a continuación de la palabra "nacionalidad", la siguiente frase: ", domicilio y dirección de correo electrónico de ambas partes, si la tuvieren".
 (2) Artículo 22, inciso 1° modificado por la Ley N°21.561: La duración de la jornada ordinaria de trabajo no excederá de cuarenta y cuatro horas semanales y su distribución se podrá efectuar en cada semana calendario o sobre la base de promedios semanales en lapsos de hasta cuatro semanas, en cuyo caso la jornada ordinaria no podrá exceder de cuarenta y cinco horas ordinarias en cada semana, ni extenderse con este límite por más de dos semanas.
@@ -233,41 +284,8 @@ Rut: ${rut}
 Correo electrónico: ${trab.email || '_______________________'}
 (4) Se agrega lo indicado en la cláusula octava en consideración a la reforma introducida por la Ley N°21.327, que agrega el artículo 9 bis, que establece: “En conformidad a lo dispuesto en el artículo 515, el empleador deberá registrar en el sitio electrónico de la Dirección del Trabajo los contratos de trabajo, dentro de los quince días siguientes a su celebración.”`;
 
-    doc.setFontSize(8);
-    const lineasNotas = doc.splitTextToSize(notasTexto, 175);
-    doc.text(lineasNotas, 20, y);
+    doc.setFontSize(8); const lineasNotas = doc.splitTextToSize(notasTexto, 175); doc.text(lineasNotas, 20, y);
 }
-
-async function onScanSuccess(decodedText) {
-    html5QrcodeScanner.pause(); document.getElementById('mensajeEscaneo').classList.remove('d-none'); rutActual = decodedText; 
-    try {
-        const blacklistSnap = await get(child(ref(db, `4_blacklist/${rutActual}`)));
-        if (blacklistSnap.exists()) { alert(`⛔ ACCESO DENEGADO ⛔\nMotivo: ${blacklistSnap.val().motivo}`); html5QrcodeScanner.resume(); document.getElementById('mensajeEscaneo').classList.add('d-none'); return; }
-        const reservaSnap = await get(child(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`)));
-        const snapshot = await get(child(ref(db, `1_trabajadores/${rutActual}`)));
-        if (snapshot.exists()) {
-            const datos = snapshot.val(); document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
-            const infoInvitado = document.getElementById('infoInvitado');
-            if (reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía") { infoInvitado.innerText = `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})`; } else { infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; }
-            document.getElementById('seccionFirma').classList.remove('d-none'); document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
-            if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad')); signaturePad.clear(); document.getElementById('mensajeEscaneo').classList.add('d-none');
-        } else { alert("RUT no encontrado en la base de datos."); html5QrcodeScanner.resume(); document.getElementById('mensajeEscaneo').classList.add('d-none'); }
-    } catch (error) { html5QrcodeScanner.resume(); }
-}
-
-document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
-document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
-    if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
-    const firmaBase64 = signaturePad.toDataURL(); const horaActual = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); const numeroFinal = document.getElementById('numeroAsignado').value;
-    const textoInfo = document.getElementById('infoInvitado').innerText; const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
-    let invitadoPor = ""; if (tipo === "Cortesía" && textoInfo.includes("Por: ")) invitadoPor = textoInfo.split("Por: ")[1].replace(")", "");
-    try {
-        await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente", numero_asignado: numeroFinal, invitado_por: invitadoPor });
-        document.getElementById('seccionFirma').classList.add('d-none'); signaturePad.clear(); html5QrcodeScanner.resume(); rutActual = "";
-    } catch (error) { alert("Error al guardar."); }
-});
-
-window.anularAsistencia = async function(rut) { if(confirm("¿Seguro que deseas anular esta asistencia?")) await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); }
 
 // ==========================================
 // PESTAÑA 2: CRM (EDICIÓN Y BORRADO)
