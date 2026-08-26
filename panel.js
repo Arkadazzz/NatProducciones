@@ -97,6 +97,7 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
+// CHECKOUT MASIVO CON MATEMÁTICA SEGURA
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
     
@@ -133,7 +134,8 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
                         }
                     }
                     
-                    const nuevoMontoTotal = parseInt(asis.monto) + bonoExtra;
+                    const montoBase = parseInt(asis.monto) || 0;
+                    const nuevoMontoTotal = montoBase + bonoExtra;
                     
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoExtra;
@@ -270,7 +272,9 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
         bonoExtra = parseInt(respuesta) || 0;
     }
     
-    const nuevoMontoTotal = parseInt(montoBaseActual) + bonoExtra;
+    const montoBase = parseInt(montoBaseActual) || 0;
+    const nuevoMontoTotal = montoBase + bonoExtra;
+    
     try {
         await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
             hora_salida: horaSalida, 
@@ -514,7 +518,7 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
             if (!deudas[r]) deudas[r] = { monto: 0, dias: 0, rutas_bd: [] };
             deudas[r].monto += parseInt(asis.monto); deudas[r].dias += 1; deudas[r].rutas_bd.push(`2_asistencias/${fecha}/${prog}/${r}`);
         }
-    } } }
+    }}}
     window.deudasGlobales = deudas; const tbody = document.getElementById('tablaDeudas'); tbody.innerHTML = "";
     for (const r in deudas) {
         const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; const fila = document.createElement('tr');
@@ -536,26 +540,46 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     try { await update(ref(db), actualizacionesFirebase); descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`); alert("¡Liquidación exitosa!"); document.getElementById('tablaDeudas').innerHTML = ""; window.deudasGlobales = {}; } catch (error) { alert("Error al liquidar."); }
 });
 
+// NUEVO: BOTÓN DE EXCEL DE BANCO (INDEPENDIENTE DE LA SALA)
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
-    if (!nombrePrograma) return alert("Debes estar DENTRO de una sala activa en la Pestaña 'Puerta' para descargar su Excel.");
-    if (nombrePrograma === "Dale Play") { if (!confirm("Dale Play normalmente se acumula. ¿Estás seguro de pagar hoy y sacarlos de la Bóveda?")) return;
-    } else { if (!confirm(`¿Descargar nómina de hoy para ${nombrePrograma}? Quedarán marcados como PAGADOS.`)) return; }
+    const fechaHoyLocal = new Date().toISOString().split('T')[0];
+    const fechaElegida = prompt("📅 Ingresa la FECHA DE LA GRABACIÓN que deseas pagar al banco hoy (Formato: AAAA-MM-DD):", fechaHoyLocal);
+    if (!fechaElegida) return;
+    
     try {
-        const snap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`))); if (!snap.exists()) return alert("No hay asistentes hoy.");
-        const asistencias = snap.val();
+        const snap = await get(child(ref(db), `2_asistencias/${fechaElegida}`)); 
+        if (!snap.exists()) return alert("No hay asistencias registradas para esta fecha en la base de datos.");
+        
+        const programas = snap.val();
         let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
-        let actualizacionesFirebase = {}; let hayPagosNuevos = false;
-        for (const r in asistencias) {
-            if (asistencias[r].estado_pago === "Pendiente" && asistencias[r].monto > 0) {
-                hayPagosNuevos = true; const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
-                if (tr) { const rutSin = r.replace(/[^0-9kK]/g, ''); csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${asistencias[r].monto};;${tr.email || ''};;${nombrePrograma};PAGO NAT\n`; }
-                actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${r}/estado_pago`] = "Pagado";
+        let actualizacionesFirebase = {}; 
+        let hayPagosNuevos = false;
+        
+        const omitirDalePlay = confirm("¿Deseas OMITIR a los asistentes de 'Dale Play' de este pago diario?\n\n(Dale a 'Aceptar' para omitirlos y dejarlos en la Bóveda Semanal, o dale a 'Cancelar' para incluirlos y pagarlos hoy mismo).");
+
+        for (const prog in programas) {
+            if (omitirDalePlay && prog === "Dale Play") continue; 
+            
+            for (const r in programas[prog]) {
+                const asis = programas[prog][r];
+                if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
+                    hayPagosNuevos = true; 
+                    const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val() || {nombres: "Desconocido", apellidos: ""};
+                    const rutSin = r.replace(/[^0-9kK]/g, ''); 
+                    csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${asis.monto};;${tr.email || ''};;${prog};PAGO NAT\n`; 
+                    actualizacionesFirebase[`2_asistencias/${fechaElegida}/${prog}/${r}/estado_pago`] = "Pagado";
+                }
             }
         }
-        if (!hayPagosNuevos) return alert("Ya fueron marcadas como Pagadas.");
-        await update(ref(db), actualizacionesFirebase);
-        descargarCSV(csv, `Nomina_Banco_DIARIA_${nombrePrograma.replace(/[ \/]/g, "_")}_${fechaPrograma}.csv`); alert("¡Nómina diaria descargada!");
-    } catch (e) { alert("Error al generar Excel."); }
+        
+        if (!hayPagosNuevos) return alert("No hay pagos pendientes para esta fecha. O ya fueron pagados, o sus montos son de $0.");
+        
+        if(confirm(`¡Se encontraron extras por pagar el día ${fechaElegida}!\n\n¿Descargar el Excel del Banco y marcarlos como PAGADOS en el sistema?`)){
+            await update(ref(db), actualizacionesFirebase);
+            descargarCSV(csv, `Nomina_Banco_DIARIA_${fechaElegida}.csv`); 
+            alert("¡Nómina diaria descargada con éxito!");
+        }
+    } catch (e) { alert("Error al generar Excel del Banco."); console.log(e); }
 });
 
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
@@ -565,7 +589,7 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
         let tot = {}; const todas = snap.val();
         for (const f in todas) { if (f.startsWith(mes)) { for (const prog in todas[f]) { for (const r in todas[f][prog]) {
             if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; tot[r].monto += parseInt(todas[f][prog][r].monto) || 0;
-        } } } }
+        }}}}
         let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
         for (const r in tot) {
             const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
@@ -581,7 +605,7 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
 // ==========================================
-// PESTAÑA 4: REPORTES DT (CON COLUMNA TELÉFONO)
+// PESTAÑA 4: REPORTES DT (CON COLUMNA TELÉFONO REPARADA)
 // ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
@@ -615,7 +639,7 @@ async function cargarReportesDT() {
                                 <tbody>`;
             for (const rut in asistentesDeEseDia) {
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-                htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
+                htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td class="text-warning fw-bold">${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
             }
             htmlAcordeon += `</tbody></table></div></div></div></div>`;
         }
