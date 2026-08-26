@@ -245,11 +245,9 @@ document.getElementById('buscadorCRM').addEventListener('input', (e) => {
     }, {}); renderCRM(filtrados);
 });
 
-// AQUI ESTA LA MAGIA DEL FORMULARIO EDITABLE
 let rutPerfilActual = "";
 window.verPerfil = function(rut) {
     rutPerfilActual = rut; const p = listaGlobalCRM[rut];
-    
     document.getElementById('contenidoFicha').innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
@@ -272,7 +270,6 @@ window.verPerfil = function(rut) {
     modalFichaInstance.show();
 }
 
-// FUNCIONES NUEVAS: GUARDAR Y ELIMINAR DE RAIZ
 document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
@@ -294,7 +291,6 @@ document.getElementById('btnEliminarTrabajador').addEventListener('click', async
     }
 });
 
-// BLACKLIST
 document.getElementById('btnBloquear').addEventListener('click', async () => {
     const motivo = document.getElementById('motivoBloqueo').value.trim(); if(!motivo) return alert("Debes escribir un motivo.");
     if(confirm("¿Bloquear permanentemente a este usuario?")) {
@@ -388,24 +384,45 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
 // ==========================================
-// PESTAÑA 4: REPORTES DT 
+// PESTAÑA 4: REPORTES DT (CON MEMORIA DE ACORDEÓN)
 // ==========================================
-document.getElementById('dt-tab').addEventListener('click', async () => {
+async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
-    contenedor.innerHTML = "<p class='text-center text-muted'>Cargando base de datos...</p>";
+    const btnRefresh = document.getElementById('btnRefrescarDT');
+    
+    // Guardar qué acordeón estaba abierto para no cerrarlo al actualizar
+    let idAbierto = null;
+    const acordeonAbierto = document.querySelector('#acordeonDT .accordion-collapse.show');
+    if (acordeonAbierto) idAbierto = acordeonAbierto.id;
+
+    btnRefresh.innerText = "⏳ Cargando..."; btnRefresh.disabled = true;
     const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
-    if (!asisSnap.exists()) { contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros.</p>"; return; }
+    btnRefresh.innerText = "🔄 Actualizar Lista en Vivo"; btnRefresh.disabled = false;
+
+    if (!asisSnap.exists()) { contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros de asistencia.</p>"; return; }
     
     const todasLasAsistencias = asisSnap.val(); const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-    let htmlAcordeon = ""; let index = 0; const fechasOrdenadas = Object.keys(todasLasAsistencias).sort().reverse();
+    let htmlAcordeon = ""; let index = 0; 
+    const fechasOrdenadas = Object.keys(todasLasAsistencias).sort().reverse();
 
     for (const fecha of fechasOrdenadas) {
         for (const prog in todasLasAsistencias[fecha]) {
-            index++; const asistentesDeEseDia = todasLasAsistencias[fecha][prog]; const cantidad = Object.keys(asistentesDeEseDia).length;
+            index++; 
+            const asistentesDeEseDia = todasLasAsistencias[fecha][prog]; 
+            const cantidad = Object.keys(asistentesDeEseDia).length;
+            
+            // Lógica para mantener abierto el que estábamos mirando
+            const isOpen = (idAbierto === `collapseDT_${index}`) ? 'show' : '';
+            const isCollapsed = (idAbierto === `collapseDT_${index}`) ? '' : 'collapsed';
+
             htmlAcordeon += `
             <div class="accordion-item">
-                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}">📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span></button></h2>
-                <div id="collapse${index}" class="accordion-collapse collapse" data-bs-parent="#acordeonDT">
+                <h2 class="accordion-header">
+                    <button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">
+                        📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span>
+                    </button>
+                </h2>
+                <div id="collapseDT_${index}" class="accordion-collapse collapse ${isOpen}" data-bs-parent="#acordeonDT">
                     <div class="accordion-body">
                         <div class="table-responsive">
                             <table class="table table-dark table-hover table-sm text-center align-middle" style="font-size: 0.85em;">
@@ -419,7 +436,10 @@ document.getElementById('dt-tab').addEventListener('click', async () => {
         }
     }
     contenedor.innerHTML = htmlAcordeon;
-});
+}
+
+document.getElementById('dt-tab').addEventListener('click', cargarReportesDT);
+document.getElementById('btnRefrescarDT').addEventListener('click', cargarReportesDT);
 
 // ==========================================
 // PESTAÑA 5: MANTENIMIENTO Y EMPAQUETADO ZIP
