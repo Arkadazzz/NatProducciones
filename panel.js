@@ -159,33 +159,83 @@ window.generarContratoPDF = async function(rut) {
     doc.save(`Contrato_${nombrePrograma.replace(/[ \/]/g, "_")}_${rut}.pdf`);
 }
 
+// ==========================================
+// REDACCIÓN EXACTA DEL CONTRATO LEGAL 
+// ==========================================
 function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
-    let y = 15; doc.setFont("helvetica", "bold"); doc.setFontSize(12);
-    doc.text("CONTRATO DE TRABAJO A TRATO POR JORNADA EXTRAORDINARIA", 105, y, null, null, "center"); y += 15;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    let y = 15; 
+    doc.setFont("helvetica", "bold"); 
+    doc.setFontSize(11);
+    doc.text("Contrato de Trabajo Extras Público (Televisión)", 105, y, null, null, "center"); 
+    y += 15;
+    
+    doc.setFont("helvetica", "normal"); 
+    doc.setFontSize(10);
+    
     const mesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    const [yearF, monthF, dayF] = fechaProg.split('-'); const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} del ${yearF}`;
-    const textoContrato = `En SANTIAGO, a ${fechaTexto}, entre NAT PRODUCCIONES SpA., RUT 77.200.730-8, representada por don Agustín Pino Lorca, Cédula de Identidad Nº 21.037.108-9, ambos con domicilio en Avenida Vicuña Mackenna 1370, comuna de Ñuñoa, ciudad de Santiago, que en adelante se denominará “el Empleador”, y don(ña) ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, Cédula de Identidad Nº ${rut}, de Nacionalidad Chilena, nacido(a) el ${trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________'}, domiciliado(a) en ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, que en adelante se denominará “el Trabajador”, se ha convenido el siguiente Contrato de Trabajo a Trato:
+    const [yearF, monthF, dayF] = fechaProg.split('-'); 
+    const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} de ${yearF}`;
+    const fechaNac = trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________';
 
-PRIMERO: El Empleador contrata los servicios del Trabajador para que se desempeñe en calidad de Extra de Televisión. Las partes dejan constancia que la relación laboral se desarrollará en las dependencias de los estudios de grabación que el empleador determine o en locaciones exteriores según sea el requerimiento del programa "${nombreProg}".
+    const textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por doña Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, de nacionalidad Chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '__________________________________'}, domiciliado/a en calle ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
 
-SEGUNDO: Por acuerdo entre las partes, el presente contrato se pacta por una jornada extraordinaria específica que iniciará a las ${asis.hora_ingreso} horas y finalizará a las ${asis.hora_salida || '____'} horas del día de la fecha. Las partes acuerdan, de conformidad a lo establecido en el Artículo 22 del Código del Trabajo, que dada la naturaleza de los servicios prestados, este contrato no está sujeto a control de asistencia tradicional, rigiéndose estrictamente por los horarios pactados para la grabación o evento.
+PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
-TERCERO: Como remuneración a trato por los servicios prestados durante la jornada señalada en la cláusula segunda (incluyendo eventuales extensiones u horas extra que fuesen requeridas y autorizadas por el Productor a cargo), el Empleador pagará al Trabajador la suma bruta/líquida (según corresponda) de $${asis.monto} (pesos chilenos). 
-Dicho pago se realizará mediante transferencia electrónica a la cuenta bancaria del trabajador (Banco: ${trab.banco || '______'}, Cuenta: ${trab.numeroCuenta || '______'}) en los plazos estipulados por las políticas de remuneración de la Productora.
+SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
-CUARTO: El Trabajador declara para todos los efectos legales que se encuentra afiliado a la Administradora de Fondos de Pensiones (A.F.P.) ${trab.afp || '______'} y al sistema de previsión de salud ${trab.salud || '______'}.
+TERCERO. El trabajador/a cumplirá una jornada ordinaria de trabajo que estará establecida en la citación a la jornada, que será entregado al trabajador/a con un mínimo anticipación 24 horas. La jornada diaria no excederá de 10 horas. Lo anterior, sin perjuicio de lo establecido en el Párrafo 2°, del Capítulo IV, del Título I, del Libro I, del Código del Trabajo, relativo a horas extraordinarias.
 
-QUINTO: El Trabajador cede y transfiere a NAT PRODUCCIONES SpA., y/o a quien ésta determine, todos los derechos de imagen, voz, fijación y reproducción audiovisual derivados de su participación en el programa objeto de este contrato, sin límite de tiempo, territorio ni medios de difusión, renunciando desde ya a cualquier cobro adicional por concepto de retransmisión, comercialización o uso publicitario de dicho material.
+CUARTO. El empleador se compromete a pagar al trabajador $${asis.monto} por jornada el que será liquidado y pagado mediante transferencia bancaria.
 
-SEXTO: Las partes dejan expresa constancia de que, de conformidad a la Ley N° 19.799 sobre Documentos Electrónicos, Firma Electrónica y Servicios de Certificación de dicha Firma, el presente contrato se suscribe mediante Firma Electrónica Simple. El trazo digital plasmado por el Trabajador al momento de su ingreso al recinto, asociado a su RUT y validado a través del sistema de acreditación de la Productora, tiene plena validez legal, reconociendo ambas partes su autenticidad. 
+QUINTO. El trabajador autoriza en este acto al empleador a filmar, divulgar, editar, grabar total o parcialmente su imagen y voz, sin restricciones ni límites temporales mediante cualquier soporte o medio de registro, reproducción o difusión.
 
-SÉPTIMO: Para todos los efectos derivados del presente contrato, las partes fijan su domicilio en la ciudad y comuna de Santiago y se someten a la jurisdicción de sus Tribunales de Justicia.`;
-    const lineas = doc.splitTextToSize(textoContrato, 175); doc.text(lineas, 20, y);
-    y += (lineas.length * 5) + 30; 
-    doc.setFont("helvetica", "bold"); doc.text("_________________________________", 50, y, null, null, "center"); doc.text("AGUSTÍN PINO LORCA", 50, y + 5, null, null, "center"); doc.setFont("helvetica", "normal"); doc.text("NAT PRODUCCIONES SpA.", 50, y + 10, null, null, "center"); doc.text("RUT: 77.200.730-8", 50, y + 15, null, null, "center");
-    doc.setFont("helvetica", "bold"); if (asis.firma_digital) doc.addImage(asis.firma_digital, 'PNG', 115, y - 30, 80, 30);
-    doc.text("_________________________________", 155, y, null, null, "center"); doc.text(`${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}`, 155, y + 5, null, null, "center"); doc.setFont("helvetica", "normal"); doc.text(`RUT: ${rut}`, 155, y + 10, null, null, "center"); doc.text("EL TRABAJADOR", 155, y + 15, null, null, "center");
+SEXTO. La duración del presente contrato estará determinada por toda la duración de la jornada señalada, pudiendo tener término de acuerdo a las causales que la ley señala.
+
+SÉPTIMO. El empleador se obliga a pagar la totalidad de obligaciones previsionales que establece la ley, debiendo retener de la remuneración bruta las cotizaciones que sean de cargo del trabajador, y enterarlas en la institución correspondiente (AFP ${trab.afp || '_____'}, Salud ${trab.salud || '_____'}).
+
+OCTAVO. El empleador deberá registrar en el sitio electrónico de la Dirección del Trabajo el contrato de trabajo.
+
+NOVENO. Se deja constancia que el trabajador ingresó al servicio del empleador, el día ${fechaTexto}.
+
+DÉCIMO. El presente contrato se firma en dos ejemplares del mismo tenor y fecha.
+
+UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple. El trazo digital plasmado por el Trabajador asociado a su RUT y validado a través del sistema de acreditación de la Productora, tiene plena validez legal.`;
+
+    const lineas = doc.splitTextToSize(textoContrato, 175); 
+    doc.text(lineas, 20, y);
+    y += (lineas.length * 4.5) + 20; 
+
+    doc.setFont("helvetica", "bold"); 
+    doc.text("_________________________________", 50, y, null, null, "center"); 
+    doc.text("Firma Empleador", 50, y + 5, null, null, "center"); 
+    doc.setFont("helvetica", "normal"); 
+    doc.text("CAMILA FEVRE SEGUEL", 50, y + 10, null, null, "center"); 
+
+    doc.setFont("helvetica", "bold"); 
+    if (asis.firma_digital) {
+        doc.addImage(asis.firma_digital, 'PNG', 115, y - 25, 80, 25);
+    }
+    doc.text("_________________________________", 155, y, null, null, "center"); 
+    doc.text("Firma Trabajador", 155, y + 5, null, null, "center"); 
+    doc.setFont("helvetica", "normal"); 
+    doc.text(`${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}`, 155, y + 10, null, null, "center"); 
+    
+    y += 25;
+    
+    const notasTexto = `NOTAS: 
+(1) Ley N°21.327 Firma electrónica Modernización de la Dirección del Trabajo. Se agregó en el numeral 2 del inciso primero del artículo 10, del Contrato de Trabajo a continuación de la palabra "nacionalidad", la siguiente frase: ", domicilio y dirección de correo electrónico de ambas partes, si la tuvieren".
+(2) Artículo 22, inciso 1° modificado por la Ley N°21.561: La duración de la jornada ordinaria de trabajo no excederá de cuarenta y cuatro horas semanales y su distribución se podrá efectuar en cada semana calendario o sobre la base de promedios semanales en lapsos de hasta cuatro semanas, en cuyo caso la jornada ordinaria no podrá exceder de cuarenta y cinco horas ordinarias en cada semana, ni extenderse con este límite por más de dos semanas.
+(3) Modalidad alternativa de pago: de acuerdo con el inciso segundo del Artículo 54 del Código del Trabajo, modificado por la Ley 21.327 "A solicitud del trabajador(a), el pago podrá realizarse por medio de cheque, o vale vista bancario a su nombre, o transferencia electrónica a la cuenta bancaria del trabajador, sin que ello importe costo alguno para él.
+Ejemplo: El pago al trabajador/a, se realizará mediante transferencia electrónica a la siguiente cuenta:
+Banco: ${trab.banco || '_______________________'}
+Tipo y número de cuenta: ${trab.tipoCuenta || '_________'} N° ${trab.numeroCuenta || '_________________'}
+Rut: ${rut}
+Correo electrónico: ${trab.email || '_______________________'}
+(4) Se agrega lo indicado en la cláusula octava en consideración a la reforma introducida por la Ley N°21.327, que agrega el artículo 9 bis, que establece: “En conformidad a lo dispuesto en el artículo 515, el empleador deberá registrar en el sitio electrónico de la Dirección del Trabajo los contratos de trabajo, dentro de los quince días siguientes a su celebración.”`;
+
+    doc.setFontSize(8);
+    const lineasNotas = doc.splitTextToSize(notasTexto, 175);
+    doc.text(lineasNotas, 20, y);
 }
 
 async function onScanSuccess(decodedText) {
@@ -248,8 +298,6 @@ document.getElementById('buscadorCRM').addEventListener('input', (e) => {
 let rutPerfilActual = "";
 window.verPerfil = function(rut) {
     rutPerfilActual = rut; const p = listaGlobalCRM[rut];
-    
-    // AHORA SÍ INCLUYE FECHA DE NACIMIENTO Y CORREO ELECTRÓNICO
     document.getElementById('contenidoFicha').innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
@@ -394,7 +442,7 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
 // ==========================================
-// PESTAÑA 4: REPORTES DT (CON MEMORIA DE ACORDEÓN)
+// PESTAÑA 4: REPORTES DT 
 // ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
