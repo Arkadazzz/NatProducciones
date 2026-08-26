@@ -233,7 +233,7 @@ function renderCRM(datos) {
         const p = datos[rut]; const bloqueado = blacklistGlobal[rut] ? true : false;
         const estadoBadge = bloqueado ? '<span class="badge bg-danger">Bloqueado</span>' : '<span class="badge bg-success">Activo</span>';
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${rut}</td><td>${p.nombres} ${p.apellidos}</td><td>${p.telefono || '-'}</td><td>${estadoBadge}</td><td><button class="btn btn-outline-info btn-sm" onclick="verPerfil('${rut}')">Editar/Ver Ficha</button></td>`;
+        tr.innerHTML = `<td>${rut}</td><td>${p.nombres} ${p.apellidos}</td><td>${p.telefono || '-'}</td><td>${estadoBadge}</td><td><button class="btn btn-outline-info btn-sm" onclick="verPerfil('${rut}')">Editar / Ficha</button></td>`;
         tbody.appendChild(tr);
     }
 }
@@ -245,11 +245,11 @@ document.getElementById('buscadorCRM').addEventListener('input', (e) => {
     }, {}); renderCRM(filtrados);
 });
 
+// AQUI ESTA LA MAGIA DEL FORMULARIO EDITABLE
 let rutPerfilActual = "";
 window.verPerfil = function(rut) {
     rutPerfilActual = rut; const p = listaGlobalCRM[rut];
     
-    // Convertimos la ficha en campos <input> para que el staff pueda corregir errores
     document.getElementById('contenidoFicha').innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
@@ -272,7 +272,7 @@ window.verPerfil = function(rut) {
     modalFichaInstance.show();
 }
 
-// NUEVO: Guardar correcciones
+// FUNCIONES NUEVAS: GUARDAR Y ELIMINAR DE RAIZ
 document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
@@ -287,7 +287,6 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
     } catch (e) { alert("Error al guardar."); }
 });
 
-// NUEVO: Eliminar de raíz
 document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre. Si vuelve, tendrá que rellenar el formulario de nuevo.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
@@ -295,6 +294,7 @@ document.getElementById('btnEliminarTrabajador').addEventListener('click', async
     }
 });
 
+// BLACKLIST
 document.getElementById('btnBloquear').addEventListener('click', async () => {
     const motivo = document.getElementById('motivoBloqueo').value.trim(); if(!motivo) return alert("Debes escribir un motivo.");
     if(confirm("¿Bloquear permanentemente a este usuario?")) {
@@ -309,7 +309,7 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 });
 
 // ==========================================
-// PESTAÑA 3: FINANZAS
+// PESTAÑA 3: FINANZAS Y BÓVEDA
 // ==========================================
 document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return;
@@ -388,73 +388,34 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
 // ==========================================
-// PESTAÑA 4: REPORTES DT (NUEVA FUNCIÓN DE ACORDEÓN)
+// PESTAÑA 4: REPORTES DT 
 // ==========================================
 document.getElementById('dt-tab').addEventListener('click', async () => {
     const contenedor = document.getElementById('acordeonDT');
     contenedor.innerHTML = "<p class='text-center text-muted'>Cargando base de datos...</p>";
-    
-    // Traer todos los asistentes y trabajadores
     const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
-    if (!asisSnap.exists()) { contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros de asistencia guardados.</p>"; return; }
+    if (!asisSnap.exists()) { contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros.</p>"; return; }
     
-    const todasLasAsistencias = asisSnap.val();
-    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-    let htmlAcordeon = ""; let index = 0;
-
-    // Recorrer de lo más nuevo a lo más viejo (Invertir el orden de las fechas)
-    const fechasOrdenadas = Object.keys(todasLasAsistencias).sort().reverse();
+    const todasLasAsistencias = asisSnap.val(); const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+    let htmlAcordeon = ""; let index = 0; const fechasOrdenadas = Object.keys(todasLasAsistencias).sort().reverse();
 
     for (const fecha of fechasOrdenadas) {
         for (const prog in todasLasAsistencias[fecha]) {
-            index++;
-            const asistentesDeEseDia = todasLasAsistencias[fecha][prog];
-            const cantidad = Object.keys(asistentesDeEseDia).length;
-            
-            // Cabecera de la flecha
+            index++; const asistentesDeEseDia = todasLasAsistencias[fecha][prog]; const cantidad = Object.keys(asistentesDeEseDia).length;
             htmlAcordeon += `
             <div class="accordion-item">
-                <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}">
-                        📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span>
-                    </button>
-                </h2>
+                <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}">📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span></button></h2>
                 <div id="collapse${index}" class="accordion-collapse collapse" data-bs-parent="#acordeonDT">
                     <div class="accordion-body">
                         <div class="table-responsive">
                             <table class="table table-dark table-hover table-sm text-center align-middle" style="font-size: 0.85em;">
-                                <thead style="color: #b066ff;">
-                                    <tr>
-                                        <th>RUT</th><th>Nombre Completo</th><th>Dirección</th><th>AFP</th><th>Salud</th><th>Banco</th><th>Cuenta</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-            `;
-            
-            // Filas de las personas
+                                <thead style="color: #b066ff;"><tr><th>RUT</th><th>Nombre Completo</th><th>Dirección</th><th>AFP</th><th>Salud</th><th>Banco</th><th>Cuenta</th></tr></thead>
+                                <tbody>`;
             for (const rut in asistentesDeEseDia) {
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-                htmlAcordeon += `
-                                    <tr>
-                                        <td>${rut}</td>
-                                        <td>${tr.nombres} ${tr.apellidos}</td>
-                                        <td>${tr.direccion || '-'}</td>
-                                        <td>${tr.afp || '-'}</td>
-                                        <td>${tr.salud || '-'}</td>
-                                        <td>${tr.banco || '-'}</td>
-                                        <td>${tr.numeroCuenta || '-'}</td>
-                                    </tr>
-                `;
+                htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
             }
-            
-            // Cerrar HTML
-            htmlAcordeon += `
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
+            htmlAcordeon += `</tbody></table></div></div></div></div>`;
         }
     }
     contenedor.innerHTML = htmlAcordeon;
