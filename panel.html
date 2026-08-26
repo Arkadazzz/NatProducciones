@@ -74,28 +74,31 @@
                         <hr style="border-color: #333;">
 
                         <h5>➕ Abrir Nuevo Programa</h5>
-                        <select id="nombrePrograma" class="form-select mb-3">
+                        <select id="nombrePrograma" class="form-select mb-3" style="font-size: 1.1em; padding: 12px;">
                             <option value="">-- Selecciona el Programa --</option>
                             <option value="Dale Play">Dale Play</option>
                             <option value="Detrás del Muro">Detrás del Muro (I/P + Cortesía)</option>
                         </select>
-                        <input type="date" id="fechaPrograma" class="form-control mb-3">
+                        
+                        <!-- CALENDARIO GIGANTE -->
+                        <input type="date" id="fechaPrograma" class="form-control mb-3 fw-bold text-center" style="font-size: 1.3em; padding: 15px; color: #d6b3ff !important; border: 2px solid #b066ff !important;">
+                        
                         <div class="row">
                             <div class="col-4 mb-3">
                                 <label class="text-muted" style="font-size:0.85em;">Base ($)</label>
-                                <input type="number" id="montoPago" class="form-control" placeholder="Ej: 20000">
+                                <input type="number" id="montoPago" class="form-control fw-bold text-center" placeholder="20000" style="font-size: 1.1em; padding: 10px;">
                             </div>
+                            <!-- HORA DE TEXTO GIGANTE -->
                             <div class="col-4 mb-3">
                                 <label class="text-muted" style="font-size:0.85em;">Salida Estimada</label>
-                                <input type="time" id="horaTermino" class="form-control">
+                                <input type="text" id="horaTermino" class="form-control fw-bold text-center text-warning" placeholder="Ej: 19:30" style="font-size: 1.1em; padding: 10px;">
                             </div>
-                            <!-- NUEVO: VALOR HORA EXTRA -->
                             <div class="col-4 mb-3">
-                                <label class="text-muted" style="font-size:0.85em;">Valor Hora Extra</label>
-                                <input type="number" id="valorHoraExtra" class="form-control" placeholder="Ej: 3000">
+                                <label class="text-muted" style="font-size:0.85em;">Valor H.Extra</label>
+                                <input type="number" id="valorHoraExtra" class="form-control fw-bold text-center" placeholder="3000" style="font-size: 1.1em; padding: 10px;">
                             </div>
                         </div>
-                        <button class="btn btn-custom w-100" id="btnActivarWeb">Publicar y Abrir Puertas</button>
+                        <button class="btn btn-custom w-100 fs-5" id="btnActivarWeb">Publicar y Abrir Puertas</button>
                     </div>
 
                     <div class="card-panel d-none" id="seccionEscaner">
@@ -200,22 +203,22 @@
 
         <!-- PESTAÑA 3: FINANZAS Y BÓVEDA -->
         <div class="tab-pane fade" id="finanzas" role="tabpanel">
-            <div class="alert alert-info" style="background: #1c103f; border-color: #b066ff; color: white;">
-                <b>Nota:</b> Para usar los botones diarios, primero debes unirte a una "Sala Activa" en la pestaña de Control Puerta.
+            <div class="alert alert-info fw-bold" style="background: #1c103f; border-color: #b066ff; color: white;">
+                <b>Nota:</b> Puedes descargar las nóminas diarias incluso si ya cerraste las salas. El sistema buscará a todos los extras de la fecha que elijas.
             </div>
             <div class="row mb-4">
                 <div class="col-md-6">
                     <div class="card-panel text-center h-100">
                         <h4 style="color: #00d26a;">🏦 Pagos Diarios Inmediatos</h4>
-                        <p style="color: #aaaaaa;">Descarga la nómina del banco para la sala seleccionada HOY.</p>
-                        <button class="btn btn-outline-success w-100 fw-bold py-2 mt-2" id="btnExcelBanco">Descargar Nómina de HOY</button>
+                        <p style="color: #aaaaaa;">Descarga el archivo Santander con los pagos del día.</p>
+                        <button class="btn btn-outline-success w-100 fw-bold py-3 mt-2 fs-5" id="btnExcelBanco">Descargar Nómina Diaria</button>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="card-panel text-center h-100">
                         <h4 style="color: #ffcc00;">📊 Cierre Contable Mensual</h4>
                         <p style="color: #aaaaaa;">Genera el archivo I.M.T. con la suma de TODOS los programas del mes.</p>
-                        <button class="btn btn-outline-warning text-white w-100 fw-bold py-2 mt-2" id="btnExcelContador">Descargar Reporte del Mes</button>
+                        <button class="btn btn-outline-warning text-white w-100 fw-bold py-3 mt-2 fs-5" id="btnExcelContador">Descargar Reporte del Mes</button>
                     </div>
                 </div>
             </div>
