@@ -26,7 +26,7 @@ let html5QrcodeScanner = null; let signaturePad; let rutActual = ""; let claveAc
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
 
 let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico = 1;
-window.asistentesSinSalida = 0; // Para el escudo del cierre
+window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
@@ -98,20 +98,75 @@ window.cerrarProgramaGlobal = async function(clave) {
 }
 
 // ==========================================
-// NUEVO: ESCUDO "CERRAR JORNADA"
+// NUEVO: CIERRE DE JORNADA MASIVO (CHECKOUT AUTOMÁTICO)
 // ==========================================
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
     
-    if (window.asistentesSinSalida > 0) {
-        if(!confirm(`⚠️ ADVERTENCIA ⚠️\n\nFaltan ${window.asistentesSinSalida} personas por marcarles la salida.\nSi cierras la jornada ahora, no podrás calcular sus horas extras automáticamente.\n\n(No te preocupes, sus pagos base ya están guardados).\n\n¿Cerrar jornada de todas formas?`)) return;
-    } else {
-        if(!confirm("🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Estás seguro de que quieres CERRAR LA JORNADA de este programa?\nDesaparecerá de la web para el público.")) return;
+    const now = new Date();
+    const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+    let mensajeAlerta = `🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nSi aprietas Aceptar, el sistema le marcará la salida AUTOMÁTICAMENTE a todos a las ${horaSalidaMasiva} y calculará sus horas extras (si corresponden).\n\n¿Proceder?`;
+
+    if (!confirm(mensajeAlerta)) return;
+
+    try {
+        // 1. Leemos a todos los que están adentro
+        const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
+        
+        if (snap.exists()) {
+            const asistencias = snap.val();
+            let actualizacionesFirebase = {};
+            let procesados = 0;
+
+            // Recorremos a cada persona
+            for (const rut in asistencias) {
+                const asis = asistencias[rut];
+                
+                // Si la persona AÚN NO tiene marcada la salida
+                if (!asis.hora_salida) {
+                    let bonoExtra = 0;
+                    
+                    // Calculamos matemáticamente sus horas extras (solo si no es cortesía)
+                    if (asis.tipo_ingreso !== "Cortesía" && horaTerminoGeneral && valorHoraExtraGlobal > 0) {
+                        let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
+                        let [hR, mR] = horaSalidaMasiva.split(':').map(Number);
+                        let minE = hE * 60 + mE;
+                        let minR = hR * 60 + mR;
+                        let diff = minR - minE;
+                        
+                        if (diff > 0) {
+                            bonoExtra = Math.round((diff / 60) * valorHoraExtraGlobal);
+                        }
+                    }
+                    
+                    const nuevoMontoTotal = parseInt(asis.monto) + bonoExtra;
+                    
+                    // Armamos el paquete de actualización para Firebase
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoExtra;
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = nuevoMontoTotal;
+                    
+                    procesados++;
+                }
+            }
+
+            // Enviamos el guardado masivo a Firebase en 1 segundo
+            if (Object.keys(actualizacionesFirebase).length > 0) {
+                await update(ref(db), actualizacionesFirebase);
+                alert(`✅ Checkout Masivo Exitoso.\nSe le marcó la salida automática y se calculó el pago a ${procesados} personas.`);
+            }
+        }
+
+        // 2. Cerramos la puerta pública
+        await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
+        alert("¡Jornada terminada con éxito! Gran trabajo hoy.");
+        salirDeSala();
+
+    } catch (error) {
+        alert("Error al intentar cerrar la jornada masivamente.");
+        console.error(error);
     }
-    
-    await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
-    alert("¡Jornada terminada con éxito! Gran trabajo hoy.");
-    salirDeSala();
 });
 
 document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
@@ -137,7 +192,7 @@ function activarRadares() {
         totalFirmados = Object.keys(asistencias).length; actualizarTablero();
         
         let maxNumero = 0; const conteoStaff = {}; 
-        window.asistentesSinSalida = 0; // Reiniciamos el contador del escudo
+        window.asistentesSinSalida = 0; 
         
         const tbody = document.getElementById('tablaAsistentes'); tbody.innerHTML = "";
         
@@ -150,11 +205,10 @@ function activarRadares() {
             if (asis.hora_salida) {
                 btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
             } else { 
-                window.asistentesSinSalida++; // Contamos a los que faltan
+                window.asistentesSinSalida++; 
                 btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
             }
             
-            // NUEVO: BOTÓN DE EDICIÓN DE PAGO INDIVIDUAL
             const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}', ${asis.monto}, '${trab.nombres}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
 
             const tr = document.createElement('tr');
@@ -182,9 +236,6 @@ function actualizarTablero() {
     document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
 }
 
-// ==========================================
-// NUEVO: EDICIÓN DE SUELDO INDIVIDUAL EN VIVO
-// ==========================================
 window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
     let nuevoMonto = prompt(`¿Cuánto será el NUEVO PAGO TOTAL de ${nombrePersona} para la jornada de hoy?\n(Monto actual: $${montoActual})`, montoActual);
     if (nuevoMonto === null || nuevoMonto === "") return;
@@ -197,12 +248,8 @@ window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
     } catch (e) { alert("Error al actualizar el pago."); }
 }
 
-// ==========================================
-// NUEVO: CÁLCULO DE HORAS EXTRAS AUTOMÁTICO
-// ==========================================
 window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     const now = new Date();
-    // Forzamos formato 24 hrs estricto (Ej: "19:30")
     const horaSalida = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     let bonoExtra = 0;
     
@@ -210,7 +257,6 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
         if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
     } else {
         let bonoSugerido = 0;
-        // Calculadora Matemática de minutos
         if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
             let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
             let [hR, mR] = horaSalida.split(':').map(Number);
@@ -218,7 +264,6 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
             let minR = hR * 60 + mR;
             let diff = minR - minE;
             
-            // Si salió después de la hora estimada, calculamos el bono proporcional por minuto y lo redondeamos
             if (diff > 0) {
                 bonoSugerido = Math.round((diff / 60) * valorHoraExtraGlobal);
             }
