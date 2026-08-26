@@ -66,7 +66,6 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const mon = document.getElementById('montoPago').value;
     const valorHE = document.getElementById('valorHoraExtra').value || 0;
     
-    // NUEVO: TRADUCTOR DE HORA MANUAL A FORMATO 24H
     const rawHora = document.getElementById('horaTermino').value.trim();
     const ampm = document.getElementById('amPmTermino').value;
     
@@ -78,7 +77,6 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
         return alert("Formato de hora incorrecto. Usa números del 1 al 12. Ejemplo: 07:30");
     }
     
-    // Lógica para convertir a formato militar (24h)
     if (ampm === "PM" && hh !== 12) hh += 12;
     if (ampm === "AM" && hh === 12) hh = 0;
     
@@ -650,7 +648,7 @@ async function cargarReportesDT() {
                                 <tbody>`;
             for (const rut in asistentesDeEseDia) {
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-                htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td class="text-warning fw-bold">${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
+                htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
             }
             htmlAcordeon += `</tbody></table></div></div></div></div>`;
         }
