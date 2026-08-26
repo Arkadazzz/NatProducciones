@@ -23,18 +23,13 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     if (snapshot.exists()) {
         programasActivos = snapshot.val();
         const keys = Object.keys(programasActivos);
-        
         document.getElementById('pantallaSinEvento').classList.add('d-none');
 
-        // MULTI-SALA LOGIC
         if (keys.length === 1) {
-            // Solo hay 1 evento abierto: ir directo
             activarFormulario(programasActivos[keys[0]]);
         } else {
-            // Hay varios: mostrar menú de selección
             document.getElementById('formularioPrincipal').classList.add('d-none');
             document.getElementById('pantallaSeleccion').classList.remove('d-none');
-            
             const divBotones = document.getElementById('botonesProgramas');
             divBotones.innerHTML = '';
             keys.forEach(k => {
@@ -63,18 +58,43 @@ function activarFormulario(programaSeleccionado) {
     const partes = eventoActivo.fecha.split('-');
     if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
 
-    if (eventoActivo.nombre === "Detrás del Muro Cortesía") {
-        document.getElementById('divInvitadoPor').classList.remove('d-none');
-        document.getElementById('invitadoPor').setAttribute('required', 'true');
-    } else {
+    if (eventoActivo.nombre === "Detrás del Muro") {
+        document.getElementById('zonaCortesia').classList.remove('d-none');
+        document.getElementById('tipoAsistencia').setAttribute('required', 'true');
+        document.getElementById('tipoAsistencia').value = ""; 
+        document.getElementById('divPinSeguridad').classList.add('d-none');
         document.getElementById('divInvitadoPor').classList.add('d-none');
-        document.getElementById('invitadoPor').removeAttribute('required');
+    } else {
+        document.getElementById('zonaCortesia').classList.add('d-none');
+        document.getElementById('tipoAsistencia').removeAttribute('required');
     }
 }
 
+document.getElementById('tipoAsistencia').addEventListener('change', (e) => {
+    const seleccion = e.target.value;
+    if (seleccion === "Extra") {
+        document.getElementById('divPinSeguridad').classList.remove('d-none');
+        document.getElementById('pinAcceso').setAttribute('required', 'true');
+        document.getElementById('divInvitadoPor').classList.add('d-none');
+        document.getElementById('invitadoPor').removeAttribute('required');
+    } else if (seleccion === "Cortesía") {
+        document.getElementById('divInvitadoPor').classList.remove('d-none');
+        document.getElementById('invitadoPor').setAttribute('required', 'true');
+        document.getElementById('divPinSeguridad').classList.add('d-none');
+        document.getElementById('pinAcceso').removeAttribute('required');
+    } else {
+        document.getElementById('divPinSeguridad').classList.add('d-none');
+        document.getElementById('divInvitadoPor').classList.add('d-none');
+    }
+});
+
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
-    if (rut.length < 8) return alert("Ingresa un RUT válido.");
+    // VALIDACIÓN ESTRICTA DEL RUT
+    const rutRegex = /^[0-9]+-[0-9kK]{1}$/;
+    if (!rutRegex.test(rut)) {
+        return alert("⚠️ FORMATO INCORRECTO ⚠️\nEl RUT debe ser ingresado SIN PUNTOS y CON GUION.\nEjemplo: 12345678-9");
+    }
 
     try {
         const snapshot = await get(child(ref(db), `1_trabajadores/${rut}`));
@@ -101,9 +121,16 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
     if (!eventoActivo) return alert("Error de programa.");
 
     const rut = document.getElementById('rut').value.trim();
-    const esCortesia = (eventoActivo.nombre === "Detrás del Muro Cortesía");
-    const tipoAsis = esCortesia ? "Cortesía" : "Pago";
-    const invitadoPor = esCortesia ? document.getElementById('invitadoPor').value : "";
+    const esMuro = (eventoActivo.nombre === "Detrás del Muro");
+    const tipoAsis = esMuro ? document.getElementById('tipoAsistencia').value : "Pago";
+    const invitadoPor = (tipoAsis === "Cortesía") ? document.getElementById('invitadoPor').value : "";
+
+    if (tipoAsis === "Extra" && eventoActivo.pin) {
+        const pinIngresado = document.getElementById('pinAcceso').value;
+        if (pinIngresado !== eventoActivo.pin) {
+            return alert("⛔ ACCESO DENEGADO ⛔\nEl PIN de seguridad es incorrecto.\nSi eres un invitado, por favor cambia la opción a 'Invitado de Cortesía'.");
+        }
+    }
 
     try {
         if (!trabajadorExistente) {
@@ -128,7 +155,8 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
         document.getElementById('contenedorQR').classList.remove('d-none');
         
         let textoResumen = `${eventoActivo.nombre.toUpperCase()}`;
-        if (esCortesia) textoResumen += ` (De: ${invitadoPor})`;
+        if (tipoAsis === "Cortesía") textoResumen += ` (Invitado de ${invitadoPor})`;
+        if (tipoAsis === "Extra") textoResumen += ` (I/P Autorizado)`;
         document.getElementById('resumenProgramaQR').innerText = textoResumen;
         
         document.getElementById('codigoQR').innerHTML = ""; 
