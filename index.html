@@ -13,7 +13,7 @@
         .text-muted { color: #aaaaaa !important; }
         .form-control, .form-select { background-color: #222222 !important; border: 1px solid #444444 !important; color: #ffffff !important; border-radius: 8px; }
         .form-control:focus, .form-select:focus { border-color: #b066ff !important; box-shadow: 0 0 8px rgba(176, 102, 255, 0.5) !important; background-color: #222222 !important; color: #ffffff !important;}
-        .form-control:invalid { border-color: #ff3333 !important; } /* Borde rojo si el formato está mal */
+        .form-control:invalid { border-color: #ff3333 !important; } 
         .btn-primary { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; padding: 12px; font-weight: bold; text-transform: uppercase; color: white; }
         .btn-primary:hover { background: linear-gradient(135deg, #9d4edd, #7b2cbf); transform: translateY(-2px); transition: 0.3s; color: white; }
         .alert-custom { background: #1a1a1a; border: 1px solid #b066ff; color: #ffffff; }
@@ -70,7 +70,6 @@
                     </div>
                     <div class="mb-3"><label class="form-label">Dirección Completa</label><input type="text" class="form-control" id="direccion"></div>
                     <div class="row">
-                        <!-- FORMATO ESTRICTO DE TELÉFONO -->
                         <div class="col-md-6 mb-3"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="telefono" placeholder="+569..." pattern="^\+569[0-9]{8}$" title="Debe empezar con +569 seguido de 8 números"></div>
                         <div class="col-md-6 mb-3"><label class="form-label">Correo Electrónico</label><input type="email" class="form-control" id="email"></div>
                     </div>
@@ -90,7 +89,6 @@
                         <div class="col-md-6 mb-3"><label class="form-label">Tipo de Cuenta</label>
                             <select class="form-select" id="tipoCuenta"><option value="">Selecciona...</option><option value="CUENTA_RUT">Cuenta RUT</option><option value="CUENTA_CORRIENTE">Cuenta Corriente</option><option value="CUENTA_VISTA">Cuenta Vista / Ahorro</option></select>
                         </div>
-                        <!-- FORMATO ESTRICTO DE CUENTA -->
                         <div class="col-md-6 mb-3"><label class="form-label">N° de Cuenta</label><input type="text" class="form-control" id="numeroCuenta" pattern="^[0-9]+$" title="Solo números, sin guiones ni espacios"></div>
                     </div>
                 </div>
@@ -145,11 +143,15 @@
 
         <div id="contenedorQR" class="text-center d-none mt-4">
             <h4 class="text-success mb-2 fw-bold" id="mensajeExito">¡Reserva Exitosa!</h4>
-            <p class="text-white fw-bold mb-1 fs-5" id="resumenProgramaQR"></p>
-            <p class="text-muted">Muestra este código en la puerta del canal:</p>
+            <p class="text-white fw-bold mb-3 fs-5" id="resumenProgramaQR"></p>
+            
             <div id="codigoQR" class="d-inline-block bg-white p-3 rounded shadow mb-3"></div>
-            <br>
-            <button class="btn btn-outline-light fw-bold px-4 py-2 mt-2" onclick="window.location.reload()">Volver al Inicio</button>
+            
+            <div class="alert mt-2 text-start" style="background: #1c103f; border: 1px solid #b066ff; border-radius: 10px;">
+                <p class="text-white mb-0" style="font-size: 0.95em;" id="instruccionesQR"></p>
+            </div>
+            
+            <button class="btn btn-outline-light fw-bold px-4 py-2 mt-3" onclick="window.location.reload()">Volver al Inicio</button>
         </div>
     </div>
 </div>
