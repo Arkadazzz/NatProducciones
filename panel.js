@@ -29,6 +29,7 @@ let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico 
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
+// Memoria Inicial
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
 // ==========================================
@@ -323,6 +324,9 @@ async function onScanSuccess(decodedText) {
         
         if (snapshot.exists()) {
             const datos = snapshot.val(); 
+            // NUEVO: ACTUALIZAMOS LA MEMORIA EN VIVO PARA QUE LA TABLA NO MUESTRE "DESCONOCIDO"
+            listaGlobalCRM[rutActual] = datos; 
+
             document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
             
@@ -523,7 +527,10 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 
 document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return;
-    if(Object.keys(listaGlobalCRM).length === 0) { const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); }
+    
+    // NUEVO: REFRESCO DE MEMORIA OBLIGATORIO AL ENTRAR A FINANZAS
+    const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
+    
     let deudas = {}; const todas = snap.val();
     for (const fecha in todas) { for (const prog in todas[fecha]) { for (const r in todas[fecha][prog]) {
         const asis = todas[fecha][prog][r];
@@ -545,8 +552,15 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     const fechaHoy = new Date().toISOString().split('T')[0];
     let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
     let actualizacionesFirebase = {};
+    
+    // NUEVO: OTRA CAPA MÁS DE REFRESCO ANTES DE IMPRIMIR EL EXCEL
+    const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
+    
     for (const r in window.deudasGlobales) {
-        const deuda = window.deudasGlobales[r]; const tr = listaGlobalCRM[r];
+        const deuda = window.deudasGlobales[r]; 
+        // NUEVO: RESCATE ABSOLUTO SI AÚN NO EXISTE EN MEMORIA
+        const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
+        
         if (tr) { const rutSin = r.replace(/[^0-9kK]/g, ''); csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT\n`; }
         for (const ruta of deuda.rutas_bd) { actualizacionesFirebase[`${ruta}/estado_pago`] = "Pagado"; }
     }
@@ -561,6 +575,9 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaElegida}`)); 
         if (!snap.exists()) return alert("No hay asistencias registradas para esta fecha en la base de datos.");
+        
+        // REFRESCO PREVENTIVO
+        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
         
         const programas = snap.val();
         let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
@@ -648,6 +665,7 @@ async function cargarReportesDT() {
                                 <tbody>`;
             for (const rut in asistentesDeEseDia) {
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
+                // REPARADO: YA NO ESTÁ EN DORADO NI AMARILLO
                 htmlAcordeon += `<tr><td>${rut}</td><td>${tr.nombres} ${tr.apellidos}</td><td>${tr.telefono || '-'}</td><td>${tr.direccion || '-'}</td><td>${tr.afp || '-'}</td><td>${tr.salud || '-'}</td><td>${tr.banco || '-'}</td><td>${tr.numeroCuenta || '-'}</td></tr>`;
             }
             htmlAcordeon += `</tbody></table></div></div></div></div>`;
@@ -662,6 +680,8 @@ document.getElementById('btnRefrescarDT').addEventListener('click', cargarReport
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return alert("No hay datos de asistencias.");
+        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); // REFRESH CACHE
+        
         let csv = "\uFEFFFecha;Programa;RUT;Nombres;Apellidos;Monto Final;Tipo Ingreso;Hora Ingreso;Hora Salida;Bono Extra;Estado Pago;Invitado Por\n";
         const todas = snap.val();
         for (const fecha in todas) { for (const prog in todas[fecha]) { for (const r in todas[fecha][prog]) {
@@ -677,6 +697,8 @@ document.getElementById('btnRespaldoPDFs').addEventListener('click', async () =>
     try {
         btn.innerText = "⏳ Empaquetando PDFs... (Espera)"; btn.disabled = true;
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) { alert("No hay contratos."); resetBtnZip(btn); return; }
+        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); // REFRESH CACHE
+        
         const todas = snap.val(); const zip = new JSZip(); let pdfsGenerados = 0; const { jsPDF } = window.jspdf;
         for (const fecha in todas) { for (const prog in todas[fecha]) {
             const carpetaPrograma = zip.folder(`${fecha}_${prog.replace(/[ \/]/g, "_")}`);
