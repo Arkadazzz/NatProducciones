@@ -20,7 +20,6 @@ const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "1
 onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
-// Variables de la SALA ACTUAL
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
 let html5QrcodeScanner = null; let signaturePad;
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
@@ -146,7 +145,6 @@ function activarRadares() {
                 conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
             }
             
-            // BOTONES DE SALIDA Y CONTRATO
             let btnSalidaContrato = "";
             if (asis.hora_salida) {
                 btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
@@ -184,16 +182,11 @@ function actualizarTablero() {
     document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
 }
 
-// ----------------------------------------------------
-// NUEVA FUNCIÓN: MARCAR SALIDA Y CALCULAR HORAS EXTRAS
-// ----------------------------------------------------
 window.marcarSalida = async function(rut) {
     const horaSalida = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    
-    // Preguntamos al productor si quiere agregar un bono por horas extras
     let bonoExtra = prompt(`La hora de salida es ${horaSalida}.\nLa salida estimada era a las ${horaTerminoGeneral}.\n\nSi el extra acumuló horas extra, ingresa el monto adicional a sumarle a su pago base de $${montoPago}:\n(Si no hay bono, deja en 0)`);
     
-    if (bonoExtra === null) return; // Si apretó cancelar
+    if (bonoExtra === null) return; 
     
     bonoExtra = parseInt(bonoExtra) || 0;
     const nuevoMontoTotal = parseInt(montoPago) + bonoExtra;
@@ -211,7 +204,7 @@ window.marcarSalida = async function(rut) {
 }
 
 // ----------------------------------------------------
-// NUEVA FUNCIÓN: GENERADOR DE PDF LEGAL
+// GENERADOR DE PDF: CONTRATO OFICIAL NAT PRODUCCIONES
 // ----------------------------------------------------
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut];
@@ -220,44 +213,71 @@ window.generarContratoPDF = async function(rut) {
     
     const asis = asisSnap.val();
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
     
-    // Configuración de texto
+    // Usamos formato Oficio (Legal) que es el estándar chileno para contratos, y márgenes estrechos.
+    const doc = new jsPDF({ format: 'legal' });
+    let y = 15; // Cursor de altura
+
+    // TÍTULO
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("CONTRATO DE PRESTACIÓN DE SERVICIOS DIARIOS", 105, 30, null, null, "center");
-    
+    doc.setFontSize(12);
+    doc.text("CONTRATO DE TRABAJO A TRATO POR JORNADA EXTRAORDINARIA", 105, y, null, null, "center");
+    y += 15;
+
+    // TEXTO BASE (Tu contrato real)
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     
-    const textoLegal = `En Santiago de Chile, a ${fechaPrograma}, se celebra el presente contrato de prestación de servicios entre NAT PRODUCCIONES, en adelante "La Productora", y don/doña ${trab.nombres} ${trab.apellidos}, RUT ${rut}, con domicilio en ${trab.direccion || '__________________'}, en adelante "El Trabajador/a".
+    // Formatear Fecha
+    const mesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const [yearF, monthF, dayF] = fechaPrograma.split('-');
+    const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} del ${yearF}`;
 
-PRIMERO: El Trabajador prestará servicios eventuales y transitorios como ${asis.tipo_ingreso} para la realización del programa de televisión denominado "${nombrePrograma}".
+    const textoContrato = `En SANTIAGO, a ${fechaTexto}, entre NAT PRODUCCIONES SpA., RUT 77.200.730-8, representada por don Agustín Pino Lorca, Cédula de Identidad Nº 21.037.108-9, ambos con domicilio en Avenida Vicuña Mackenna 1370, comuna de Ñuñoa, ciudad de Santiago, que en adelante se denominará “el Empleador”, y don(ña) ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, Cédula de Identidad Nº ${rut}, de Nacionalidad Chilena, nacido(a) el ${trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________'}, domiciliado(a) en ${trab.direccion.toUpperCase() || '_______________________'}, que en adelante se denominará “el Trabajador”, se ha convenido el siguiente Contrato de Trabajo a Trato:
 
-SEGUNDO: La jornada de prestación de servicios se fija para el día de la fecha, comenzando su registro de ingreso a las ${asis.hora_ingreso} hrs, y su salida a las ${asis.hora_salida || horaTerminoGeneral} hrs.
+PRIMERO: El Empleador contrata los servicios del Trabajador para que se desempeñe en calidad de Extra de Televisión. Las partes dejan constancia que la relación laboral se desarrollará en las dependencias de los estudios de grabación que el empleador determine o en locaciones exteriores según sea el requerimiento del programa "${nombrePrograma}".
 
-TERCERO: Como honorario único y total por los servicios prestados en esta jornada (incluyendo recargos u horas extra si correspondiesen), La Productora pagará la suma líquida de $${asis.monto} pesos. Este monto será depositado en la cuenta bancaria proporcionada por El Trabajador (Banco ${trab.banco || '_____'}, Cuenta N° ${trab.numeroCuenta || '_____'}).
+SEGUNDO: Por acuerdo entre las partes, el presente contrato se pacta por una jornada extraordinaria específica que iniciará a las ${asis.hora_ingreso} horas y finalizará a las ${asis.hora_salida || horaTerminoGeneral} horas del día de la fecha. Las partes acuerdan, de conformidad a lo establecido en el Artículo 22 del Código del Trabajo, que dada la naturaleza de los servicios prestados, este contrato no está sujeto a control de asistencia tradicional, rigiéndose estrictamente por los horarios pactados para la grabación o evento.
 
-CUARTO: El Trabajador declara que se encuentra afiliado a la AFP ${trab.afp || '_____'} y al sistema de salud ${trab.salud || '_____'}.
+TERCERO: Como remuneración a trato por los servicios prestados durante la jornada señalada en la cláusula segunda (incluyendo eventuales extensiones u horas extra que fuesen requeridas y autorizadas por el Productor a cargo), el Empleador pagará al Trabajador la suma bruta/líquida (según corresponda) de $${asis.monto} (pesos chilenos). 
+Dicho pago se realizará mediante transferencia electrónica a la cuenta bancaria del trabajador (Banco: ${trab.banco || '______'}, Cuenta: ${trab.numeroCuenta || '______'}) en los plazos estipulados por las políticas de remuneración de la Productora.
 
-QUINTO: Para constancia y en señal de conformidad, el trabajador firma de manera electrónica el presente documento.`;
+CUARTO: El Trabajador declara para todos los efectos legales que se encuentra afiliado a la Administradora de Fondos de Pensiones (A.F.P.) ${trab.afp || '______'} y al sistema de previsión de salud ${trab.salud || '______'}.
 
-    // Imprimir texto con saltos de línea automáticos
-    const lineas = doc.splitTextToSize(textoLegal, 170);
-    doc.text(lineas, 20, 50);
+QUINTO: El Trabajador cede y transfiere a NAT PRODUCCIONES SpA., y/o a quien ésta determine, todos los derechos de imagen, voz, fijación y reproducción audiovisual derivados de su participación en el programa objeto de este contrato, sin límite de tiempo, territorio ni medios de difusión, renunciando desde ya a cualquier cobro adicional por concepto de retransmisión, comercialización o uso publicitario de dicho material.
+
+SEXTO: Las partes dejan expresa constancia de que, de conformidad a la Ley N° 19.799 sobre Documentos Electrónicos, Firma Electrónica y Servicios de Certificación de dicha Firma, el presente contrato se suscribe mediante Firma Electrónica Simple. El trazo digital (firma en pantalla o dispositivo móvil) plasmado por el Trabajador al momento de su ingreso al recinto, asociado a su Rol Único Tributario (RUT) y validado a través del sistema de acreditación de la Productora, tiene plena validez legal, reconociendo ambas partes su autenticidad, integridad y no repudio. 
+
+SÉPTIMO: Para todos los efectos derivados del presente contrato, las partes fijan su domicilio en la ciudad y comuna de Santiago y se someten a la jurisdicción de sus Tribunales de Justicia.`;
+
+    // Imprimir el texto justificado
+    const lineas = doc.splitTextToSize(textoContrato, 175); // 175mm de ancho para que queden márgenes de 20mm
+    doc.text(lineas, 20, y);
     
-    // Imprimir Firma Digital
+    // FIRMAS
+    y += (lineas.length * 5) + 30; // Bajamos el cursor según el largo del texto
+    
+    // Empleador (Izquierda)
+    doc.setFont("helvetica", "bold");
+    doc.text("_________________________________", 50, y, null, null, "center");
+    doc.text("AGUSTÍN PINO LORCA", 50, y + 5, null, null, "center");
+    doc.setFont("helvetica", "normal");
+    doc.text("NAT PRODUCCIONES SpA.", 50, y + 10, null, null, "center");
+    doc.text("RUT: 77.200.730-8", 50, y + 15, null, null, "center");
+
+    // Trabajador (Derecha)
+    doc.setFont("helvetica", "bold");
     if (asis.firma_digital) {
-        doc.setFont("helvetica", "bold");
-        doc.text("FIRMA DEL TRABAJADOR:", 105, 170, null, null, "center");
-        // Ajustamos la imagen de la firma centrada
-        doc.addImage(asis.firma_digital, 'PNG', 55, 180, 100, 50);
-        doc.setFont("helvetica", "normal");
-        doc.text(`${trab.nombres} ${trab.apellidos}`, 105, 235, null, null, "center");
-        doc.text(`RUT: ${rut}`, 105, 242, null, null, "center");
+        // Estampar firma arriba de la línea
+        doc.addImage(asis.firma_digital, 'PNG', 115, y - 30, 80, 30);
     }
+    doc.text("_________________________________", 155, y, null, null, "center");
+    doc.text(`${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}`, 155, y + 5, null, null, "center");
+    doc.setFont("helvetica", "normal");
+    doc.text(`RUT: ${rut}`, 155, y + 10, null, null, "center");
+    doc.text("EL TRABAJADOR", 155, y + 15, null, null, "center");
 
-    doc.save(`Contrato_${nombrePrograma}_${rut}.pdf`);
+    doc.save(`Contrato_NatProducciones_${rut}.pdf`);
 }
 
 async function onScanSuccess(decodedText) {
