@@ -97,6 +97,15 @@
                         </div>
                         <div id="reader"></div>
                         <div id="mensajeEscaneo" class="alert mt-3 d-none text-center fw-bold" style="background: #2d1b4e; border: 1px solid #b066ff; color: #ffffff;">Buscando RUT...</div>
+                        
+                        <!-- NUEVO: INGRESO MANUAL DE EMERGENCIA -->
+                        <div class="mt-4 p-3 rounded" style="background: #1a1a1a; border: 1px dashed #444444;">
+                            <label class="form-label text-warning mb-1" style="font-size: 0.85em;">¿Falla la cámara o la pantalla del extra está rota?</label>
+                            <div class="input-group">
+                                <input type="text" id="rutManual" class="form-control bg-dark text-white" placeholder="Ingresa el RUT manual (Ej: 12345678-9)">
+                                <button class="btn btn-outline-warning fw-bold" id="btnIngresoManual">🔍 Buscar</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -217,7 +226,7 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 4: REPORTES DT (MODIFICADA PARA TIEMPO REAL) -->
+        <!-- PESTAÑA 4: REPORTES DT -->
         <div class="tab-pane fade" id="reportesdt" role="tabpanel">
             <div class="card-panel">
                 <div class="d-flex justify-content-between align-items-start mb-3">
