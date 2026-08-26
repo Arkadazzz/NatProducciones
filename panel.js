@@ -64,10 +64,26 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
-    const horaSal = document.getElementById('horaTermino').value;
     const valorHE = document.getElementById('valorHoraExtra').value || 0;
     
-    if (!nom || !fec || !mon || !horaSal) return alert("Completa todos los campos obligatorios.");
+    // NUEVO: TRADUCTOR DE HORA MANUAL A FORMATO 24H
+    const rawHora = document.getElementById('horaTermino').value.trim();
+    const ampm = document.getElementById('amPmTermino').value;
+    
+    if (!nom || !fec || !mon || !rawHora) return alert("Completa todos los campos obligatorios.");
+    
+    if (!rawHora.includes(":")) return alert("La hora debe llevar dos puntos. Ejemplo: 07:30");
+    let [hh, mm] = rawHora.split(':').map(Number);
+    if (isNaN(hh) || isNaN(mm) || hh < 1 || hh > 12 || mm < 0 || mm > 59) {
+        return alert("Formato de hora incorrecto. Usa números del 1 al 12. Ejemplo: 07:30");
+    }
+    
+    // Lógica para convertir a formato militar (24h)
+    if (ampm === "PM" && hh !== 12) hh += 12;
+    if (ampm === "AM" && hh === 12) hh = 0;
+    
+    const horaSal = `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`;
+
     let pinGenerado = ""; if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
     
@@ -97,7 +113,6 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
-// CHECKOUT MASIVO CON MATEMÁTICA SEGURA
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
     
@@ -540,7 +555,6 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     try { await update(ref(db), actualizacionesFirebase); descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`); alert("¡Liquidación exitosa!"); document.getElementById('tablaDeudas').innerHTML = ""; window.deudasGlobales = {}; } catch (error) { alert("Error al liquidar."); }
 });
 
-// NUEVO: BOTÓN DE EXCEL DE BANCO (INDEPENDIENTE DE LA SALA)
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     const fechaHoyLocal = new Date().toISOString().split('T')[0];
     const fechaElegida = prompt("📅 Ingresa la FECHA DE LA GRABACIÓN que deseas pagar al banco hoy (Formato: AAAA-MM-DD):", fechaHoyLocal);
@@ -604,9 +618,6 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
-// ==========================================
-// PESTAÑA 4: REPORTES DT (CON COLUMNA TELÉFONO REPARADA)
-// ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarDT');
@@ -650,9 +661,6 @@ async function cargarReportesDT() {
 document.getElementById('dt-tab').addEventListener('click', cargarReportesDT);
 document.getElementById('btnRefrescarDT').addEventListener('click', cargarReportesDT);
 
-// ==========================================
-// PESTAÑA 5: MANTENIMIENTO Y EMPAQUETADO ZIP
-// ==========================================
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return alert("No hay datos de asistencias.");
