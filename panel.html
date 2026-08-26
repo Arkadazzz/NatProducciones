@@ -33,6 +33,9 @@
         .accordion-button:not(.collapsed) { background-color: #2d1b4e; color: #ffffff; box-shadow: none; border-color: #b066ff; }
         .accordion-item { background-color: #141414; border: 1px solid #333; margin-bottom: 10px; border-radius: 8px !important; overflow: hidden; }
         .accordion-body { background-color: #0a0a0a; padding: 15px; }
+
+        .btn-pago-editable { cursor: pointer; transition: 0.2s; border: 1px solid #00ff00; }
+        .btn-pago-editable:hover { transform: scale(1.05); background-color: #00ff00 !important; color: black !important; }
     </style>
 </head>
 <body>
@@ -78,13 +81,18 @@
                         </select>
                         <input type="date" id="fechaPrograma" class="form-control mb-3">
                         <div class="row">
-                            <div class="col-6 mb-3">
-                                <label class="text-muted" style="font-size:0.85em;">Monto Base ($)</label>
+                            <div class="col-4 mb-3">
+                                <label class="text-muted" style="font-size:0.85em;">Base ($)</label>
                                 <input type="number" id="montoPago" class="form-control" placeholder="Ej: 20000">
                             </div>
-                            <div class="col-6 mb-3">
-                                <label class="text-muted" style="font-size:0.85em;">Hora Salida Estimada</label>
+                            <div class="col-4 mb-3">
+                                <label class="text-muted" style="font-size:0.85em;">Salida Estimada</label>
                                 <input type="time" id="horaTermino" class="form-control">
+                            </div>
+                            <!-- NUEVO: VALOR HORA EXTRA -->
+                            <div class="col-4 mb-3">
+                                <label class="text-muted" style="font-size:0.85em;">Valor Hora Extra</label>
+                                <input type="number" id="valorHoraExtra" class="form-control" placeholder="Ej: 3000">
                             </div>
                         </div>
                         <button class="btn btn-custom w-100" id="btnActivarWeb">Publicar y Abrir Puertas</button>
@@ -166,7 +174,6 @@
                             </table>
                         </div>
 
-                        <!-- NUEVO BOTÓN: ES UN DÍA -->
                         <button class="btn btn-danger w-100 fw-bold mt-4 py-3 fs-5 shadow" id="btnEsUnDia" style="background: linear-gradient(135deg, #ff3333, #cc0000); border: none;">
                             🎬 ¡Es un día! (Cerrar Jornada)
                         </button>
