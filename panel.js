@@ -706,62 +706,60 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
     }
 }
 
-// NUEVA FUNCIÓN: ANÁLISIS DE FRECUENCIA PARA PREMIOS "DALE PLAY"
-window.generarReporteFrecuencia = async function() {
-    try {
-        const snap = await get(ref(db, '2_asistencias'));
-        if (!snap.exists()) return alert("No hay asistencias registradas en el sistema.");
-        
-        const trabSnap = await get(ref(db, '1_trabajadores')); 
-        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-        
-        const todas = snap.val();
-        let conteoAsistencias = {};
-
-        // Recorremos todo el historial
-        for (const fecha in todas) {
-            for (const prog in todas[fecha]) {
-                for (const rut in todas[fecha][prog]) {
-                    if (!conteoAsistencias[rut]) {
-                        conteoAsistencias[rut] = { total_general: 0, programas_visitados: {}, conteo_dale_play: 0 };
-                    }
-                    conteoAsistencias[rut].total_general++;
-                    
-                    if (!conteoAsistencias[rut].programas_visitados[prog]) {
-                        conteoAsistencias[rut].programas_visitados[prog] = 0;
-                    }
-                    conteoAsistencias[rut].programas_visitados[prog]++;
-                    
-                    if (prog === "Dale Play") {
-                        conteoAsistencias[rut].conteo_dale_play++;
-                    }
-                }
-            }
-        }
-
-        let csv = "\uFEFFRUT;NOMBRES;APELLIDOS;TOTAL ASISTENCIAS GENERALES;VECES EN DALE PLAY;DETALLE DE PROGRAMAS VISITADOS\n";
-        
-        for (const rut in conteoAsistencias) {
-            const datos = conteoAsistencias[rut];
-            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
-            
-            // Armamos un texto resumen de a qué programas fue (Ej: Dale Play(3), Detras del Muro(1))
-            let detalle = [];
-            for (const p in datos.programas_visitados) {
-                detalle.push(`${p} (${datos.programas_visitados[p]})`);
-            }
-            let textoDetalle = detalle.join(", ");
-            
-            csv += `${rut};${tr.nombres};${tr.apellidos};${datos.total_general};${datos.conteo_dale_play};${textoDetalle}\n`;
-        }
-
-        descargarCSV(csv, `Reporte_Fidelidad_Publico_${new Date().toISOString().split('T')[0]}.csv`);
-
-    } catch (e) {
-        alert("Error al generar el reporte de fidelidad.");
-    }
+// NUEVA FUNCIÓN: ANÁLISIS DE FRECUENCIA PARA PREMIOS "DALE PLAY"  
+window.generarReporteFrecuencia = async function() {  
+    try {  
+        const snap = await get(ref(db, '2_asistencias'));  
+        if (!snap.exists()) return alert("No hay asistencias registradas en el sistema.");  
+          
+        const trabSnap = await get(ref(db, '1_trabajadores'));   
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};  
+          
+        const todas = snap.val();  
+        let conteoAsistencias = {};  
+  
+        // Recorremos todo el historial  
+        for (const fecha in todas) {  
+            for (const prog in todas[fecha]) {  
+                for (const rut in todas[fecha][prog]) {  
+                    if (!conteoAsistencias[rut]) {  
+                        conteoAsistencias[rut] = { total_general: 0, programas_visitados: {}, conteo_dale_play: 0 };  
+                    }  
+                    conteoAsistencias[rut].total_general++;  
+                      
+                    if (!conteoAsistencias[rut].programas_visitados[prog]) {  
+                        conteoAsistencias[rut].programas_visitados[prog] = 0;  
+                    }  
+                    conteoAsistencias[rut].programas_visitados[prog]++;  
+                      
+                    if (prog === "Dale Play") {  
+                        conteoAsistencias[rut].conteo_dale_play++;  
+                    }  
+                }  
+            }  
+        }  
+  
+        let csv = "\uFEFFRUT;NOMBRES;APELLIDOS;TOTAL ASISTENCIAS GENERALES;VECES EN DALE PLAY;DETALLE DE PROGRAMAS VISITADOS\n";  
+          
+        for (const rut in conteoAsistencias) {  
+            const datos = conteoAsistencias[rut];  
+            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };  
+              
+            let detalle = [];  
+            for (const p in datos.programas_visitados) {  
+                detalle.push(`${p} (${datos.programas_visitados[p]})`);  
+            }  
+            let textoDetalle = detalle.join(", ");  
+              
+            csv += `${rut};${tr.nombres};${tr.apellidos};${datos.total_general};${datos.conteo_dale_play};${textoDetalle}\n`;  
+        }  
+  
+        descargarCSV(csv, `Reporte_Fidelidad_Publico_${new Date().toISOString().split('T')[0]}.csv`);  
+  
+    } catch (e) {  
+        alert("Error al generar el reporte de fidelidad.");  
+    }  
 }
-
 document.getElementById('dt-tab').addEventListener('click', cargarReportesDT);
 document.getElementById('btnRefrescarDT').addEventListener('click', cargarReportesDT);
 
