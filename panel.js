@@ -815,3 +815,105 @@ btnEjecutar.addEventListener('click', async () => {
         modal.hide(); inputConfirmar.value = ""; btnEjecutar.disabled = true; window.location.reload();
     } catch (error) { alert("Error al limpiar."); }
 });
+// ==========================================
+// NUEVA PESTAÑA: SORTEO DALE PLAY
+// ==========================================
+document.getElementById('sorteo-tab').addEventListener('click', async () => {
+    const contenedorFechas = document.getElementById('listaFechasSorteo');
+    contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
+    
+    try {
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) return contenedorFechas.innerHTML = "<p class='text-muted'>No hay asistencias registradas.</p>";
+        
+        const todas = snap.val();
+        let fechasDalePlay = [];
+        
+        for (const fecha in todas) {
+            if (todas[fecha]["Dale Play"]) {
+                fechasDalePlay.push(fecha);
+            }
+        }
+        
+        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-muted'>No se han realizado programas 'Dale Play' aún.</p>";
+        
+        fechasDalePlay.sort().reverse();
+        
+        let htmlFechas = "";
+        fechasDalePlay.forEach(fecha => {
+            htmlFechas += `
+            <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px; width: 100%; max-width: 260px;">
+                <input class="form-check-input check-sorteo" type="checkbox" value="${fecha}" id="chk_${fecha}" checked style="transform: scale(1.4); margin-top: 8px; cursor: pointer;">
+                <label class="form-check-label fw-bold ms-2 text-white" for="chk_${fecha}" style="cursor: pointer; width: 100%;">
+                    🎬 Dale Play<br><small class="text-warning">${fecha}</small>
+                </label>
+            </div>`;
+        });
+        
+        contenedorFechas.innerHTML = htmlFechas;
+        
+    } catch (e) {
+        contenedorFechas.innerHTML = "<p class='text-danger'>Error al cargar las fechas.</p>";
+    }
+});
+
+document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
+    const checkboxes = document.querySelectorAll('.check-sorteo:checked');
+    const fechasSeleccionadas = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (fechasSeleccionadas.length === 0) return alert("Debes seleccionar al menos una fecha de Dale Play para el sorteo.");
+    
+    const btnSorteo = document.getElementById('btnRealizarSorteo');
+    btnSorteo.innerText = "🎰 Mezclando los RUTs y girando la ruleta...";
+    btnSorteo.disabled = true;
+    document.getElementById('resultadoSorteo').classList.add('d-none');
+    
+    try {
+        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
+        if (!asisSnap.exists()) throw new Error("No hay datos");
+        
+        const todas = asisSnap.val();
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        let candidatos = []; 
+        
+        fechasSeleccionadas.forEach(fecha => {
+            if (todas[fecha] && todas[fecha]["Dale Play"]) {
+                for (const rut in todas[fecha]["Dale Play"]) {
+                    candidatos.push(rut);
+                }
+            }
+        });
+        
+        if (candidatos.length === 0) {
+            alert("No hubo asistentes registrados en las fechas que seleccionaste.");
+            btnSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
+            btnSorteo.disabled = false;
+            return;
+        }
+        
+        const indiceGanador = Math.floor(Math.random() * candidatos.length);
+        const rutGanador = candidatos[indiceGanador];
+        const trabGanador = trabajadores[rutGanador] || { nombres: "Trabajador", apellidos: "Desconocido" };
+        
+        setTimeout(() => {
+            document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
+            document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
+            
+            let asistenciasGanador = 0;
+            fechasSeleccionadas.forEach(f => {
+                if(todas[f] && todas[f]["Dale Play"] && todas[f]["Dale Play"][rutGanador]) asistenciasGanador++;
+            });
+            
+            document.getElementById('ganadorFechas').innerText = `🏅 Esta persona asistió a ${asistenciasGanador} de los ${fechasSeleccionadas.length} programas seleccionados.`;
+            
+            document.getElementById('resultadoSorteo').classList.remove('d-none');
+            btnSorteo.innerText = "🔄 Realizar otro Sorteo";
+            btnSorteo.disabled = false;
+        }, 2000);
+        
+    } catch (e) {
+        alert("Error al realizar el sorteo.");
+        btnSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
+        btnSorteo.disabled = false;
+    }
+});
