@@ -816,7 +816,7 @@ btnEjecutar.addEventListener('click', async () => {
     } catch (error) { alert("Error al limpiar."); }
 });
 // ==========================================
-// NUEVA PESTAÑA: SORTEO DALE PLAY (ASISTENCIA PERFECTA)
+// NUEVA PESTAÑA: SORTEO DALE PLAY (ASISTENCIA PERFECTA Y MENSAJE UI)
 // ==========================================
 document.getElementById('sorteo-tab').addEventListener('click', async () => {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
@@ -891,18 +891,25 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         
         for (const rut in conteoPorRut) {
             if (conteoPorRut[rut] === cantidadRequerida) {
-                candidatos.push(rut); // Entra a la tómbola 1 sola vez
+                candidatos.push(rut); 
             }
         }
         
+        // 3. SI NO HAY NADIE CON ASISTENCIA PERFECTA
         if (candidatos.length === 0) {
-            alert(`Ningún extra cumple la condición. Nadie tiene asistencia perfecta en las ${cantidadRequerida} fechas que seleccionaste.`);
-            btnSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
-            btnSorteo.disabled = false;
+            setTimeout(() => {
+                document.getElementById('ganadorNombre').innerText = "SIN GANADOR 😔";
+                document.getElementById('ganadorRut').innerText = "";
+                document.getElementById('ganadorFechas').innerText = "Lamentablemente ninguna persona asistió a todas las fechas seleccionadas durante la semana.";
+                
+                document.getElementById('resultadoSorteo').classList.remove('d-none');
+                btnSorteo.innerText = "🔄 Intentar con otras fechas";
+                btnSorteo.disabled = false;
+            }, 1000);
             return;
         }
         
-        // 3. Elegir un ganador al azar entre los de asistencia perfecta
+        // 4. Elegir un ganador al azar entre los de asistencia perfecta
         const indiceGanador = Math.floor(Math.random() * candidatos.length);
         const rutGanador = candidatos[indiceGanador];
         const trabGanador = trabajadores[rutGanador] || { nombres: "Trabajador", apellidos: "Desconocido" };
