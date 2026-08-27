@@ -816,7 +816,7 @@ btnEjecutar.addEventListener('click', async () => {
     } catch (error) { alert("Error al limpiar."); }
 });
 // ==========================================
-// NUEVA PESTAÑA: SORTEO DALE PLAY (ASISTENCIA PERFECTA Y MENSAJE UI)
+// NUEVA PESTAÑA: SORTEO DALE PLAY (ASISTENCIA PERFECTA ABSOLUTA)
 // ==========================================
 document.getElementById('sorteo-tab').addEventListener('click', async () => {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
@@ -858,13 +858,15 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
 });
 
 document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
+    // 1. Recopilar fechas marcadas en el panel
     const checkboxes = document.querySelectorAll('.check-sorteo:checked');
     const fechasSeleccionadas = Array.from(checkboxes).map(cb => cb.value);
+    const totalFechasRequeridas = fechasSeleccionadas.length;
     
-    if (fechasSeleccionadas.length === 0) return alert("Debes seleccionar al menos una fecha de Dale Play para el sorteo.");
+    if (totalFechasRequeridas === 0) return alert("Debes seleccionar al menos una fecha de Dale Play para el sorteo.");
     
     const btnSorteo = document.getElementById('btnRealizarSorteo');
-    btnSorteo.innerText = "🎰 Buscando asistentes perfectos y girando la ruleta...";
+    btnSorteo.innerText = "🎰 Filtrando asistencia perfecta y girando ruleta...";
     btnSorteo.disabled = true;
     document.getElementById('resultadoSorteo').classList.add('d-none');
     
@@ -874,33 +876,31 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         
         const todas = asisSnap.val();
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        let candidatosPerfectos = []; 
         
-        // 1. Contar a cuántas de las fechas seleccionadas asistió cada RUT
-        let conteoPorRut = {};
-        fechasSeleccionadas.forEach(fecha => {
-            if (todas[fecha] && todas[fecha]["Dale Play"]) {
-                for (const rut in todas[fecha]["Dale Play"]) {
-                    conteoPorRut[rut] = (conteoPorRut[rut] || 0) + 1;
+        // 2. FILTRO ABSOLUTO: Revisamos trabajador por trabajador
+        for (const rut in trabajadores) {
+            let asistenciasConfirmadas = 0;
+            
+            // Contamos en cuántas de las fechas seleccionadas el RUT marcó salida/ingreso
+            fechasSeleccionadas.forEach(fecha => {
+                if (todas[fecha] && todas[fecha]["Dale Play"] && todas[fecha]["Dale Play"][rut]) {
+                    asistenciasConfirmadas++;
                 }
-            }
-        });
-        
-        // 2. Filtro Estricto: Solo entran los que tienen asistencia igual al total de fechas marcadas
-        let candidatos = []; 
-        const cantidadRequerida = fechasSeleccionadas.length;
-        
-        for (const rut in conteoPorRut) {
-            if (conteoPorRut[rut] === cantidadRequerida) {
-                candidatos.push(rut); 
+            });
+            
+            // Si asistió a TODAS las fechas marcadas, entra a la tómbola
+            if (asistenciasConfirmadas === totalFechasRequeridas) {
+                candidatosPerfectos.push(rut);
             }
         }
         
-        // 3. SI NO HAY NADIE CON ASISTENCIA PERFECTA
-        if (candidatos.length === 0) {
+        // 3. SI NADIE CUMPLE LA CONDICIÓN ESTRICTA
+        if (candidatosPerfectos.length === 0) {
             setTimeout(() => {
                 document.getElementById('ganadorNombre').innerText = "SIN GANADOR 😔";
                 document.getElementById('ganadorRut').innerText = "";
-                document.getElementById('ganadorFechas').innerText = "Lamentablemente ninguna persona asistió a todas las fechas seleccionadas durante la semana.";
+                document.getElementById('ganadorFechas').innerText = "Lamentablemente, ninguna persona cumplió con el requisito de asistir a TODAS las fechas seleccionadas.";
                 
                 document.getElementById('resultadoSorteo').classList.remove('d-none');
                 btnSorteo.innerText = "🔄 Intentar con otras fechas";
@@ -909,15 +909,15 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
             return;
         }
         
-        // 4. Elegir un ganador al azar entre los de asistencia perfecta
-        const indiceGanador = Math.floor(Math.random() * candidatos.length);
-        const rutGanador = candidatos[indiceGanador];
-        const trabGanador = trabajadores[rutGanador] || { nombres: "Trabajador", apellidos: "Desconocido" };
+        // 4. RANDOMIZACIÓN PURA
+        const indiceAleatorio = Math.floor(Math.random() * candidatosPerfectos.length);
+        const rutGanador = candidatosPerfectos[indiceAleatorio];
+        const trabGanador = trabajadores[rutGanador];
         
         setTimeout(() => {
             document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
             document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
-            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${cantidadRequerida} fechas seleccionadas (Total de personas en la tómbola: ${candidatos.length}).`;
+            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
             
             document.getElementById('resultadoSorteo').classList.remove('d-none');
             btnSorteo.innerText = "🔄 Realizar otro Sorteo";
