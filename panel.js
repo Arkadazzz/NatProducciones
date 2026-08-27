@@ -816,7 +816,7 @@ btnEjecutar.addEventListener('click', async () => {
     } catch (error) { alert("Error al limpiar."); }
 });
 // ==========================================
-// NUEVA PESTAÑA: SORTEO DALE PLAY
+// NUEVA PESTAÑA: SORTEO DALE PLAY (ASISTENCIA PERFECTA)
 // ==========================================
 document.getElementById('sorteo-tab').addEventListener('click', async () => {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
@@ -864,7 +864,7 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
     if (fechasSeleccionadas.length === 0) return alert("Debes seleccionar al menos una fecha de Dale Play para el sorteo.");
     
     const btnSorteo = document.getElementById('btnRealizarSorteo');
-    btnSorteo.innerText = "🎰 Mezclando los RUTs y girando la ruleta...";
+    btnSorteo.innerText = "🎰 Buscando asistentes perfectos y girando la ruleta...";
     btnSorteo.disabled = true;
     document.getElementById('resultadoSorteo').classList.add('d-none');
     
@@ -874,23 +874,35 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         
         const todas = asisSnap.val();
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-        let candidatos = []; 
         
+        // 1. Contar a cuántas de las fechas seleccionadas asistió cada RUT
+        let conteoPorRut = {};
         fechasSeleccionadas.forEach(fecha => {
             if (todas[fecha] && todas[fecha]["Dale Play"]) {
                 for (const rut in todas[fecha]["Dale Play"]) {
-                    candidatos.push(rut);
+                    conteoPorRut[rut] = (conteoPorRut[rut] || 0) + 1;
                 }
             }
         });
         
+        // 2. Filtro Estricto: Solo entran los que tienen asistencia igual al total de fechas marcadas
+        let candidatos = []; 
+        const cantidadRequerida = fechasSeleccionadas.length;
+        
+        for (const rut in conteoPorRut) {
+            if (conteoPorRut[rut] === cantidadRequerida) {
+                candidatos.push(rut); // Entra a la tómbola 1 sola vez
+            }
+        }
+        
         if (candidatos.length === 0) {
-            alert("No hubo asistentes registrados en las fechas que seleccionaste.");
+            alert(`Ningún extra cumple la condición. Nadie tiene asistencia perfecta en las ${cantidadRequerida} fechas que seleccionaste.`);
             btnSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
             btnSorteo.disabled = false;
             return;
         }
         
+        // 3. Elegir un ganador al azar entre los de asistencia perfecta
         const indiceGanador = Math.floor(Math.random() * candidatos.length);
         const rutGanador = candidatos[indiceGanador];
         const trabGanador = trabajadores[rutGanador] || { nombres: "Trabajador", apellidos: "Desconocido" };
@@ -898,13 +910,7 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         setTimeout(() => {
             document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
             document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
-            
-            let asistenciasGanador = 0;
-            fechasSeleccionadas.forEach(f => {
-                if(todas[f] && todas[f]["Dale Play"] && todas[f]["Dale Play"][rutGanador]) asistenciasGanador++;
-            });
-            
-            document.getElementById('ganadorFechas').innerText = `🏅 Esta persona asistió a ${asistenciasGanador} de los ${fechasSeleccionadas.length} programas seleccionados.`;
+            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${cantidadRequerida} fechas seleccionadas (Total de personas en la tómbola: ${candidatos.length}).`;
             
             document.getElementById('resultadoSorteo').classList.remove('d-none');
             btnSorteo.innerText = "🔄 Realizar otro Sorteo";
