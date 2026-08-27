@@ -29,9 +29,6 @@ let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico 
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
-// ==========================================
-// GENERADOR AUTOMÁTICO DE HORAS (INTERVALOS DE 15 MIN)
-// ==========================================
 function poblarSelectoresHora() {
     let opcionesHTML = '<option value="">-- Selecciona --</option>';
     for (let h = 0; h < 24; h++) {
@@ -42,8 +39,6 @@ function poblarSelectoresHora() {
             let h12 = h % 12;
             if (h12 === 0) h12 = 12;
             let hh12 = h12.toString().padStart(2, '0');
-            
-            // value = formato matemático (19:30) | Texto = formato visual (07:30 PM)
             opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm} ${ampm}</option>`;
         }
     }
@@ -54,7 +49,6 @@ function poblarSelectoresHora() {
 }
 poblarSelectoresHora();
 
-// Memoria Inicial
 get(ref(db, '1_trabajadores')).then(snap => { if (snap.exists()) listaGlobalCRM = snap.val(); });
 
 // ==========================================
@@ -90,10 +84,8 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
-    const valorHE = document.getElementById('valorHoraExtra').value || 0;
-    
-    // REPARADO: Ahora lee directamente del menú desplegable y no pide escribir nada
     const horaCitacion = document.getElementById('horaCitacion').value; 
+    const valorHE = document.getElementById('valorHoraExtra').value || 0;
     const horaSal = document.getElementById('horaTermino').value;
     
     if (!nom || !fec || !mon || !horaSal || !horaCitacion) return alert("Completa todos los campos obligatorios.");
@@ -642,6 +634,9 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
+// ==========================================
+// NUEVA PESTAÑA: DEGLOSE DE PROGRAMAS Y ASISTENCIA DE SEGURIDAD
+// ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarDT');
@@ -665,9 +660,16 @@ async function cargarReportesDT() {
 
             htmlAcordeon += `
             <div class="accordion-item">
-                <h2 class="accordion-header"><button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span></button></h2>
+                <h2 class="accordion-header">
+                    <button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">
+                        📅 ${fecha} | 🎬 ${prog}   <span class="badge bg-success ms-2">${cantidad} personas</span>
+                    </button>
+                </h2>
                 <div id="collapseDT_${index}" class="accordion-collapse collapse ${isOpen}" data-bs-parent="#acordeonDT">
                     <div class="accordion-body">
+                        <button class="btn btn-outline-info btn-sm mb-3 fw-bold" onclick="window.descargarListaSeguridad('${fecha}', '${prog}')">
+                            🛡️ Descargar Excel para Seguridad
+                        </button>
                         <div class="table-responsive">
                             <table class="table table-dark table-hover table-sm text-center align-middle" style="font-size: 0.85em;">
                                 <thead style="color: #b066ff;"><tr><th>RUT</th><th>Nombre Completo</th><th>Teléfono</th><th>Dirección</th><th>AFP</th><th>Salud</th><th>Banco</th><th>Cuenta</th></tr></thead>
@@ -680,6 +682,84 @@ async function cargarReportesDT() {
         }
     }
     contenedor.innerHTML = htmlAcordeon;
+}
+
+window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
+    try {
+        const asisSnap = await get(child(ref(db), `2_asistencias/${fechaElegida}/${programaElegido}`));
+        if (!asisSnap.exists()) return alert("No hay datos para descargar.");
+        
+        const trabSnap = await get(ref(db, '1_trabajadores'));
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        
+        const asistentes = asisSnap.val();
+        let csv = "\uFEFFPROGRAMA;FECHA;RUT;NOMBRES;APELLIDOS\n";
+        
+        for (const rut in asistentes) {
+            const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
+            csv += `${programaElegido};${fechaElegida};${rut};${tr.nombres};${tr.apellidos}\n`;
+        }
+        
+        descargarCSV(csv, `Lista_Seguridad_${programaElegido.replace(/[ \/]/g, "_")}_${fechaElegida}.csv`);
+    } catch (e) {
+        alert("Error al descargar lista de seguridad.");
+    }
+}
+
+// NUEVA FUNCIÓN: ANÁLISIS DE FRECUENCIA PARA PREMIOS "DALE PLAY"
+window.generarReporteFrecuencia = async function() {
+    try {
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) return alert("No hay asistencias registradas en el sistema.");
+        
+        const trabSnap = await get(ref(db, '1_trabajadores')); 
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        
+        const todas = snap.val();
+        let conteoAsistencias = {};
+
+        // Recorremos todo el historial
+        for (const fecha in todas) {
+            for (const prog in todas[fecha]) {
+                for (const rut in todas[fecha][prog]) {
+                    if (!conteoAsistencias[rut]) {
+                        conteoAsistencias[rut] = { total_general: 0, programas_visitados: {}, conteo_dale_play: 0 };
+                    }
+                    conteoAsistencias[rut].total_general++;
+                    
+                    if (!conteoAsistencias[rut].programas_visitados[prog]) {
+                        conteoAsistencias[rut].programas_visitados[prog] = 0;
+                    }
+                    conteoAsistencias[rut].programas_visitados[prog]++;
+                    
+                    if (prog === "Dale Play") {
+                        conteoAsistencias[rut].conteo_dale_play++;
+                    }
+                }
+            }
+        }
+
+        let csv = "\uFEFFRUT;NOMBRES;APELLIDOS;TOTAL ASISTENCIAS GENERALES;VECES EN DALE PLAY;DETALLE DE PROGRAMAS VISITADOS\n";
+        
+        for (const rut in conteoAsistencias) {
+            const datos = conteoAsistencias[rut];
+            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
+            
+            // Armamos un texto resumen de a qué programas fue (Ej: Dale Play(3), Detras del Muro(1))
+            let detalle = [];
+            for (const p in datos.programas_visitados) {
+                detalle.push(`${p} (${datos.programas_visitados[p]})`);
+            }
+            let textoDetalle = detalle.join(", ");
+            
+            csv += `${rut};${tr.nombres};${tr.apellidos};${datos.total_general};${datos.conteo_dale_play};${textoDetalle}\n`;
+        }
+
+        descargarCSV(csv, `Reporte_Fidelidad_Publico_${new Date().toISOString().split('T')[0]}.csv`);
+
+    } catch (e) {
+        alert("Error al generar el reporte de fidelidad.");
+    }
 }
 
 document.getElementById('dt-tab').addEventListener('click', cargarReportesDT);
