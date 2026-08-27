@@ -56,6 +56,8 @@
         <li class="nav-item" role="presentation"><button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 BD & Edición</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="dt-tab" data-bs-toggle="tab" data-bs-target="#reportesdt" type="button">📋 Reportes DT</button></li>
+        <!-- NUEVA PESTAÑA DE SEGURIDAD -->
+        <li class="nav-item" role="presentation"><button class="nav-link" id="seguridad-tab" data-bs-toggle="tab" data-bs-target="#seguridad" type="button">🛡️ Seguridad & Premios</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="mantenimiento-tab" data-bs-toggle="tab" data-bs-target="#mantenimiento" type="button">⚙️ Mant.</button></li>
     </ul>
 
@@ -82,7 +84,6 @@
                         
                         <input type="date" id="fechaPrograma" class="form-control mb-3 fw-bold text-center" style="font-size: 1.3em; padding: 15px; color: #d6b3ff !important; border: 2px solid #b066ff !important;">
                         
-                        <!-- FILA REPARADA CON SELECTORES DE 15 MINUTOS -->
                         <div class="row align-items-end mb-4">
                             <div class="col-6 col-md-3 mb-2">
                                 <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Base ($)</label>
@@ -91,12 +92,12 @@
                             
                             <div class="col-6 col-md-3 mb-2">
                                 <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Citación</label>
-                                <select id="horaCitacion" class="form-select fw-bold text-center text-info" style="height: 48px; font-size: 1.1em;"></select>
+                                <select id="horaCitacion" class="form-select fw-bold text-center text-info px-1" style="height: 48px; font-size: 0.95em;"></select>
                             </div>
 
                             <div class="col-6 col-md-3 mb-2">
                                 <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Salida</label>
-                                <select id="horaTermino" class="form-select fw-bold text-center text-warning" style="height: 48px; font-size: 1.1em;"></select>
+                                <select id="horaTermino" class="form-select fw-bold text-center text-warning px-1" style="height: 48px; font-size: 0.95em;"></select>
                             </div>
                             
                             <div class="col-6 col-md-3 mb-2">
@@ -259,6 +260,51 @@
                 
                 <div class="accordion mt-4" id="acordeonDT">
                     <p class="text-center text-muted mt-3">Haz clic en Actualizar para cargar...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- NUEVA PESTAÑA 6: SEGURIDAD Y PREMIOS -->
+        <div class="tab-pane fade" id="seguridad" role="tabpanel">
+            <div class="row">
+                <!-- SEGURIDAD (HOY) -->
+                <div class="col-md-6 mb-4">
+                    <div class="card-panel h-100" style="border-color: #00d26a;">
+                        <h4 style="color: #00d26a;">👮 Reporte de Seguridad</h4>
+                        <p style="color: #aaaaaa;">Descarga el listado de asistentes (RUT y Nombre) para enviar al guardia del canal.</p>
+                        
+                        <label class="form-label text-white mt-2">Fecha del Evento:</label>
+                        <input type="date" id="fechaSeguridad" class="form-control mb-3 fw-bold text-center bg-dark text-white">
+                        
+                        <label class="form-label text-white">Programa:</label>
+                        <select id="programaSeguridad" class="form-select mb-4 text-center fw-bold bg-dark text-white">
+                            <option value="">-- Selecciona el Programa --</option>
+                            <option value="Dale Play">Dale Play</option>
+                            <option value="Detrás del Muro">Detrás del Muro</option>
+                        </select>
+                        <button class="btn btn-outline-success w-100 fw-bold py-3 fs-5 mt-auto" id="btnExcelSeguridad">Descargar Excel Seguridad</button>
+                    </div>
+                </div>
+
+                <!-- PREMIOS LEALTAD -->
+                <div class="col-md-6 mb-4">
+                    <div class="card-panel h-100" style="border-color: #ffcc00; background: rgba(255, 204, 0, 0.05);">
+                        <h4 style="color: #ffcc00;">🏆 Sorteo Lealtad (Dale Play)</h4>
+                        <p style="color: #aaaaaa;">Calcula quiénes asistieron a <b>todos</b> los Dale Play de los últimos 7 días para premiarlos.</p>
+                        <button class="btn btn-warning w-100 fw-bold py-3 mt-2 fs-5 text-dark" id="btnBuscarLeales">Generar Reporte de Lealtad (Últimos 7 días)</button>
+                        
+                        <div id="resultadoLealtad" class="mt-4 d-none">
+                            <h6 class="text-white fw-bold mb-3 border-bottom pb-2 border-warning">Programas evaluados: <span id="contadorDalePlay" class="text-warning fs-5 ms-1">0</span></h6>
+                            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                <table class="table table-dark table-hover table-sm text-center align-middle">
+                                    <thead style="color: #ffcc00; position: sticky; top: 0; background: #1a1a1a;">
+                                        <tr><th>RUT</th><th>Nombre</th><th>Asistencias</th></tr>
+                                    </thead>
+                                    <tbody id="tablaLealtad"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
