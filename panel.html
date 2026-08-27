@@ -59,6 +59,7 @@
         <!-- NUEVA PESTAÑA DE SEGURIDAD -->
         <li class="nav-item" role="presentation"><button class="nav-link" id="seguridad-tab" data-bs-toggle="tab" data-bs-target="#seguridad" type="button">🛡️ Seguridad & Premios</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="mantenimiento-tab" data-bs-toggle="tab" data-bs-target="#mantenimiento" type="button">⚙️ Mant.</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="sorteo-tab" data-bs-toggle="tab" data-bs-target="#sorteo" type="button">🏆 Sorteos</button></li>
     </ul>
 
     <div class="tab-content" id="myTabContent">
@@ -344,7 +345,26 @@
 
     </div>
 </div>
+<!-- PESTAÑA 6: SORTEO DALE PLAY -->
+        <div class="tab-pane fade" id="sorteo" role="tabpanel">
+            <div class="card-panel">
+                <h4 style="color: #ffcc00; font-weight: bold;">🏆 Sorteo Fidelidad "Dale Play"</h4>
+                <p class="text-muted">Selecciona las fechas que participarán en el sorteo. El sistema detectará automáticamente a las personas que asistieron y elegirá un ganador al azar.</p>
+                
+                <div id="listaFechasSorteo" class="d-flex flex-wrap gap-3 mb-4 mt-4">
+                    <p class="text-warning">Haz clic en la pestaña para cargar las fechas...</p>
+                </div>
+                
+                <button class="btn btn-warning w-100 fw-bold py-3 fs-5 shadow" id="btnRealizarSorteo" style="color: #000;">🎁 ¡Girar la Ruleta Mágica!</button>
+            </div>
 
+            <div class="card-panel d-none text-center mt-4 shadow-lg" id="resultadoSorteo" style="border: 3px solid #ffcc00; background: rgba(255, 204, 0, 0.05);">
+                <h3 class="text-warning mb-1 fw-bold">🎉 ¡TENEMOS GANADOR(A)! 🎉</h3>
+                <h1 id="ganadorNombre" class="text-white fw-bold my-4" style="font-size: 3.5rem; text-shadow: 0 0 15px rgba(255, 204, 0, 0.5);"></h1>
+                <h4 id="ganadorRut" class="text-info mb-3 fw-bold"></h4>
+                <div class="alert alert-dark d-inline-block border-warning text-warning" id="ganadorFechas"></div>
+            </div>
+        </div>
 <!-- MODAL EDICIÓN Y FICHA TÉCNICA -->
 <div class="modal fade" id="modalFicha" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
