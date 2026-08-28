@@ -73,26 +73,78 @@
                             </select>
                         </div>
                     </div>
-                    <div class="mb-3"><label class="form-label">Dirección Completa</label><input type="text" class="form-control" id="direccion"></div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-warning">Dirección Completa *</label>
+                        <div class="row mb-3">
+                            <div class="col-6"><input type="text" id="calle" class="form-control bg-dark text-white border-dark" placeholder="Nombre de Calle" required></div>
+                            <div class="col-3"><input type="text" id="numeroCalle" class="form-control bg-dark text-white border-dark" placeholder="N°" required></div>
+                            <div class="col-3"><input type="text" id="comuna" class="form-control bg-dark text-white border-dark" placeholder="Comuna" required></div>
+                        </div>
+                    </div>
+                    
                     <div class="row">
-                        <div class="col-md-6 mb-3"><label class="form-label">Teléfono</label><input type="text" class="form-control" id="telefono" placeholder="+569..." pattern="^\+569[0-9]{8}$" title="Debe empezar con +569 seguido de 8 números"></div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label text-warning">Teléfono (Solo números) *</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-secondary text-white border-dark">+56 9</span>
+                                <input type="tel" id="telefono" class="form-control bg-dark text-white border-dark" placeholder="1234 5678" required pattern="^[0-9]{8}$" title="Debe contener exactamente 8 números">
+                            </div>
+                        </div>
                         <div class="col-md-6 mb-3"><label class="form-label">Correo Electrónico</label><input type="email" class="form-control" id="email"></div>
                     </div>
                     <h5 class="mt-4 mb-3" style="color: #d6b3ff; border-bottom: 1px solid #333; padding-bottom: 10px; font-weight: bold;">Contratación y Pago</h5>
                     <div class="row">
-                        <div class="col-md-6 mb-3"><label class="form-label">AFP</label>
-                            <select class="form-select" id="afp"><option value="">Selecciona...</option><option value="CAPITAL">Capital</option><option value="CUPRUM">Cuprum</option><option value="HABITAT">Habitat</option><option value="MODELO">Modelo</option><option value="PLANVITAL">PlanVital</option><option value="PROVIDA">ProVida</option><option value="UNO">Uno</option></select>
+                        <div class="col-md-6 mb-3"><label class="form-label text-warning">AFP *</label>
+                            <select class="form-select" id="afp">
+                                <option value="">Selecciona...</option>
+                                <option value="No cotizo / No sé">No cotizo / No sé</option>
+                                <option value="CAPITAL">Capital</option>
+                                <option value="CUPRUM">Cuprum</option>
+                                <option value="HABITAT">Habitat</option>
+                                <option value="MODELO">Modelo</option>
+                                <option value="PLANVITAL">PlanVital</option>
+                                <option value="PROVIDA">ProVida</option>
+                                <option value="UNO">Uno</option>
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3"><label class="form-label">Salud</label>
-                            <select class="form-select" id="salud"><option value="">Selecciona...</option><option value="FONASA">Fonasa</option><option value="BANMEDICA">Banmédica</option><option value="COLMENA">Colmena</option><option value="CONSALUD">Consalud</option><option value="CRUZBLANCA">Cruz Blanca</option><option value="NUEVAMASVIDA">Nueva Masvida</option><option value="VIDATRES">Vida Tres</option></select>
+                            <select class="form-select" id="salud">
+                                <option value="">Selecciona...</option>
+                                <option value="FONASA">Fonasa</option>
+                                <option value="BANMEDICA">Banmédica</option>
+                                <option value="COLMENA">Colmena</option>
+                                <option value="CONSALUD">Consalud</option>
+                                <option value="CRUZBLANCA">Cruz Blanca</option>
+                                <option value="NUEVAMASVIDA">Nueva Masvida</option>
+                                <option value="VIDATRES">Vida Tres</option>
+                            </select>
                         </div>
                     </div>
                     <div class="mb-3"><label class="form-label">Banco</label>
-                        <select class="form-select" id="banco"><option value="">Selecciona...</option><option value="ESTADO">Banco Estado</option><option value="CHILE">Banco de Chile</option><option value="BCI">BCI</option><option value="SANTANDER">Santander</option><option value="ITAU">Itaú</option><option value="SCOTIABANK">Scotiabank</option><option value="FALABELLA">Falabella</option><option value="BICE">BICE</option><option value="SECURITY">Security</option><option value="CONSORCIO">Consorcio</option><option value="RIPLEY">Ripley</option></select>
+                        <select class="form-select" id="banco">
+                            <option value="">Selecciona...</option>
+                            <option value="ESTADO">Banco Estado</option>
+                            <option value="CHILE">Banco de Chile</option>
+                            <option value="BCI">BCI</option>
+                            <option value="SANTANDER">Santander</option>
+                            <option value="ITAU">Itaú</option>
+                            <option value="SCOTIABANK">Scotiabank</option>
+                            <option value="FALABELLA">Falabella</option>
+                            <option value="BICE">BICE</option>
+                            <option value="SECURITY">Security</option>
+                            <option value="CONSORCIO">Consorcio</option>
+                            <option value="RIPLEY">Ripley</option>
+                        </select>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3"><label class="form-label">Tipo de Cuenta</label>
-                            <select class="form-select" id="tipoCuenta"><option value="">Selecciona...</option><option value="CUENTA_RUT">Cuenta RUT</option><option value="CUENTA_CORRIENTE">Cuenta Corriente</option><option value="CUENTA_VISTA">Cuenta Vista / Ahorro</option></select>
+                            <select class="form-select" id="tipoCuenta">
+                                <option value="">Selecciona...</option>
+                                <option value="CUENTA_RUT">Cuenta RUT</option>
+                                <option value="CUENTA_CORRIENTE">Cuenta Corriente</option>
+                                <option value="CUENTA_VISTA">Cuenta Vista / Ahorro</option>
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3"><label class="form-label">N° de Cuenta</label><input type="text" class="form-control" id="numeroCuenta" pattern="^[0-9]+$" title="Solo números, sin guiones ni espacios"></div>
                     </div>
@@ -134,6 +186,15 @@
                         </div>
                     </div>
 
+                    <div class="mb-4 p-3 rounded" style="background: rgba(255, 204, 0, 0.05); border: 1px dashed #ffcc00;">
+                        <label for="quiereContrato" class="form-label text-warning fw-bold">¿Deseas que se te realice un contrato por esta jornada? *</label>
+                        <select id="quiereContrato" class="form-select bg-dark text-white border-warning" required>
+                            <option value="">-- Selecciona una opción --</option>
+                            <option value="Sí">Sí, quiero contrato de trabajo</option>
+                            <option value="No">No, prefiero participar sin contrato</option>
+                        </select>
+                    </div>
+
                     <div class="form-check mt-4 mb-3">
                         <input class="form-check-input" type="checkbox" id="aceptoTerminos">
                         <label class="form-check-label text-muted" for="aceptoTerminos" style="font-size: 0.85em;">
@@ -161,6 +222,8 @@
     </div>
 </div>
 
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=3.0"></script>
 </body>
 </html>
+
+
