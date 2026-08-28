@@ -478,7 +478,7 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
 
 document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) return alert("No hay plata retenida.");
-    if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes y descargar el archivo del banco?")) return;
+    if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?")) return;
     const fechaHoy = new Date().toISOString().split('T')[0];
     let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
     let actualizacionesFirebase = {};
@@ -495,9 +495,6 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     try { await update(ref(db), actualizacionesFirebase); descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`); alert("¡Liquidación exitosa!"); document.getElementById('tablaDeudas').innerHTML = ""; window.deudasGlobales = {}; } catch (error) { alert("Error al liquidar."); }
 });
 
-// ==========================================
-// PAGOS BANCO (SELECCIÓN MÚLTIPLE Y SUMATORIA)
-// ==========================================
 let modalPagosInstance;
 
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
@@ -508,7 +505,7 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
         const snap = await get(ref(db, '2_asistencias'));
         if (!snap.exists()) {
             alert("No hay asistencias registradas en el sistema.");
-            btn.innerText = "Descargar Nómina Diaria"; btn.disabled = false;
+            btn.innerText = "Generar Nómina de Pago"; btn.disabled = false;
             return;
         }
 
@@ -545,7 +542,6 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
         } else {
             document.getElementById('btnGenerarNominaBanco').classList.remove('d-none');
             let html = "";
-            // Ordenar de lo más nuevo a lo más viejo
             const sortedKeys = Object.keys(programasPendientes).sort().reverse();
             
             sortedKeys.forEach(key => {
@@ -569,7 +565,7 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
         alert("Error al cargar los pagos pendientes.");
     }
     
-    btn.innerText = "Descargar Nómina Diaria"; btn.disabled = false;
+    btn.innerText = "Generar Nómina de Pago"; btn.disabled = false;
 });
 
 document.getElementById('btnGenerarNominaBanco').addEventListener('click', async () => {
@@ -633,15 +629,6 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
     } catch (e) {
         alert("Error al procesar y descargar los pagos.");
     }
-});        
-        if (!hayPagosNuevos) return alert("No hay pagos pendientes para esta fecha o sus montos son de $0.");
-        
-        if(confirm(`¡Se encontraron extras por pagar el día ${fechaElegida}!\n\n¿Descargar el Excel del Banco y marcarlos como PAGADOS?`)){
-            await update(ref(db), actualizacionesFirebase);
-            descargarCSV(csv, `Nomina_Banco_DIARIA_${fechaElegida}.csv`); 
-            alert("¡Nómina diaria descargada con éxito!");
-        }
-    } catch (e) { alert("Error al generar Excel del Banco."); }
 });
 
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
@@ -652,10 +639,13 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
         for (const f in todas) { if (f.startsWith(mes)) { for (const prog in todas[f]) { for (const r in todas[f][prog]) {
             if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; tot[r].monto += parseInt(todas[f][prog][r].monto) || 0;
         }}}}
-        let csv = "\uFEFFRUT;Nombre;Monto;Fecha\n";
+        let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
         for (const r in tot) {
             const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
-            if (tr) { csv += `${r};${tr.nombres} ${tr.apellidos};${tot[r].monto};${tot[r].fechaIn}\n`; }
+            if (tr) {
+                const parts = r.split('-'); const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; const [y, m, d] = (tr.fechaNacimiento||"").split('-');
+                csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${tot[r].fechaIn.split('-').reverse().join('-')};${tot[r].fechaIn.split('-').reverse().join('-')};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
+            }
         }
         descargarCSV(csv, `Contador_${mes}.csv`);
     } catch (e) { alert("Error al generar Excel."); }
@@ -887,8 +877,8 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         
         setTimeout(() => {
             document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
-            document.getElementById('ganadorRut').innerText = `RUT: ${rutGanador}`;
-            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total en tómbola: ${candidatosPerfectos.length}).`;
+            document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
+            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
             
             document.getElementById('resultadoSorteo').classList.remove('d-none');
             btnSorteo.innerText = "🔄 Realizar otro Sorteo";
