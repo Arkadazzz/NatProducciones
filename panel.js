@@ -17,9 +17,38 @@ const db = getDatabase(app);
 
 const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "FALABELLA": "52", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
 
-onAuthStateChanged(auth, (user) => { if (!user) window.location.href = "login.html"; });
-document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
+// ==========================================
+// SISTEMA DE SEGURIDAD POR CORREOS (LISTA VIP)
+// ==========================================
+// Agrega aquí los correos que tienen permiso para ver Finanzas, BD, Seguridad, etc.
+// Asegúrate de escribirlos en minúsculas y entre comillas.
+const CORREOS_ADMINISTRADORES = [
+    "nat.producciones2020@gmail.com",
+    "tu_correo_personal@gmail.com", 
+    "correo_jefa_1@gmail.com"
+];
 
+onAuthStateChanged(auth, (user) => { 
+    if (!user) {
+        window.location.href = "login.html"; 
+    } else {
+        // Verificar si el correo que inició sesión está en la lista VIP
+        const esAdmin = CORREOS_ADMINISTRADORES.includes(user.email.toLowerCase());
+        
+        if (!esAdmin) {
+            // Si el correo NO es administrador, ocultamos las pestañas privadas
+            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'seguridad-tab', 'mantenimiento-tab'];
+            pestanasBloqueadas.forEach(id => {
+                const tab = document.getElementById(id);
+                if (tab && tab.parentElement) {
+                    tab.parentElement.classList.add('d-none'); // Esto desaparece el botón de arriba
+                }
+            });
+        }
+    }
+});
+
+document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
 let valorHoraExtraGlobal = 0;
 let html5QrcodeScanner = null; let signaturePad; let rutActual = ""; let claveActual = "";
