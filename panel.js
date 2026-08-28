@@ -24,7 +24,7 @@ const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "1
 // Asegúrate de escribirlos en minúsculas y entre comillas.
 const CORREOS_ADMINISTRADORES = [
     "nat.producciones2020@gmail.com",
-    "tu_correo_personal@gmail.com", 
+    "pinoelgueta@gmail.com", 
     "correo_jefa_1@gmail.com"
 ];
 
