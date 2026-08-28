@@ -320,7 +320,27 @@
 
     </div>
 </div>
-
+<!-- MODAL PAGOS BANCO (NÓMINA AGRUPADA) -->
+<div class="modal fade" id="modalPagosBanco" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #00d26a;">
+            <div class="modal-header" style="border-bottom: 1px solid #333;">
+                <h5 class="modal-title" style="color: #00d26a; font-weight: bold;">🏦 Generar Nómina de Pago</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size: 0.95em;">Selecciona los programas que deseas incluir en esta nómina. Si una persona asistió a más de un programa seleccionado, <b>sus montos se sumarán automáticamente</b> en un solo depósito.</p>
+                <div id="listaProgramasPendientes" class="d-flex flex-column gap-2 mt-3" style="max-height: 400px; overflow-y: auto;">
+                    <!-- Checkboxes se cargan por JS -->
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #333;">
+                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success fw-bold" id="btnGenerarNominaBanco">📥 Descargar Nómina y Marcar Pagados</button>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- MODAL EDICIÓN Y FICHA TÉCNICA -->
 <div class="modal fade" id="modalFicha" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
