@@ -166,13 +166,10 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
             await set(ref(db, '1_trabajadores/' + rut), trabajadorData);
         }
 
-        const quiereContrato = document.getElementById('quiereContrato').value;
-
         const reservaData = {
             rut: rut, 
             tipo: tipoAsis, 
             invitado_por: invitadoPor, 
-            quiere_contrato: quiereContrato,
             hora_registro: new Date().toLocaleTimeString()
         };
         await set(ref(db, `3_reservas/${eventoActivo.fecha}/${eventoActivo.nombre}/${rut}`), reservaData);
@@ -201,5 +198,3 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
 
     } catch (error) { alert("Error al procesar. Revisa tu conexión."); }
 });
-
-
