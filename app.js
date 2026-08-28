@@ -98,8 +98,7 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
     try {
         const blacklistSnap = await get(child(ref(db), `4_blacklist/${rut}`));
         if (blacklistSnap.exists()) {
-            const motivo = blacklistSnap.val().motivo || "Decisión de producción";
-            return alert(`⛔ ESTÁS BLOQUEADO(A) DEL SISTEMA ⛔\n\nNo puedes inscribirte para participar en los programas.\nMotivo: ${motivo}`);
+            return alert(`⛔ ESTÁS BLOQUEADO(A) DEL SISTEMA ⛔\n\nNo puedes inscribirte para participar en los programas.\nSi crees que esto es un error, por favor contacta a producción.`);
         }
 
         const snapshot = await get(child(ref(db), `1_trabajadores/${rut}`));
@@ -116,7 +115,9 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
             trabajadorExistente = false;
             document.getElementById('camposExtras').classList.remove('d-none');
             const inputs = document.querySelectorAll('#camposExtras input, #camposExtras select');
-            inputs.forEach(input => input.setAttribute('required', 'true'));
+            inputs.forEach(input => {
+                if(input.id !== 'email') input.setAttribute('required', 'true')
+            });
         }
     } catch (error) { console.error(error); }
 });
@@ -139,19 +140,40 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
 
     try {
         if (!trabajadorExistente) {
+            const calle = document.getElementById('calle').value.trim();
+            const numCalle = document.getElementById('numeroCalle').value.trim();
+            const comuna = document.getElementById('comuna').value.trim();
+            const direccionCompleta = `${calle} #${numCalle}, ${comuna}`;
+            
+            const telefonoCompleto = `+569${document.getElementById('telefono').value.trim()}`;
+
             const trabajadorData = {
-                rut: rut, nombres: document.getElementById('nombres').value.trim(), apellidos: document.getElementById('apellidos').value.trim(),
-                fechaNacimiento: document.getElementById('fechaNacimiento').value, sexo: document.getElementById('sexo').value,
-                direccion: document.getElementById('direccion').value.trim(), telefono: document.getElementById('telefono').value.trim(), email: document.getElementById('email').value.trim(),
-                afp: document.getElementById('afp').value, salud: document.getElementById('salud').value, banco: document.getElementById('banco').value.trim(),
-                tipoCuenta: document.getElementById('tipoCuenta').value, numeroCuenta: document.getElementById('numeroCuenta').value.trim(),
+                rut: rut, 
+                nombres: document.getElementById('nombres').value.trim(), 
+                apellidos: document.getElementById('apellidos').value.trim(),
+                fechaNacimiento: document.getElementById('fechaNacimiento').value, 
+                sexo: document.getElementById('sexo').value,
+                direccion: direccionCompleta, 
+                telefono: telefonoCompleto, 
+                email: document.getElementById('email').value.trim(),
+                afp: document.getElementById('afp').value, 
+                salud: document.getElementById('salud').value, 
+                banco: document.getElementById('banco').value,
+                tipoCuenta: document.getElementById('tipoCuenta').value, 
+                numeroCuenta: document.getElementById('numeroCuenta').value.trim(),
                 fecha_registro_formulario: new Date().toISOString()
             };
             await set(ref(db, '1_trabajadores/' + rut), trabajadorData);
         }
 
+        const quiereContrato = document.getElementById('quiereContrato').value;
+
         const reservaData = {
-            rut: rut, tipo: tipoAsis, invitado_por: invitadoPor, hora_registro: new Date().toLocaleTimeString()
+            rut: rut, 
+            tipo: tipoAsis, 
+            invitado_por: invitadoPor, 
+            quiere_contrato: quiereContrato,
+            hora_registro: new Date().toLocaleTimeString()
         };
         await set(ref(db, `3_reservas/${eventoActivo.fecha}/${eventoActivo.nombre}/${rut}`), reservaData);
 
@@ -164,7 +186,6 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
         if (tipoAsis === "Extra") textoResumen += ` (I/P Autorizado)`;
         document.getElementById('resumenProgramaQR').innerText = textoResumen;
         
-        // INYECTAR MENSAJE PERSONALIZADO
         const partesF = eventoActivo.fecha.split('-');
         const fechaBonita = `${partesF[2]}-${partesF[1]}-${partesF[0]}`;
         const horaCitacionMsg = eventoActivo.hora_citacion || "la hora indicada por producción";
@@ -180,3 +201,5 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
 
     } catch (error) { alert("Error al procesar. Revisa tu conexión."); }
 });
+
+
