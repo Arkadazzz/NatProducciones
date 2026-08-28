@@ -495,36 +495,145 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     try { await update(ref(db), actualizacionesFirebase); descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`); alert("¡Liquidación exitosa!"); document.getElementById('tablaDeudas').innerHTML = ""; window.deudasGlobales = {}; } catch (error) { alert("Error al liquidar."); }
 });
 
-document.getElementById('btnExcelBanco').addEventListener('click', async () => {
-    const fechaHoyLocal = new Date().toISOString().split('T')[0];
-    const fechaElegida = prompt("📅 Ingresa la FECHA DE LA GRABACIÓN que deseas pagar al banco hoy (Formato: AAAA-MM-DD):", fechaHoyLocal);
-    if (!fechaElegida) return;
-    
-    try {
-        const snap = await get(child(ref(db), `2_asistencias/${fechaElegida}`)); 
-        if (!snap.exists()) return alert("No hay asistencias registradas para esta fecha.");
-        const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
-        
-        const programas = snap.val();
-        let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
-        let actualizacionesFirebase = {}; 
-        let hayPagosNuevos = false;
-        const omitirDalePlay = confirm("¿Deseas OMITIR a los asistentes de 'Dale Play' de este pago diario?\n\n(Aceptar: Omitir y dejarlos en la Bóveda. Cancelar: Incluirlos y pagarlos hoy).");
+// ==========================================
+// PAGOS BANCO (SELECCIÓN MÚLTIPLE Y SUMATORIA)
+// ==========================================
+let modalPagosInstance;
 
-        for (const prog in programas) {
-            if (omitirDalePlay && prog === "Dale Play") continue; 
-            for (const r in programas[prog]) {
-                const asis = programas[prog][r];
-                if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
-                    hayPagosNuevos = true; 
-                    const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val() || {nombres: "Desconocido", apellidos: ""};
-                    const rutSin = r.replace(/[^0-9kK]/g, ''); 
-                    csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${asis.monto};;${tr.email || ''};;${prog};PAGO NAT\n`; 
-                    actualizacionesFirebase[`2_asistencias/${fechaElegida}/${prog}/${r}/estado_pago`] = "Pagado";
+document.getElementById('btnExcelBanco').addEventListener('click', async () => {
+    const btn = document.getElementById('btnExcelBanco');
+    btn.innerText = "⏳ Buscando pendientes..."; btn.disabled = true;
+
+    try {
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) {
+            alert("No hay asistencias registradas en el sistema.");
+            btn.innerText = "Descargar Nómina Diaria"; btn.disabled = false;
+            return;
+        }
+
+        const todas = snap.val();
+        let programasPendientes = {};
+
+        // Buscar qué programas tienen personas en estado "Pendiente"
+        for (const fecha in todas) {
+            for (const prog in todas[fecha]) {
+                let tienePendientes = false;
+                let cantidadPersonas = 0;
+                let montoTotalPrograma = 0;
+
+                for (const r in todas[fecha][prog]) {
+                    const asis = todas[fecha][prog][r];
+                    if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
+                        tienePendientes = true;
+                        cantidadPersonas++;
+                        montoTotalPrograma += parseInt(asis.monto);
+                    }
+                }
+
+                if (tienePendientes) {
+                    programasPendientes[`${fecha}|${prog}`] = { fecha, prog, cantidadPersonas, montoTotalPrograma };
                 }
             }
         }
+
+        const contenedor = document.getElementById('listaProgramasPendientes');
         
+        if (Object.keys(programasPendientes).length === 0) {
+            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay pagos pendientes en el sistema. Todo está al día.</div>";
+            document.getElementById('btnGenerarNominaBanco').classList.add('d-none');
+        } else {
+            document.getElementById('btnGenerarNominaBanco').classList.remove('d-none');
+            let html = "";
+            // Ordenar de lo más nuevo a lo más viejo
+            const sortedKeys = Object.keys(programasPendientes).sort().reverse();
+            
+            sortedKeys.forEach(key => {
+                const p = programasPendientes[key];
+                html += `
+                <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px;">
+                    <input class="form-check-input check-pago" type="checkbox" value="${key}" id="chk_pago_${key}" style="transform: scale(1.4); margin-top: 5px; cursor: pointer;">
+                    <label class="form-check-label ms-2 text-white w-100" for="chk_pago_${key}" style="cursor: pointer; display: flex; justify-content: space-between;">
+                        <span>📅 ${p.fecha} | 🎬 ${p.prog}</span>
+                        <span class="badge bg-warning text-dark border border-warning">${p.cantidadPersonas} personas ($${p.montoTotalPrograma})</span>
+                    </label>
+                </div>`;
+            });
+            contenedor.innerHTML = html;
+        }
+
+        if (!modalPagosInstance) modalPagosInstance = new bootstrap.Modal(document.getElementById('modalPagosBanco'));
+        modalPagosInstance.show();
+
+    } catch (e) {
+        alert("Error al cargar los pagos pendientes.");
+    }
+    
+    btn.innerText = "Descargar Nómina Diaria"; btn.disabled = false;
+});
+
+document.getElementById('btnGenerarNominaBanco').addEventListener('click', async () => {
+    const checkboxes = document.querySelectorAll('.check-pago:checked');
+    const seleccionados = Array.from(checkboxes).map(cb => cb.value);
+
+    if (seleccionados.length === 0) return alert("Debes seleccionar al menos un programa para pagar.");
+    if (!confirm(`¿Generar nómina agrupando los ${seleccionados.length} programas seleccionados y marcarlos como PAGADOS en el sistema?`)) return;
+
+    try {
+        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
+        const todas = asisSnap.val();
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+
+        let agrupacionPagos = {}; 
+        let actualizacionesFirebase = {};
+
+        // Sumar los montos de la misma persona en los distintos programas elegidos
+        seleccionados.forEach(clave => {
+            const [fecha, prog] = clave.split('|');
+            const asistentes = todas[fecha][prog];
+            
+            for (const r in asistentes) {
+                const asis = asistentes[r];
+                if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
+                    if (!agrupacionPagos[r]) {
+                        agrupacionPagos[r] = { montoTotal: 0, programas: [], rutasFirebase: [] };
+                    }
+                    agrupacionPagos[r].montoTotal += parseInt(asis.monto);
+                    
+                    if (!agrupacionPagos[r].programas.includes(prog)) {
+                        agrupacionPagos[r].programas.push(prog);
+                    }
+                    agrupacionPagos[r].rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${r}/estado_pago`);
+                }
+            }
+        });
+
+        let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
+
+        for (const rut in agrupacionPagos) {
+            const datosPago = agrupacionPagos[rut];
+            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
+            const rutSin = rut.replace(/[^0-9kK]/g, '');
+            const glosaProg = datosPago.programas.join(', ').substring(0, 40);
+
+            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${datosPago.montoTotal};;${tr.email || ''};;${glosaProg};PAGO NAT\n`;
+
+            datosPago.rutasFirebase.forEach(ruta => {
+                actualizacionesFirebase[ruta] = "Pagado";
+            });
+        }
+
+        await update(ref(db), actualizacionesFirebase);
+        descargarCSV(csv, `Nomina_Banco_Agrupada_${new Date().toISOString().split('T')[0]}.csv`);
+        alert("¡Nómina generada con éxito! Revisa tus descargas.");
+        
+        modalPagosInstance.hide();
+        document.getElementById('finanzas-tab').click();
+
+    } catch (e) {
+        alert("Error al procesar y descargar los pagos.");
+    }
+});        
         if (!hayPagosNuevos) return alert("No hay pagos pendientes para esta fecha o sus montos son de $0.");
         
         if(confirm(`¡Se encontraron extras por pagar el día ${fechaElegida}!\n\n¿Descargar el Excel del Banco y marcarlos como PAGADOS?`)){
