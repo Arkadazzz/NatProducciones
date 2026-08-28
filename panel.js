@@ -283,7 +283,7 @@ async function onScanSuccess(decodedText) {
     try {
         const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
         if (blacklistSnap.exists()) { 
-            alert(`⛔ ACCESO DENEGADO ⛔\nMotivo: ${blacklistSnap.val().motivo}`); 
+            alert(`⛔ ACCESO DENEGADO ⛔\nLa persona no tiene permitido el ingreso.`); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
             document.getElementById('mensajeEscaneo').classList.add('d-none'); return; 
         }
