@@ -114,6 +114,10 @@
                                 <input type="text" id="numeroAsignado" class="form-control text-center fw-bold text-success" readonly style="font-size: 3rem; background: #000000; border: none;">
                                 <small style="color: #aaaaaa;">Dile este número a la persona</small>
                             </div>
+
+                            <!-- ZONA PARA EDITAR INVITADOS O CONTRATOS -->
+                            <div id="opcionesFirmaAdmin" class="mb-3 p-3 bg-dark rounded border border-warning d-none"></div>
+                            
                             <p style="color: #aaaaaa; margin-bottom: 5px;">Firma del trabajador:</p>
                             <canvas id="signature-pad"></canvas>
                             <div class="d-flex justify-content-between mt-3">
@@ -136,7 +140,7 @@
                         </div>
                         <div class="table-responsive">
                             <table class="table table-dark table-hover align-middle">
-                                <thead><tr><th>N°</th><th>Nombre</th><th>Ingreso</th><th>Salida/Contrato</th><th>Acción</th></tr></thead>
+                                <thead><tr><th>N°</th><th>Nombre</th><th>Ingreso</th><th>DT</th><th>Salida/PDF</th><th>Acción</th></tr></thead>
                                 <tbody id="tablaAsistentes"></tbody>
                             </table>
                         </div>
