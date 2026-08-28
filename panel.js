@@ -307,7 +307,7 @@ async function onScanSuccess(decodedText) {
             opcionesDiv.classList.remove('d-none');
             
             if (esCortesia) {
-                const nombreActual = reservaSnap.val().invitado_por;
+                const nombreActual = reservaSnap.exists() ? reservaSnap.val().invitado_por : "";
                 opcionesDiv.innerHTML = `
                     <label class="form-label text-warning mb-1">Corregir "Invitado Por":</label>
                     <select id="editInvitadoPor" class="form-select bg-dark text-white border-warning">
@@ -361,7 +361,7 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
 
     if (tipo === "Cortesía") {
         invitadoPor = document.getElementById('editInvitadoPor') ? document.getElementById('editInvitadoPor').value : "";
-        aplicaContrato = false; // Cortesía NUNCA lleva contrato laboral, solo cesión de imagen
+        aplicaContrato = false; 
     } else {
         aplicaContrato = document.getElementById('checkAplicaContrato') ? document.getElementById('checkAplicaContrato').checked : true;
     }
@@ -410,21 +410,35 @@ SEGUNDO. Por el presente acto, el Cedente autoriza a Camila Alejandra Fevre Segu
 TERCERO. Se deja expresa constancia de que la participación es voluntaria y no existe remuneración laboral asociada a este acuerdo.`;
     } else {
         titulo = "Contrato de Trabajo Extras Público (Televisión)";
-        textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, que en adelante se denominará “el/la empleador/a”, y don/a ${nombreCompleto}, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, domiciliado/a en calle ${direccion}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal:
+        textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por don/a Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${nombreCompleto}, de nacionalidad chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '___________________________'}, domiciliado/a en ${direccion}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
 
-PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}".
+PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, entre el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
-SEGUNDO. El empleador se compromete a pagar al trabajador $${asis.monto} por jornada.
+SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
-TERCERO. El trabajador autoriza la difusión de su imagen para la producción.
+TERCERO. El trabajador/a cumplirá una jornada ordinaria de trabajo que estará establecida en la citación a la jornada, que será entregado al trabajador/a con un mínimo anticipación 24 horas. La jornada diaria no excederá de 10 horas. Lo anterior, sin perjuicio de lo establecido en el Párrafo 2°, del Capítulo IV, del Título I, del Libro I, del Código del Trabajo, relativo a horas extraordinarias.
 
-CUARTO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple validada en plataforma.`;
+CUARTO. El empleador se compromete a pagar al trabajador $${asis.monto} por jornada el que será liquidado y pagado mediante transferencia bancaria.
+
+QUINTO. El trabajador autoriza en este acto al empleador a filmar, divulgar, editar, grabar total o parcialmente su imagen y voz, sin restricciones ni límites temporales mediante cualquier soporte o medio de registro, reproducción o difusión.
+
+SEXTO. La duración del presente contrato estará determinada por toda la duración de la jornada señalada, pudiendo tener término de acuerdo a las causales que la ley señala.
+
+SÉPTIMO. El empleador se obliga a pagar la totalidad de obligaciones previsionales que establece la ley, debiendo retener de la remuneración bruta las cotizaciones que sean de cargo del trabajador, y enterarlas en la institución correspondiente.
+
+OCTAVO. El empleador deberá registrar en el sitio electrónico de la Dirección del Trabajo el contrato de trabajo.
+
+NOVENO. Se deja constancia que el trabajador ingresó al servicio del empleador, el día ${fechaTexto}.
+
+DÉCIMO. El presente contrato se firma en dos ejemplares del mismo tenor y fecha.
+
+UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple validada en plataforma.`;
     }
 
     doc.text(titulo, 105, y, null, null, "center"); y += 15;
     doc.setFont("helvetica", "normal"); doc.setFontSize(10);
     
-    const lineas = doc.splitTextToSize(textoContrato, 175); doc.text(lineas, 20, y); y += (lineas.length * 5) + 30; 
+    const lineas = doc.splitTextToSize(textoContrato, 175); doc.text(lineas, 20, y); y += (lineas.length * 4.8) + 20; 
 
     doc.setFont("helvetica", "bold"); doc.text("_________________________________", 50, y, null, null, "center"); doc.text("Firma Producción", 50, y + 5, null, null, "center"); doc.setFont("helvetica", "normal"); doc.text("CAMILA FEVRE SEGUEL", 50, y + 10, null, null, "center"); 
 
