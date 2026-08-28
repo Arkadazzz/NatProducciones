@@ -28,12 +28,10 @@
         .metric-box { background: #1a1a1a; border: 1px solid #444444; border-radius: 10px; padding: 10px; text-align: center; }
         .metric-box small { color: #dddddd !important; font-size: 1em; font-weight: 500; }
         .metric-box span { display: block; font-size: 2.2em; font-weight: bold; line-height: 1; margin-top: 5px; }
-        
         .accordion-button { background-color: #1a1a1a; color: #b066ff; font-weight: bold; border: 1px solid #333; }
         .accordion-button:not(.collapsed) { background-color: #2d1b4e; color: #ffffff; box-shadow: none; border-color: #b066ff; }
         .accordion-item { background-color: #141414; border: 1px solid #333; margin-bottom: 10px; border-radius: 8px !important; overflow: hidden; }
         .accordion-body { background-color: #0a0a0a; padding: 15px; }
-
         .btn-pago-editable { cursor: pointer; transition: 0.2s; border: 1px solid #00ff00; }
         .btn-pago-editable:hover { transform: scale(1.05); background-color: #00ff00 !important; color: black !important; }
     </style>
@@ -68,41 +66,20 @@
                 <div class="col-lg-5">
                     <div class="card-panel" id="seccionConfiguracion">
                         <h5 style="color: #00d26a;">🟢 Salas Activas</h5>
-                        <div id="contenedorProgramasActivos" class="mb-4">
-                            <p class="text-muted" style="font-size: 0.9em;">Cargando...</p>
-                        </div>
-
+                        <div id="contenedorProgramasActivos" class="mb-4"><p class="text-muted" style="font-size: 0.9em;">Cargando...</p></div>
                         <hr style="border-color: #333;">
-
                         <h5>➕ Abrir Nuevo Programa</h5>
                         <select id="nombrePrograma" class="form-select mb-3" style="font-size: 1.1em; padding: 12px;">
                             <option value="">-- Selecciona el Programa --</option>
                             <option value="Dale Play">Dale Play</option>
                             <option value="Detrás del Muro">Detrás del Muro (I/P + Cortesía)</option>
                         </select>
-                        
                         <input type="date" id="fechaPrograma" class="form-control mb-3 fw-bold text-center" style="font-size: 1.3em; padding: 15px; color: #d6b3ff !important; border: 2px solid #b066ff !important;">
-                        
                         <div class="row align-items-end mb-4">
-                            <div class="col-6 col-md-3 mb-2">
-                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Base ($)</label>
-                                <input type="number" id="montoPago" class="form-control fw-bold text-center" placeholder="20000" style="height: 48px; font-size: 1.1em;">
-                            </div>
-                            
-                            <div class="col-6 col-md-3 mb-2">
-                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Citación</label>
-                                <select id="horaCitacion" class="form-select fw-bold text-center text-info" style="height: 48px; font-size: 1.1em;"></select>
-                            </div>
-
-                            <div class="col-6 col-md-3 mb-2">
-                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">Salida</label>
-                                <select id="horaTermino" class="form-select fw-bold text-center text-warning" style="height: 48px; font-size: 1.1em;"></select>
-                            </div>
-                            
-                            <div class="col-6 col-md-3 mb-2">
-                                <label class="text-muted mb-1" style="font-size:0.85em; white-space: nowrap;">H. Extra ($)</label>
-                                <input type="number" id="valorHoraExtra" class="form-control fw-bold text-center" placeholder="3000" style="height: 48px; font-size: 1.1em;">
-                            </div>
+                            <div class="col-6 col-md-3 mb-2"><label class="text-muted mb-1" style="font-size:0.85em;">Base ($)</label><input type="number" id="montoPago" class="form-control fw-bold text-center" placeholder="20000" style="height: 48px; font-size: 1.1em;"></div>
+                            <div class="col-6 col-md-3 mb-2"><label class="text-muted mb-1" style="font-size:0.85em;">Citación</label><select id="horaCitacion" class="form-select fw-bold text-center text-info" style="height: 48px; font-size: 1.1em;"></select></div>
+                            <div class="col-6 col-md-3 mb-2"><label class="text-muted mb-1" style="font-size:0.85em;">Salida</label><select id="horaTermino" class="form-select fw-bold text-center text-warning" style="height: 48px; font-size: 1.1em;"></select></div>
+                            <div class="col-6 col-md-3 mb-2"><label class="text-muted mb-1" style="font-size:0.85em;">H. Extra ($)</label><input type="number" id="valorHoraExtra" class="form-control fw-bold text-center" placeholder="3000" style="height: 48px; font-size: 1.1em;"></div>
                         </div>
                         <button class="btn btn-custom w-100 fs-5" id="btnActivarWeb">📢 Publicar Formulario de Inscripción</button>
                     </div>
@@ -118,7 +95,7 @@
                         <div class="mt-4 p-3 rounded" style="background: #1a1a1a; border: 1px dashed #444444;">
                             <label class="form-label text-warning mb-1" style="font-size: 0.85em;">¿Falla la cámara o la pantalla del extra está rota?</label>
                             <div class="input-group">
-                                <input type="text" id="rutManual" class="form-control bg-dark text-white" placeholder="Ingresa el RUT manual (Ej: 12345678-9)">
+                                <input type="text" id="rutManual" class="form-control bg-dark text-white" placeholder="Ingresa el RUT manual">
                                 <button class="btn btn-outline-warning fw-bold" id="btnIngresoManual">🔍 Buscar</button>
                             </div>
                         </div>
@@ -137,7 +114,6 @@
                                 <input type="text" id="numeroAsignado" class="form-control text-center fw-bold text-success" readonly style="font-size: 3rem; background: #000000; border: none;">
                                 <small style="color: #aaaaaa;">Dile este número a la persona</small>
                             </div>
-                            
                             <p style="color: #aaaaaa; margin-bottom: 5px;">Firma del trabajador:</p>
                             <canvas id="signature-pad"></canvas>
                             <div class="d-flex justify-content-between mt-3">
@@ -149,40 +125,21 @@
 
                     <div class="card-panel d-none" id="seccionLista">
                         <h5 class="mb-4"><span class="led-green"></span> Monitoreo en Vivo</h5>
-                        
                         <div class="row mb-4">
-                            <div class="col-4">
-                                <div class="metric-box">
-                                    <small>📝 Llenaron</small>
-                                    <span class="text-info" id="contEsperados">0</span>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="metric-box">
-                                    <small>⏳ Faltan</small>
-                                    <span class="text-warning" id="contFaltan">0</span>
-                                </div>
-                            </div>
-                            <div class="col-4">
-                                <div class="metric-box" style="border-color: #00d26a;">
-                                    <small>✅ Adentro</small>
-                                    <span class="text-success" id="contFirmados">0</span>
-                                </div>
-                            </div>
+                            <div class="col-4"><div class="metric-box"><small>📝 Llenaron</small><span class="text-info" id="contEsperados">0</span></div></div>
+                            <div class="col-4"><div class="metric-box"><small>⏳ Faltan</small><span class="text-warning" id="contFaltan">0</span></div></div>
+                            <div class="col-4"><div class="metric-box" style="border-color: #00d26a;"><small>✅ Adentro</small><span class="text-success" id="contFirmados">0</span></div></div>
                         </div>
-
                         <div id="seccionConteoInvitados" class="d-none mb-4 p-3 rounded" style="background: #1a1400; border: 1px solid #ffcc00;">
                             <h6 style="color: #ffcc00; font-weight: bold; margin-bottom: 10px;">🏆 Llegadas de Cortesía (Por Staff)</h6>
                             <div id="listaConteoInvitados" class="d-flex flex-wrap gap-2"></div>
                         </div>
-
                         <div class="table-responsive">
                             <table class="table table-dark table-hover align-middle">
                                 <thead><tr><th>N°</th><th>Nombre</th><th>Ingreso</th><th>Salida/Contrato</th><th>Acción</th></tr></thead>
                                 <tbody id="tablaAsistentes"></tbody>
                             </table>
                         </div>
-
                         <button class="btn btn-danger w-100 fw-bold mt-4 py-3 fs-5 shadow" id="btnEsUnDia" style="background: linear-gradient(135deg, #ff3333, #cc0000); border: none;">
                             🎬 ¡Es un día! (Cerrar Jornada)
                         </button>
@@ -210,18 +167,18 @@
         <!-- PESTAÑA 3: FINANZAS Y BÓVEDA -->
         <div class="tab-pane fade" id="finanzas" role="tabpanel">
             <div class="alert alert-info fw-bold" style="background: #1c103f; border-color: #b066ff; color: white;">
-                <b>Nota:</b> Puedes descargar las nóminas diarias incluso si ya cerraste las salas. El sistema buscará a todos los extras de la fecha que elijas.
+                <b>Nota:</b> El sistema unificará automáticamente los montos de una persona si asistió a varios programas seleccionados.
             </div>
             <div class="row mb-4">
                 <div class="col-md-6">
-                    <div class="card-panel text-center h-100">
-                        <h4 style="color: #00d26a;">🏦 Pagos Diarios Inmediatos</h4>
-                        <p style="color: #aaaaaa;">Descarga el archivo Santander con los pagos del día.</p>
-                        <button class="btn btn-outline-success w-100 fw-bold py-3 mt-2 fs-5" id="btnExcelBanco">Descargar Nómina Diaria</button>
+                    <div class="card-panel text-center h-100" style="border-color: #00d26a;">
+                        <h4 style="color: #00d26a;">🏦 Pagos Diarios y Atrasados</h4>
+                        <p style="color: #aaaaaa;">Genera la nómina del banco seleccionando los programas pendientes.</p>
+                        <button class="btn btn-outline-success w-100 fw-bold py-3 mt-2 fs-5" id="btnExcelBanco">Generar Nómina de Pago</button>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <div class="card-panel text-center h-100">
+                    <div class="card-panel text-center h-100" style="border-color: #ffcc00;">
                         <h4 style="color: #ffcc00;">📊 Cierre Contable Mensual</h4>
                         <p style="color: #aaaaaa;">Genera el archivo I.M.T. con la suma de TODOS los programas del mes.</p>
                         <button class="btn btn-outline-warning text-white w-100 fw-bold py-3 mt-2 fs-5" id="btnExcelContador">Descargar Reporte del Mes</button>
@@ -235,7 +192,7 @@
                         <h4 style="color: #00d26a; margin-bottom: 0;">💼 Bóveda de Pagos Pendientes (Acumulado)</h4>
                         <p style="color: #aaaaaa; margin-bottom: 0;">Dinero retenido por programas aún no pagados en la semana.</p>
                     </div>
-                    <button class="btn btn-success fw-bold px-4 py-3 shadow" id="btnLiquidarSemana">Liquidar Semana y Descargar Banco</button>
+                    <button class="btn btn-success fw-bold px-4 py-3 shadow" id="btnLiquidarSemana">Liquidar Semana Completa</button>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-dark table-hover align-middle text-center">
@@ -256,40 +213,32 @@
                     </div>
                     <button class="btn btn-outline-success fw-bold px-4" id="btnRefrescarSeguridad">🔄 Actualizar Lista en Vivo</button>
                 </div>
-                
-                <div class="accordion mt-4" id="acordeonDT">
-                    <p class="text-center text-muted mt-3">Haz clic en Actualizar para cargar...</p>
-                </div>
+                <div class="accordion mt-4" id="acordeonDT"><p class="text-center text-muted mt-3">Haz clic en Actualizar para cargar...</p></div>
             </div>
         </div>
 
         <!-- PESTAÑA 5: MANTENIMIENTO -->
         <div class="tab-pane fade" id="mantenimiento" role="tabpanel">
-            <div class="alert alert-warning text-center fw-bold" style="background: #2a2000; border: 1px solid #ffcc00; color: #ffcc00;">
-                ⚠️ PROCEDIMIENTO OFICIAL DE CIERRE MENSUAL ⚠️
-            </div>
-            
+            <div class="alert alert-warning text-center fw-bold" style="background: #2a2000; border: 1px solid #ffcc00; color: #ffcc00;">⚠️ PROCEDIMIENTO OFICIAL DE CIERRE MENSUAL ⚠️</div>
             <div class="row">
                 <div class="col-md-4 mb-4">
                     <div class="card-panel h-100 text-center" style="border-color: #00d26a;">
                         <h4 style="color: #00d26a;">1. Respaldo Excel</h4>
-                        <p style="color: #aaaaaa;">Descarga el historial completo en formato CSV (Nombres, montos y horas).</p>
+                        <p style="color: #aaaaaa;">Descarga el historial completo en formato CSV.</p>
                         <button class="btn btn-outline-success w-100 fw-bold py-3 mt-auto" id="btnRespaldoMaestro">📥 Excel Maestro</button>
                     </div>
                 </div>
-                
                 <div class="col-md-4 mb-4">
                     <div class="card-panel h-100 text-center" style="border-color: #b066ff;">
                         <h4 style="color: #b066ff;">2. Respaldo PDFs</h4>
-                        <p style="color: #aaaaaa;">Empaqueta todos los contratos legales firmados en un solo archivo .ZIP.</p>
+                        <p style="color: #aaaaaa;">Empaqueta todos los contratos legales firmados en .ZIP.</p>
                         <button class="btn btn-outline-primary w-100 fw-bold py-3 mt-auto" id="btnRespaldoPDFs" style="border-color: #b066ff; color: #d6b3ff;">🗂️ Descargar ZIP de Contratos</button>
                     </div>
                 </div>
-
                 <div class="col-md-4 mb-4">
                     <div class="card-panel h-100 text-center" style="border-color: #ff3333; background: rgba(255, 51, 51, 0.05);">
                         <h4 style="color: #ff3333;">3. Limpieza de Nube</h4>
-                        <p style="color: #aaaaaa;">Borra todo para liberar espacio. ¡Hazlo solo después de descargar el Excel y el ZIP!</p>
+                        <p style="color: #aaaaaa;">Borra todo para liberar espacio. ¡Hazlo después del Excel y ZIP!</p>
                         <button class="btn btn-danger w-100 fw-bold py-3 mt-auto" data-bs-toggle="modal" data-bs-target="#modalLimpieza">🗑️ Vaciar Nube</button>
                     </div>
                 </div>
@@ -300,12 +249,8 @@
         <div class="tab-pane fade" id="sorteo" role="tabpanel">
             <div class="card-panel">
                 <h4 style="color: #ffcc00; font-weight: bold;">🏆 Sorteo Fidelidad "Dale Play"</h4>
-                <p class="text-muted">Selecciona las fechas que participarán en el sorteo. El sistema detectará automáticamente a las personas que asistieron y elegirá un ganador al azar.</p>
-                
-                <div id="listaFechasSorteo" class="d-flex flex-wrap gap-3 mb-4 mt-4">
-                    <p class="text-warning">Haz clic en la pestaña para cargar las fechas...</p>
-                </div>
-                
+                <p class="text-muted">Selecciona las fechas que participarán en el sorteo. El sistema detectará automáticamente a las personas que asistieron a TODAS las fechas seleccionadas y elegirá un ganador al azar.</p>
+                <div id="listaFechasSorteo" class="d-flex flex-wrap gap-3 mb-4 mt-4"><p class="text-warning">Haz clic en la pestaña para cargar las fechas...</p></div>
                 <button class="btn btn-warning w-100 fw-bold py-3 fs-5 shadow" id="btnRealizarSorteo" style="color: #000;">🎁 ¡Girar la Ruleta Mágica!</button>
             </div>
 
@@ -317,31 +262,10 @@
                 <div class="alert alert-dark d-inline-block border-warning text-warning" id="ganadorFechas"></div>
             </div>
         </div>
+    </div>
+</div>
 
-    </div>
-</div>
-<!-- MODAL PAGOS BANCO (NÓMINA AGRUPADA) -->
-<div class="modal fade" id="modalPagosBanco" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #00d26a;">
-            <div class="modal-header" style="border-bottom: 1px solid #333;">
-                <h5 class="modal-title" style="color: #00d26a; font-weight: bold;">🏦 Generar Nómina de Pago</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted" style="font-size: 0.95em;">Selecciona los programas que deseas incluir en esta nómina. Si una persona asistió a más de un programa seleccionado, <b>sus montos se sumarán automáticamente</b> en un solo depósito.</p>
-                <div id="listaProgramasPendientes" class="d-flex flex-column gap-2 mt-3" style="max-height: 400px; overflow-y: auto;">
-                    <!-- Checkboxes se cargan por JS -->
-                </div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid #333;">
-                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success fw-bold" id="btnGenerarNominaBanco">📥 Descargar Nómina y Marcar Pagados</button>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- MODAL EDICIÓN Y FICHA TÉCNICA -->
+<!-- MODAL EDICIÓN -->
 <div class="modal fade" id="modalFicha" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #444;">
@@ -360,30 +284,41 @@
                     <button type="button" class="btn btn-warning fw-bold" id="btnBloquear">Bloquear (Blacklist)</button>
                     <button type="button" class="btn btn-outline-warning fw-bold d-none" id="btnDesbloquear">Quitar Blacklist</button>
                 </div>
-                <button type="button" class="btn btn-danger w-100 fw-bold" id="btnEliminarTrabajador">❌ Eliminar Trabajador de la Base de Datos</button>
+                <button type="button" class="btn btn-danger w-100 fw-bold" id="btnEliminarTrabajador">❌ Eliminar Trabajador</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- MODAL LIMPIEZA EXTREMA -->
+<!-- MODAL LIMPIEZA -->
 <div class="modal fade" id="modalLimpieza" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content" style="background-color: #1a0a0a; color: white; border: 2px solid #ff3333;">
-            <div class="modal-header" style="border-bottom: 1px solid #ff3333;">
-                <h5 class="modal-title text-danger fw-bold">⚠️ ADVERTENCIA CRÍTICA ⚠️</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
+            <div class="modal-header" style="border-bottom: 1px solid #ff3333;"><h5 class="modal-title text-danger fw-bold">⚠️ ADVERTENCIA CRÍTICA ⚠️</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
             <div class="modal-body text-center">
-                <p>Estás a punto de <b>ELIMINAR PARA SIEMPRE</b> todo el historial de asistencias, firmas y reservas de la base de datos.</p>
+                <p>Estás a punto de <b>ELIMINAR PARA SIEMPRE</b> todo el historial de la base de datos.</p>
                 <p class="text-warning">Asegúrate de que tus PDFs ya estén subidos a Dropbox y que hayas descargado el Excel Maestro.</p>
                 <hr style="border-color: #333;">
-                <p class="mb-2">Para confirmar, escribe la palabra <b>LIMPIAR</b> en la casilla de abajo:</p>
+                <p class="mb-2">Para confirmar, escribe <b>LIMPIAR</b> en la casilla de abajo:</p>
                 <input type="text" id="inputConfirmarLimpieza" class="form-control text-center fw-bold text-danger fs-5" placeholder="Escribe LIMPIAR aquí">
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #333;"><button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-danger fw-bold" id="btnEjecutarLimpieza" disabled>Eliminar Datos de la Nube</button></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PAGOS BANCO (NÓMINA AGRUPADA) -->
+<div class="modal fade" id="modalPagosBanco" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #00d26a;">
+            <div class="modal-header" style="border-bottom: 1px solid #333;"><h5 class="modal-title" style="color: #00d26a; font-weight: bold;">🏦 Generar Nómina de Pago</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <p class="text-muted" style="font-size: 0.95em;">Selecciona los programas que deseas incluir en esta nómina. Si una persona asistió a más de un programa seleccionado, <b>sus montos se sumarán automáticamente</b> en un solo depósito.</p>
+                <div id="listaProgramasPendientes" class="d-flex flex-column gap-2 mt-3" style="max-height: 400px; overflow-y: auto;"></div>
             </div>
             <div class="modal-footer" style="border-top: 1px solid #333;">
                 <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-danger fw-bold" id="btnEjecutarLimpieza" disabled>Eliminar Datos de la Nube</button>
+                <button type="button" class="btn btn-success fw-bold" id="btnGenerarNominaBanco">📥 Descargar Nómina y Marcar Pagados</button>
             </div>
         </div>
     </div>
