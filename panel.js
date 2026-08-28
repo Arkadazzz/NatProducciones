@@ -29,6 +29,9 @@ let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico 
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
+// ==========================================
+// POBLAR SELECTORES (Cada 15 min)
+// ==========================================
 function poblarSelectoresHora() {
     let opcionesHTML = '<option value="">-- Selecciona --</option>';
     for (let h = 0; h < 24; h++) {
@@ -91,7 +94,7 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     if (!nom || !fec || !mon || !horaSal || !horaCitacion) return alert("Completa todos los campos obligatorios.");
 
     let pinGenerado = ""; if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
-    const claveSegura = nom.replace(/[.#$\/\[\]]/g, "_");
+    const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
     
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
         nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal, valor_hora_extra: valorHE, hora_citacion: horaCitacion 
@@ -119,19 +122,17 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
+// CHECKOUT MASIVO AL CERRAR JORNADA
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
     
     const now = new Date();
     const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    let mensajeAlerta = `🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nSi aprietas Aceptar, el sistema le marcará la salida AUTOMÁTICAMENTE a todos a las ${horaSalidaMasiva} y calculará sus horas extras (si corresponden).\n\n¿Proceder?`;
-
-    if (!confirm(mensajeAlerta)) return;
+    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras para todos.\n\n¿Proceder?`)) return;
 
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
-        
         if (snap.exists()) {
             const asistencias = snap.val();
             let actualizacionesFirebase = {};
@@ -139,47 +140,32 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
 
             for (const rut in asistencias) {
                 const asis = asistencias[rut];
-                
                 if (!asis.hora_salida) {
                     let bonoExtra = 0;
-                    
                     if (asis.tipo_ingreso !== "Cortesía" && horaTerminoGeneral && valorHoraExtraGlobal > 0) {
                         let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
                         let [hR, mR] = horaSalidaMasiva.split(':').map(Number);
-                        let minE = hE * 60 + mE;
-                        let minR = hR * 60 + mR;
-                        let diff = minR - minE;
-                        
-                        if (diff > 0) {
-                            bonoExtra = Math.round((diff / 60) * valorHoraExtraGlobal);
-                        }
+                        let diff = (hR * 60 + mR) - (hE * 60 + mE);
+                        if (diff > 0) bonoExtra = Math.round((diff / 60) * valorHoraExtraGlobal);
                     }
-                    
-                    const montoBase = parseInt(asis.monto) || 0;
-                    const nuevoMontoTotal = montoBase + bonoExtra;
+                    const nuevoMontoTotal = (parseInt(asis.monto) || 0) + bonoExtra;
                     
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoExtra;
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = nuevoMontoTotal;
-                    
                     procesados++;
                 }
             }
 
             if (Object.keys(actualizacionesFirebase).length > 0) {
                 await update(ref(db), actualizacionesFirebase);
-                alert(`✅ Checkout Masivo Exitoso.\nSe le marcó la salida automática y se calculó el pago a ${procesados} personas.`);
+                alert(`✅ Checkout Masivo Exitoso.\nSe calculó la salida y el pago a ${procesados} personas.`);
             }
         }
-
         await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
-        alert("¡Jornada terminada con éxito! Gran trabajo hoy.");
+        alert("¡Jornada terminada con éxito!");
         salirDeSala();
-
-    } catch (error) {
-        alert("Error al intentar cerrar la jornada masivamente.");
-        console.error(error);
-    }
+    } catch (error) { alert("Error al intentar cerrar la jornada masivamente."); }
 });
 
 document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
@@ -204,9 +190,7 @@ function activarRadares() {
         const asistencias = snapshot.exists() ? snapshot.val() : {};
         totalFirmados = Object.keys(asistencias).length; actualizarTablero();
         
-        let maxNumero = 0; const conteoStaff = {}; 
-        window.asistentesSinSalida = 0; 
-        
+        let maxNumero = 0; const conteoStaff = {}; window.asistentesSinSalida = 0; 
         const tbody = document.getElementById('tablaAsistentes'); tbody.innerHTML = "";
         
         for (const rut in asistencias) {
@@ -229,7 +213,7 @@ function activarRadares() {
                             <td>${trab.nombres} ${trab.apellidos}<br>${btnEditarPago}</td>
                             <td>${asis.hora_ingreso}</td>
                             <td>${btnSalidaContrato}</td>
-                            <td><button class="btn btn-danger btn-sm" onclick="anularAsistencia('${rut}')">X</button></td>`;
+                            <td><button class="btn btn-danger btn-sm" onclick="window.anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
         }
         window.siguienteTicketAutomatico = maxNumero + 1;
@@ -252,13 +236,9 @@ function actualizarTablero() {
 window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
     let nuevoMonto = prompt(`¿Cuánto será el NUEVO PAGO TOTAL de ${nombrePersona} para la jornada de hoy?\n(Monto actual: $${montoActual})`, montoActual);
     if (nuevoMonto === null || nuevoMonto === "") return;
-    
     nuevoMonto = parseInt(nuevoMonto);
     if (isNaN(nuevoMonto)) return alert("Por favor ingresa solo números.");
-    
-    try {
-        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { monto: nuevoMonto });
-    } catch (e) { alert("Error al actualizar el pago."); }
+    try { await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { monto: nuevoMonto }); } catch (e) { alert("Error al actualizar el pago."); }
 }
 
 window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
@@ -273,35 +253,20 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
         if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
             let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
             let [hR, mR] = horaSalida.split(':').map(Number);
-            let minE = hE * 60 + mE;
-            let minR = hR * 60 + mR;
-            let diff = minR - minE;
-            
-            if (diff > 0) {
-                bonoSugerido = Math.round((diff / 60) * valorHoraExtraGlobal);
-            }
+            let diff = (hR * 60 + mR) - (hE * 60 + mE);
+            if (diff > 0) bonoSugerido = Math.round((diff / 60) * valorHoraExtraGlobal);
         }
         
-        let msj = `Salida actual: ${horaSalida}\nSalida estipulada: ${horaTerminoGeneral || 'No definida'}.\n\nSi le darás un bono por horas extra, ingresa el monto en pesos (si no, pon 0):`;
-        
-        if (bonoSugerido > 0) {
-            msj = `¡ATENCIÓN! La persona se pasó de la hora.\n\nSalida estimada: ${horaTerminoGeneral}\nSalida real: ${horaSalida}\n\n🤖 CÁLCULO AUTOMÁTICO: $${bonoSugerido}\n\nPuedes aceptar este bono sugerido o escribir otro valor:`;
-        }
+        let msj = bonoSugerido > 0 ? `¡ATENCIÓN! La persona se pasó de la hora.\nCÁLCULO AUTOMÁTICO: $${bonoSugerido}\nPuedes aceptar o escribir otro valor:` : `Ingresa el monto de bono por horas extra (si no, pon 0):`;
         
         let respuesta = prompt(msj, bonoSugerido);
         if (respuesta === null) return; 
         bonoExtra = parseInt(respuesta) || 0;
     }
     
-    const montoBase = parseInt(montoBaseActual) || 0;
-    const nuevoMontoTotal = montoBase + bonoExtra;
-    
+    const nuevoMontoTotal = (parseInt(montoBaseActual) || 0) + bonoExtra;
     try {
-        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
-            hora_salida: horaSalida, 
-            bono_horas_extras: bonoExtra, 
-            monto: nuevoMontoTotal 
-        });
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: bonoExtra, monto: nuevoMontoTotal });
     } catch (error) { alert("Error al marcar salida."); }
 }
 
@@ -314,65 +279,48 @@ document.getElementById('btnIngresoManual').addEventListener('click', () => {
 
 async function onScanSuccess(decodedText) {
     try { if(html5QrcodeScanner) html5QrcodeScanner.pause(); } catch(e) {} 
-    document.getElementById('mensajeEscaneo').classList.remove('d-none'); 
-    rutActual = decodedText; 
-    
+    document.getElementById('mensajeEscaneo').classList.remove('d-none'); rutActual = decodedText; 
     try {
         const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
         if (blacklistSnap.exists()) { 
             alert(`⛔ ACCESO DENEGADO ⛔\nMotivo: ${blacklistSnap.val().motivo}`); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
-            return; 
+            document.getElementById('mensajeEscaneo').classList.add('d-none'); return; 
         }
         
         const reservaSnap = await get(child(ref(db), `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`));
         const snapshot = await get(child(ref(db), `1_trabajadores/${rutActual}`));
         
         if (snapshot.exists()) {
-            const datos = snapshot.val(); 
-            listaGlobalCRM[rutActual] = datos; 
-
+            const datos = snapshot.val(); listaGlobalCRM[rutActual] = datos; 
             document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
-            
-            if (reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía") { 
-                infoInvitado.innerText = `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})`; 
-            } else { 
-                infoInvitado.innerText = `✅ EXTRA CON PAGO ($${montoPago})`; 
-            }
+            infoInvitado.innerText = (reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía") ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
             
             document.getElementById('seccionFirma').classList.remove('d-none'); 
             document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
-            
             if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad')); 
-            signaturePad.clear(); 
-            document.getElementById('mensajeEscaneo').classList.add('d-none');
+            signaturePad.clear(); document.getElementById('mensajeEscaneo').classList.add('d-none');
         } else { 
-            alert("RUT no encontrado en la base de datos de los trabajadores. La persona debe llenar el formulario web primero."); 
+            alert("RUT no encontrado en la base de datos."); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
             document.getElementById('mensajeEscaneo').classList.add('d-none'); 
         }
-    } catch (error) { 
-        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-    }
+    } catch (error) { try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} }
 }
 
 document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
-    const firmaBase64 = signaturePad.toDataURL(); 
-    const now = new Date();
+    const firmaBase64 = signaturePad.toDataURL(); const now = new Date();
     const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     const numeroFinal = document.getElementById('numeroAsignado').value;
-    
     const textoInfo = document.getElementById('infoInvitado').innerText; const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
     let invitadoPor = ""; if (tipo === "Cortesía" && textoInfo.includes("Por: ")) invitadoPor = textoInfo.split("Por: ")[1].replace(")", "");
     try {
         await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { rut: rutActual, nombre_programa: nombrePrograma, monto: (tipo === "Pago" ? montoPago : 0), tipo_ingreso: tipo, hora_ingreso: horaActual, firma_digital: firmaBase64, estado_pago: "Pendiente", numero_asignado: numeroFinal, invitado_por: invitadoPor });
         document.getElementById('seccionFirma').classList.add('d-none'); signaturePad.clear(); 
-        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-        rutActual = "";
+        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} rutActual = "";
     } catch (error) { alert("Error al guardar."); }
 });
 
@@ -394,53 +342,28 @@ function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
     const [yearF, monthF, dayF] = fechaProg.split('-'); const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} de ${yearF}`;
     const fechaNac = trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________';
 
-    const textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por doña Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, de nacionalidad Chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '__________________________________'}, domiciliado/a en calle ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
+    const textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, que en adelante se denominará “el/la empleador/a”, y don/a ${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '__________________________________'}, domiciliado/a en calle ${trab.direccion ? trab.direccion.toUpperCase() : '_______________________'}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal:
 
-PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
+PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}".
 
-SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
+SEGUNDO. El empleador se compromete a pagar al trabajador $${asis.monto} por jornada.
 
-TERCERO. El trabajador/a cumplirá una jornada ordinaria de trabajo que estará establecida en la citación a la jornada, que será entregado al trabajador/a con un mínimo anticipación 24 horas. La jornada diaria no excederá de 10 horas. Lo anterior, sin perjuicio de lo establecido en el Párrafo 2°, del Capítulo IV, del Título I, del Libro I, del Código del Trabajo, relativo a horas extraordinarias.
+TERCERO. El trabajador autoriza la difusión de su imagen para la producción.
 
-CUARTO. El empleador se compromete a pagar al trabajador $${asis.monto} por jornada el que será liquidado y pagado mediante transferencia bancaria.
+CUARTO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple validada en plataforma.`;
 
-QUINTO. El trabajador autoriza en este acto al empleador a filmar, divulgar, editar, grabar total o parcialmente su imagen y voz, sin restricciones ni límites temporales mediante cualquier soporte o medio de registro, reproducción o difusión.
-
-SEXTO. La duración del presente contrato estará determinada por toda la duración de la jornada señalada, pudiendo tener término de acuerdo a las causales que la ley señala.
-
-SÉPTIMO. El empleador se obliga a pagar la totalidad de obligaciones previsionales que establece la ley, debiendo retener de la remuneración bruta las cotizaciones que sean de cargo del trabajador, y enterarlas en la institución correspondiente (AFP ${trab.afp || '_____'}, Salud ${trab.salud || '_____'}).
-
-OCTAVO. El empleador deberá registrar en el sitio electrónico de la Dirección del Trabajo el contrato de trabajo.
-
-NOVENO. Se deja constancia que el trabajador ingresó al servicio del empleador, el día ${fechaTexto}.
-
-DÉCIMO. El presente contrato se firma en dos ejemplares del mismo tenor y fecha.
-
-UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple. El trazo digital plasmado por el Trabajador asociado a su RUT y validado a través del sistema de acreditación de la Productora, tiene plena validez legal.`;
-
-    const lineas = doc.splitTextToSize(textoContrato, 175); doc.text(lineas, 20, y); y += (lineas.length * 4.5) + 20; 
+    const lineas = doc.splitTextToSize(textoContrato, 175); doc.text(lineas, 20, y); y += (lineas.length * 4.5) + 30; 
 
     doc.setFont("helvetica", "bold"); doc.text("_________________________________", 50, y, null, null, "center"); doc.text("Firma Empleador", 50, y + 5, null, null, "center"); doc.setFont("helvetica", "normal"); doc.text("CAMILA FEVRE SEGUEL", 50, y + 10, null, null, "center"); 
 
     doc.setFont("helvetica", "bold"); 
     if (asis.firma_digital) doc.addImage(asis.firma_digital, 'PNG', 115, y - 25, 80, 25);
     doc.text("_________________________________", 155, y, null, null, "center"); doc.text("Firma Trabajador", 155, y + 5, null, null, "center"); doc.setFont("helvetica", "normal"); doc.text(`${trab.nombres.toUpperCase()} ${trab.apellidos.toUpperCase()}`, 155, y + 10, null, null, "center"); 
-    
-    y += 25;
-    const notasTexto = `NOTAS: 
-(1) Ley N°21.327 Firma electrónica Modernización de la Dirección del Trabajo. Se agregó en el numeral 2 del inciso primero del artículo 10, del Contrato de Trabajo a continuación de la palabra "nacionalidad", la siguiente frase: ", domicilio y dirección de correo electrónico de ambas partes, si la tuvieren".
-(2) Artículo 22, inciso 1° modificado por la Ley N°21.561: La duración de la jornada ordinaria de trabajo no excederá de cuarenta y cuatro horas semanales y su distribución se podrá efectuar en cada semana calendario o sobre la base de promedios semanales en lapsos de hasta cuatro semanas, en cuyo caso la jornada ordinaria no podrá exceder de cuarenta y cinco horas ordinarias en cada semana, ni extenderse con este límite por más de dos semanas.
-(3) Modalidad alternativa de pago: de acuerdo con el inciso segundo del Artículo 54 del Código del Trabajo, modificado por la Ley 21.327 "A solicitud del trabajador(a), el pago podrá realizarse por medio de cheque, o vale vista bancario a su nombre, o transferencia electrónica a la cuenta bancaria del trabajador, sin que ello importe costo alguno para él.
-Ejemplo: El pago al trabajador/a, se realizará mediante transferencia electrónica a la siguiente cuenta:
-Banco: ${trab.banco || '_______________________'}
-Tipo y número de cuenta: ${trab.tipoCuenta || '_________'} N° ${trab.numeroCuenta || '_________________'}
-Rut: ${rut}
-Correo electrónico: ${trab.email || '_______________________'}
-(4) Se agrega lo indicado en la cláusula octava en consideración a la reforma introducida por la Ley N°21.327, que agrega el artículo 9 bis, que establece: “En conformidad a lo dispuesto en el artículo 515, el empleador deberá registrar en el sitio electrónico de la Dirección del Trabajo los contratos de trabajo, dentro de los quince días siguientes a su celebración.”`;
-
-    doc.setFontSize(8); const lineasNotas = doc.splitTextToSize(notasTexto, 175); doc.text(lineasNotas, 20, y);
 }
 
+// ==========================================
+// PESTAÑA 2: CRM & EDICIÓN
+// ==========================================
 document.getElementById('crm-tab').addEventListener('click', async () => {
     const [trabSnap, blackSnap] = await Promise.all([ get(ref(db, '1_trabajadores')), get(ref(db, '4_blacklist')) ]);
     listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; renderCRM(listaGlobalCRM);
@@ -506,13 +429,13 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
             salud: document.getElementById('editSalud').value
         });
         alert("Datos actualizados correctamente."); 
-        listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db), `1_trabajadores/${rutPerfilActual}`))).val();
+        listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
         renderCRM(listaGlobalCRM); modalFichaInstance.hide();
     } catch (e) { alert("Error al guardar."); }
 });
 
 document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
-    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre. Si vuelve, tendrá que rellenar el formulario de nuevo.")) {
+    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; renderCRM(listaGlobalCRM); modalFichaInstance.hide(); alert("Trabajador eliminado.");
     }
@@ -531,6 +454,9 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
     }
 });
 
+// ==========================================
+// PESTAÑA 3: FINANZAS Y BÓVEDA
+// ==========================================
 document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return;
     const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
@@ -554,7 +480,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) return alert("No hay plata retenida.");
     if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes y descargar el archivo del banco?")) return;
     const fechaHoy = new Date().toISOString().split('T')[0];
-    let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
+    let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
     let actualizacionesFirebase = {};
     
     const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
@@ -576,20 +502,17 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaElegida}`)); 
-        if (!snap.exists()) return alert("No hay asistencias registradas para esta fecha en la base de datos.");
-        
+        if (!snap.exists()) return alert("No hay asistencias registradas para esta fecha.");
         const trabSnap = await get(ref(db, '1_trabajadores')); if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
         
         const programas = snap.val();
-        let csv = "\uFEFFCuenta origen (obligatorio);Moneda origen (obligatorio);Cuenta destino (obligatorio);Moneda destino (obligatorio);Código banco destino (obligatorio solo si banco destino no es Santander);RUT beneficiario (obligatorio solo si banco destino no es Santander);Nombre beneficiario (obligatorio solo si banco destino no es Santander);Monto transferir (obligatorio);Glosa personalizada transferencia (opcional);Correo beneficiario (opcional);Mensaje correo beneficiario (opcional);Glosa cartola originador (opcional);Glosa cartola beneficiario (opcional, solo Santander)\n";
+        let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
         let actualizacionesFirebase = {}; 
         let hayPagosNuevos = false;
-        
-        const omitirDalePlay = confirm("¿Deseas OMITIR a los asistentes de 'Dale Play' de este pago diario?\n\n(Dale a 'Aceptar' para omitirlos y dejarlos en la Bóveda Semanal, o dale a 'Cancelar' para incluirlos y pagarlos hoy mismo).");
+        const omitirDalePlay = confirm("¿Deseas OMITIR a los asistentes de 'Dale Play' de este pago diario?\n\n(Aceptar: Omitir y dejarlos en la Bóveda. Cancelar: Incluirlos y pagarlos hoy).");
 
         for (const prog in programas) {
             if (omitirDalePlay && prog === "Dale Play") continue; 
-            
             for (const r in programas[prog]) {
                 const asis = programas[prog][r];
                 if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
@@ -602,14 +525,14 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
             }
         }
         
-        if (!hayPagosNuevos) return alert("No hay pagos pendientes para esta fecha. O ya fueron pagados, o sus montos son de $0.");
+        if (!hayPagosNuevos) return alert("No hay pagos pendientes para esta fecha o sus montos son de $0.");
         
-        if(confirm(`¡Se encontraron extras por pagar el día ${fechaElegida}!\n\n¿Descargar el Excel del Banco y marcarlos como PAGADOS en el sistema?`)){
+        if(confirm(`¡Se encontraron extras por pagar el día ${fechaElegida}!\n\n¿Descargar el Excel del Banco y marcarlos como PAGADOS?`)){
             await update(ref(db), actualizacionesFirebase);
             descargarCSV(csv, `Nomina_Banco_DIARIA_${fechaElegida}.csv`); 
             alert("¡Nómina diaria descargada con éxito!");
         }
-    } catch (e) { alert("Error al generar Excel del Banco."); console.log(e); }
+    } catch (e) { alert("Error al generar Excel del Banco."); }
 });
 
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
@@ -620,13 +543,10 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
         for (const f in todas) { if (f.startsWith(mes)) { for (const prog in todas[f]) { for (const r in todas[f][prog]) {
             if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; tot[r].monto += parseInt(todas[f][prog][r].monto) || 0;
         }}}}
-        let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+        let csv = "\uFEFFRUT;Nombre;Monto;Fecha\n";
         for (const r in tot) {
             const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
-            if (tr) {
-                const parts = r.split('-'); const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; const [y, m, d] = (tr.fechaNacimiento||"").split('-');
-                csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${tot[r].fechaIn.split('-').reverse().join('-')};${tot[r].fechaIn.split('-').reverse().join('-')};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
-            }
+            if (tr) { csv += `${r};${tr.nombres} ${tr.apellidos};${tot[r].monto};${tot[r].fechaIn}\n`; }
         }
         descargarCSV(csv, `Contador_${mes}.csv`);
     } catch (e) { alert("Error al generar Excel."); }
@@ -635,11 +555,11 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
 
 // ==========================================
-// NUEVA PESTAÑA: DEGLOSE DE PROGRAMAS Y ASISTENCIA DE SEGURIDAD
+// PESTAÑA 4: SEGURIDAD (LISTADOS EXCEL)
 // ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
-    const btnRefresh = document.getElementById('btnRefrescarDT');
+    const btnRefresh = document.getElementById('btnRefrescarSeguridad');
     let idAbierto = null; const acordeonAbierto = document.querySelector('#acordeonDT .accordion-collapse.show');
     if (acordeonAbierto) idAbierto = acordeonAbierto.id;
 
@@ -662,7 +582,7 @@ async function cargarReportesDT() {
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">
-                        📅 ${fecha} | 🎬 ${prog}   <span class="badge bg-success ms-2">${cantidad} personas</span>
+                        📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span>
                     </button>
                 </h2>
                 <div id="collapseDT_${index}" class="accordion-collapse collapse ${isOpen}" data-bs-parent="#acordeonDT">
@@ -706,63 +626,12 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
     }
 }
 
-// NUEVA FUNCIÓN: ANÁLISIS DE FRECUENCIA PARA PREMIOS "DALE PLAY"  
-window.generarReporteFrecuencia = async function() {  
-    try {  
-        const snap = await get(ref(db, '2_asistencias'));  
-        if (!snap.exists()) return alert("No hay asistencias registradas en el sistema.");  
-          
-        const trabSnap = await get(ref(db, '1_trabajadores'));   
-        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};  
-          
-        const todas = snap.val();  
-        let conteoAsistencias = {};  
-  
-        // Recorremos todo el historial  
-        for (const fecha in todas) {  
-            for (const prog in todas[fecha]) {  
-                for (const rut in todas[fecha][prog]) {  
-                    if (!conteoAsistencias[rut]) {  
-                        conteoAsistencias[rut] = { total_general: 0, programas_visitados: {}, conteo_dale_play: 0 };  
-                    }  
-                    conteoAsistencias[rut].total_general++;  
-                      
-                    if (!conteoAsistencias[rut].programas_visitados[prog]) {  
-                        conteoAsistencias[rut].programas_visitados[prog] = 0;  
-                    }  
-                    conteoAsistencias[rut].programas_visitados[prog]++;  
-                      
-                    if (prog === "Dale Play") {  
-                        conteoAsistencias[rut].conteo_dale_play++;  
-                    }  
-                }  
-            }  
-        }  
-  
-        let csv = "\uFEFFRUT;NOMBRES;APELLIDOS;TOTAL ASISTENCIAS GENERALES;VECES EN DALE PLAY;DETALLE DE PROGRAMAS VISITADOS\n";  
-          
-        for (const rut in conteoAsistencias) {  
-            const datos = conteoAsistencias[rut];  
-            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };  
-              
-            let detalle = [];  
-            for (const p in datos.programas_visitados) {  
-                detalle.push(`${p} (${datos.programas_visitados[p]})`);  
-            }  
-            let textoDetalle = detalle.join(", ");  
-              
-            csv += `${rut};${tr.nombres};${tr.apellidos};${datos.total_general};${datos.conteo_dale_play};${textoDetalle}\n`;  
-        }  
-  
-        descargarCSV(csv, `Reporte_Fidelidad_Publico_${new Date().toISOString().split('T')[0]}.csv`);  
-  
-    } catch (e) {  
-        alert("Error al generar el reporte de fidelidad.");  
-    }  
-}
-document.getElementById('dt-tab').addEventListener('click', cargarReportesDT);
-document.getElementById('btnRefrescarDT').addEventListener('click', cargarReportesDT);
+document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
+document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
 
+// ==========================================
+// PESTAÑA 5: MANTENIMIENTO
+// ==========================================
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); if (!snap.exists()) return alert("No hay datos de asistencias.");
@@ -813,8 +682,9 @@ btnEjecutar.addEventListener('click', async () => {
         modal.hide(); inputConfirmar.value = ""; btnEjecutar.disabled = true; window.location.reload();
     } catch (error) { alert("Error al limpiar."); }
 });
+
 // ==========================================
-// NUEVA PESTAÑA: SORTEO DALE PLAY (ASISTENCIA PERFECTA ABSOLUTA)
+// PESTAÑA 6: SORTEO DALE PLAY (ASISTENCIA PERFECTA ABSOLUTA)
 // ==========================================
 document.getElementById('sorteo-tab').addEventListener('click', async () => {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
@@ -856,7 +726,6 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
 });
 
 document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
-    // 1. Recopilar fechas marcadas en el panel
     const checkboxes = document.querySelectorAll('.check-sorteo:checked');
     const fechasSeleccionadas = Array.from(checkboxes).map(cb => cb.value);
     const totalFechasRequeridas = fechasSeleccionadas.length;
@@ -876,29 +745,25 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         let candidatosPerfectos = []; 
         
-        // 2. FILTRO ABSOLUTO: Revisamos trabajador por trabajador
         for (const rut in trabajadores) {
             let asistenciasConfirmadas = 0;
             
-            // Contamos en cuántas de las fechas seleccionadas el RUT marcó salida/ingreso
             fechasSeleccionadas.forEach(fecha => {
                 if (todas[fecha] && todas[fecha]["Dale Play"] && todas[fecha]["Dale Play"][rut]) {
                     asistenciasConfirmadas++;
                 }
             });
             
-            // Si asistió a TODAS las fechas marcadas, entra a la tómbola
             if (asistenciasConfirmadas === totalFechasRequeridas) {
                 candidatosPerfectos.push(rut);
             }
         }
         
-        // 3. SI NADIE CUMPLE LA CONDICIÓN ESTRICTA
         if (candidatosPerfectos.length === 0) {
             setTimeout(() => {
                 document.getElementById('ganadorNombre').innerText = "SIN GANADOR 😔";
                 document.getElementById('ganadorRut').innerText = "";
-                document.getElementById('ganadorFechas').innerText = "Lamentablemente, ninguna persona cumplió con el requisito de asistir a TODAS las fechas seleccionadas.";
+                document.getElementById('ganadorFechas').innerText = "Ninguna persona cumplió con el requisito de asistir a TODAS las fechas seleccionadas.";
                 
                 document.getElementById('resultadoSorteo').classList.remove('d-none');
                 btnSorteo.innerText = "🔄 Intentar con otras fechas";
@@ -907,15 +772,14 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
             return;
         }
         
-        // 4. RANDOMIZACIÓN PURA
         const indiceAleatorio = Math.floor(Math.random() * candidatosPerfectos.length);
         const rutGanador = candidatosPerfectos[indiceAleatorio];
         const trabGanador = trabajadores[rutGanador];
         
         setTimeout(() => {
             document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
-            document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
-            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
+            document.getElementById('ganadorRut').innerText = `RUT: ${rutGanador}`;
+            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total en tómbola: ${candidatosPerfectos.length}).`;
             
             document.getElementById('resultadoSorteo').classList.remove('d-none');
             btnSorteo.innerText = "🔄 Realizar otro Sorteo";
