@@ -830,9 +830,10 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                     if (asis.tipo_ingreso !== "Cortesía" && asis.aplica_contrato !== false && !asis.dt_archivado) {
                         let objRut = window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut];
                         if (!objRut) {
-                            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", telefono: "-", direccion: "-" };
+                            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", email: "-", telefono: "-", direccion: "-" };
                             objRut = {
                                 nombres: `${tr.nombres} ${tr.apellidos}`,
+                                email: tr.email || "-",
                                 telefono: tr.telefono || "-",
                                 direccion: tr.direccion || "-",
                                 fechas: [],
@@ -904,7 +905,7 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                             <div class="table-responsive">
                                 <table class="table table-dark table-hover table-bordered mb-0 align-middle text-center" style="font-size: 0.9em;">
                                     <thead style="color: #b066ff;">
-                                        <tr><th>RUT</th><th>Nombre</th><th>Teléfono</th><th>Domicilio</th><th>Fechas Asistidas</th><th>Montos (Base / +25%)</th><th>Acción</th></tr>
+                                        <tr><th>RUT</th><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Domicilio</th><th>Fechas Asistidas</th><th>Montos (Base / +25%)</th><th>Acción</th></tr>
                                     </thead>
                                     <tbody>`;
                 
@@ -923,12 +924,13 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                                         <tr class="${rowClass}" style="transition: 0.3s;" id="${trId}">
                                             <td class="fw-bold ${textColor} dt-text-element">${rut}</td>
                                             <td class="${textColor} dt-text-element">${asisData.nombres}</td>
+                                            <td class="${textColor} dt-text-element">${asisData.email}</td>
                                             <td class="${textColor} dt-text-element">${asisData.telefono}</td>
                                             <td class="${textColor} dt-text-element">${asisData.direccion}</td>
                                             <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
                                             <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
                                             <td>
-                                                <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana('${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
+                                                <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana(event, '${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
                                                     ${btnText}
                                                 </button>
                                             </td>
@@ -956,12 +958,16 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
     }
 });
 
-// FUNCIÓN DE ACTUALIZACIÓN VISUAL EN TIEMPO REAL (SIN RECARGAR LA LISTA)
-window.toggleContratoSemana = async function(rut, prog, wkSortKey, trId, btnId) {
+// FUNCIÓN DE ACTUALIZACIÓN VISUAL EN TIEMPO REAL (SIN RECARGAR LA LISTA NI COLAPSAR ACORDEÓN)
+window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, btnId) {
+    // Bloquear que el navegador crea que se le hizo clic al acordeón
+    event.preventDefault();
+    event.stopPropagation();
+
     const asisData = window.agrupacionDTGlobal[prog][wkSortKey].ruts[rut];
     const nuevoEstado = !asisData.todoLiquidado;
     
-    // 1. Modificar visualmente la tabla de inmediato sin recargar
+    // 1. Modificar visualmente la tabla de inmediato sin recargar nada
     const tr = document.getElementById(trId);
     const btn = document.getElementById(btnId);
     const textElements = tr.querySelectorAll('.dt-text-element'); 
@@ -980,7 +986,7 @@ window.toggleContratoSemana = async function(rut, prog, wkSortKey, trId, btnId) 
         btn.innerText = 'Marcar Contrato';
     }
 
-    // 2. Guardar en base de datos en segundo plano
+    // 2. Guardar en base de datos en segundo plano silenciosamente
     let updates = {};
     asisData.rutasFirebase.forEach(ruta => {
         updates[`${ruta}/dt_liquidado`] = nuevoEstado;
@@ -990,8 +996,8 @@ window.toggleContratoSemana = async function(rut, prog, wkSortKey, trId, btnId) 
         await update(ref(db), updates);
         asisData.todoLiquidado = nuevoEstado;
     } catch (e) {
-        alert("Error al actualizar el estado. Se recargará la lista.");
-        document.getElementById('btnCargarContratosDT').click(); // Solo recarga si falla la conexión
+        console.error("Error al actualizar estado en BD", e);
+        alert("Aviso: Hubo una falla de red. Verifica tu conexión.");
     }
 }
 
