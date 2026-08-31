@@ -54,13 +54,15 @@ let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico 
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
+// Llenar selectores estrictamente de 08:00 AM a 01:30 AM
 function poblarSelectoresHora() {
     let opcionesHTML = '<option value="">-- Selecciona --</option>';
-    for (let h = 0; h < 24; h++) {
-        for (let m = 0; m < 60; m += 15) {
+    const horas = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1];
+    for (let h of horas) {
+        for (let m of [0, 30]) {
             let hh24 = h.toString().padStart(2, '0');
             let mm = m.toString().padStart(2, '0');
-            let ampm = h >= 12 ? 'PM' : 'AM';
+            let ampm = (h >= 12 && h < 24) ? 'PM' : 'AM';
             let h12 = h % 12; if (h12 === 0) h12 = 12;
             let hh12 = h12.toString().padStart(2, '0');
             opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm} ${ampm}</option>`;
@@ -82,10 +84,11 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
         for (const clave in programas) {
             const p = programas[clave];
             let badgePin = p.pin ? `<span class="badge bg-warning text-dark ms-2 fw-bold fs-6">PIN I/P: ${p.pin}</span>` : "";
+            // Mostramos con slash al administrador, pero internamente tiene el guion
             container.innerHTML += `
                 <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
                     <div>
-                        <strong class="text-white">${p.nombre}</strong> ${badgePin}<br>
+                        <strong class="text-white">${p.nombre.replace(" - ", " / ")}</strong> ${badgePin}<br>
                         <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'} | H.Extra: $${p.valor_hora_extra || 0}</small>
                     </div>
                     <div>
@@ -123,7 +126,7 @@ window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE) {
     claveActual = clave; nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; 
     pinActivo = pin || ""; horaTerminoGeneral = horaSal || ""; valorHoraExtraGlobal = parseInt(valorHE) || 0;
     
-    let titulo = `Sala: ${nom}`; if (pinActivo) titulo += ` <span class="badge bg-warning text-dark ms-2">PIN: ${pinActivo}</span>`;
+    let titulo = `Sala: ${nom.replace(" - ", " / ")}`; if (pinActivo) titulo += ` <span class="badge bg-warning text-dark ms-2">PIN: ${pinActivo}</span>`;
     document.getElementById('tituloEscaner').innerHTML = titulo;
     document.getElementById('seccionConfiguracion').classList.add('d-none');
     document.getElementById('seccionEscaner').classList.remove('d-none');
@@ -137,6 +140,27 @@ window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE) {
 
 window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
+}
+
+// CÁLCULO DE HORAS EXTRA ESTRICTO (SOLO HORA COMPLETA USANDO LA FECHA DEL PROGRAMA Y LA HORA REAL)
+function calcularBonoExtraUsandoNow(horaTerminoProg, valorHoraExtra, fechaProg) {
+    if (!horaTerminoProg || !valorHoraExtra || valorHoraExtra <= 0) return 0;
+    let [y, m, d] = fechaProg.split('-');
+    let [hE, mE] = horaTerminoProg.split(':').map(Number);
+    let expectedEnd = new Date(y, m - 1, d, hE, mE);
+    
+    // Si la hora de término es 00 o 01, lógicamente pertenece al día siguiente de la fecha del evento
+    if (hE === 0 || hE === 1) {
+        expectedEnd.setDate(expectedEnd.getDate() + 1);
+    }
+    
+    const now = new Date();
+    let diffMins = Math.floor((now - expectedEnd) / 60000);
+    
+    if (diffMins >= 60) { // Solo si pasó al menos 1 hora completa
+        return Math.floor(diffMins / 60) * valorHoraExtra;
+    }
+    return 0;
 }
 
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
@@ -153,20 +177,19 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
             let actualizacionesFirebase = {};
             let procesados = 0;
 
+            let bonoExtraMasivo = 0;
+            if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
+                bonoExtraMasivo = calcularBonoExtraUsandoNow(horaTerminoGeneral, valorHoraExtraGlobal, fechaPrograma);
+            }
+
             for (const rut in asistencias) {
                 const asis = asistencias[rut];
                 if (!asis.hora_salida) {
-                    let bonoExtra = 0;
-                    if (asis.tipo_ingreso !== "Cortesía" && horaTerminoGeneral && valorHoraExtraGlobal > 0) {
-                        let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
-                        let [hR, mR] = horaSalidaMasiva.split(':').map(Number);
-                        let diff = (hR * 60 + mR) - (hE * 60 + mE);
-                        if (diff > 0) bonoExtra = Math.floor(diff / 60) * valorHoraExtraGlobal;
-                    }
-                    const nuevoMontoTotal = (parseInt(asis.monto) || 0) + bonoExtra;
+                    let bonoFinal = (asis.tipo_ingreso !== "Cortesía") ? bonoExtraMasivo : 0;
+                    const nuevoMontoTotal = (parseInt(asis.monto) || 0) + bonoFinal;
                     
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
-                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoExtra;
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoFinal;
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = nuevoMontoTotal;
                     procesados++;
                 }
@@ -284,11 +307,10 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     } else {
         let bonoSugerido = 0;
         if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
-            let [hE, mE] = horaTerminoGeneral.split(':').map(Number); let [hR, mR] = horaSalida.split(':').map(Number);
-            let diff = (hR * 60 + mR) - (hE * 60 + mE); if (diff > 0) bonoSugerido = Math.floor(diff / 60) * valorHoraExtraGlobal;
+            bonoSugerido = calcularBonoExtraUsandoNow(horaTerminoGeneral, valorHoraExtraGlobal, fechaPrograma);
         }
         
-        let msj = bonoSugerido > 0 ? `¡ATENCIÓN! La persona se pasó de la hora.\nCÁLCULO AUTOMÁTICO: $${bonoSugerido}\nPuedes aceptar o escribir otro valor:` : `Ingresa el monto de bono por horas extra (si no, pon 0):`;
+        let msj = bonoSugerido > 0 ? `¡ATENCIÓN! La persona completó horas extras.\nCÁLCULO AUTOMÁTICO: $${bonoSugerido}\nPuedes aceptar o escribir otro valor:` : `Ingresa el monto de bono por horas extra (si no, pon 0):`;
         
         let respuesta = prompt(msj, bonoSugerido);
         if (respuesta === null) return; bonoExtra = parseInt(respuesta) || 0;
@@ -406,7 +428,7 @@ window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     const asis = asisSnap.val(); const { jsPDF } = window.jspdf; const doc = new jsPDF({ format: 'legal' });
-    dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma);
+    dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
     
     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
     let nombreArchivo = asis.tipo_ingreso === "Cortesía" || !asis.aplica_contrato ? `Cesion_Imagen_${nombreCompletoLimpio}_${rut}.pdf` : `Contrato_${nombreCompletoLimpio}_${rut}.pdf`;
@@ -659,7 +681,7 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
                 <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px;">
                     <input class="form-check-input check-pago" type="checkbox" value="${key}" id="chk_pago_${key}" style="transform: scale(1.4); margin-top: 5px; cursor: pointer;">
                     <label class="form-check-label ms-2 text-white w-100" for="chk_pago_${key}" style="cursor: pointer; display: flex; justify-content: space-between;">
-                        <span>📅 ${p.fecha} | 🎬 ${p.prog}</span>
+                        <span>📅 ${p.fecha} | 🎬 ${p.prog.replace(" - ", " / ")}</span>
                         <span class="badge bg-warning text-dark border border-warning">${p.cantidadPersonas} personas ($${p.montoTotalPrograma})</span>
                     </label>
                 </div>`;
@@ -863,7 +885,7 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
             <div class="accordion-item" style="border: 1px solid #b066ff; margin-bottom: 10px; background: #1a1a1a;">
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}" style="background: #2d1b4e; color: white; font-size: 1.1em;">
-                        🎬 Programa: ${prog}
+                        🎬 Programa: ${prog.replace(" - ", " / ")}
                     </button>
                 </h2>
                 <div id="colProg_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accProgramas">
@@ -1028,7 +1050,7 @@ async function cargarReportesDT() {
             <div class="accordion-item">
                 <h2 class="accordion-header">
                     <button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">
-                        📅 ${fecha} | 🎬 ${prog} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span>
+                        📅 ${fecha} | 🎬 ${prog.replace(" - ", " / ")} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span>
                     </button>
                 </h2>
                 <div id="collapseDT_${index}" class="accordion-collapse collapse ${isOpen}" data-bs-parent="#acordeonDT">
@@ -1063,7 +1085,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         
         for (const rut in asistentes) {
             const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-            csv += `${programaElegido};${fechaElegida};${rut};${tr.nombres};${tr.apellidos}\n`;
+            csv += `${programaElegido.replace(" - ", " / ")};${fechaElegida};${rut};${tr.nombres};${tr.apellidos}\n`;
         }
         
         descargarCSV(csv, `Lista_Seguridad_${programaElegido.replace(/[ \/]/g, "_")}_${fechaElegida}.csv`);
@@ -1087,7 +1109,7 @@ document.getElementById('btnRespaldoMaestro').addEventListener('click', async ()
         const todas = snap.val();
         for (const fecha in todas) { for (const prog in todas[fecha]) { for (const r in todas[fecha][prog]) {
             const asis = todas[fecha][prog][r]; const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
-            csv += `${fecha};${prog};${r};${trab.nombres};${trab.apellidos};${asis.monto || 0};${asis.tipo_ingreso || ''};${asis.hora_ingreso || ''};${asis.hora_salida || ''};${asis.bono_horas_extras || 0};${asis.estado_pago || ''};${asis.invitado_por || ''}\n`;
+            csv += `${fecha};${prog.replace(" - ", " / ")};${r};${trab.nombres};${trab.apellidos};${asis.monto || 0};${asis.tipo_ingreso || ''};${asis.hora_ingreso || ''};${asis.hora_salida || ''};${asis.bono_horas_extras || 0};${asis.estado_pago || ''};${asis.invitado_por || ''}\n`;
         }}}
         descargarCSV(csv, `Respaldo_Maestro_Asistencias_${new Date().toISOString().split('T')[0]}.csv`);
     } catch (error) { alert("Error al generar el respaldo maestro."); }
@@ -1106,7 +1128,7 @@ document.getElementById('btnRespaldoPDFs').addEventListener('click', async () =>
             for (const r in todas[fecha][prog]) {
                 const asis = todas[fecha][prog][r]; const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
                 if (asis.firma_digital) {
-                    const doc = new jsPDF({ format: 'legal' }); dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog);
+                    const doc = new jsPDF({ format: 'legal' }); dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog.replace(" - ", " / "));
                     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
                     const nombreArchivo = asis.tipo_ingreso === "Cortesía" || !asis.aplica_contrato ? `Cesion_Imagen_${nombreCompletoLimpio}_${r}.pdf` : `Contrato_${nombreCompletoLimpio}_${r}.pdf`;
                     const pdfBlob = doc.output('blob'); carpetaPrograma.file(nombreArchivo, pdfBlob); pdfsGenerados++;
