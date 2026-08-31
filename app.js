@@ -36,7 +36,8 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-outline-light fs-5 py-3 mb-2 w-100 fw-bold';
                 btn.style.borderColor = '#b066ff';
-                btn.innerText = programasActivos[k].nombre;
+                // Mostramos el nombre con Slash visualmente al usuario
+                btn.innerText = programasActivos[k].nombre.replace(" - ", " / ");
                 btn.onclick = () => activarFormulario(programasActivos[k]);
                 divBotones.appendChild(btn);
             });
@@ -54,7 +55,8 @@ function activarFormulario(programaSeleccionado) {
     document.getElementById('pantallaSeleccion').classList.add('d-none');
     document.getElementById('formularioPrincipal').classList.remove('d-none');
     
-    document.getElementById('lblProgramaActivo').innerText = eventoActivo.nombre.toUpperCase();
+    // Mostramos visualmente el slash ( / )
+    document.getElementById('lblProgramaActivo').innerText = eventoActivo.nombre.replace(" - ", " / ").toUpperCase();
     const partes = eventoActivo.fecha.split('-');
     if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
 
@@ -91,7 +93,7 @@ document.getElementById('tipoAsistencia').addEventListener('change', (e) => {
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
     
-    // Algoritmo matemático para validar el RUT Chileno
+    // Algoritmo matemático infalible para validar el RUT Chileno (Módulo 11)
     function validarRutChileno(rutCompleto) {
         if (!/^[0-9]+-[0-9kK]{1}$/.test(rutCompleto)) return false;
         let tmp = rutCompleto.split('-');
@@ -108,7 +110,7 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
     }
 
     if (!validarRutChileno(rut)) {
-        return alert("⚠️ RUT INVÁLIDO ⚠️\nPor favor verifica que el RUT esté bien escrito, sin puntos y con su guion correcto (Ej: 12345678-9).\nSi hay un error de tipeo, tu contrato saldrá con errores.");
+        return alert("⚠️ RUT INVÁLIDO ⚠️\nPor favor verifica que el RUT esté bien escrito, sin puntos y con su guion correcto (Ej: 12345678-9).\nSi hay un error de tipeo, tu contrato y pago saldrán con errores.");
     }
 
     try {
@@ -194,7 +196,7 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
         document.getElementById('encabezadoFormulario').classList.add('d-none');
         document.getElementById('contenedorQR').classList.remove('d-none');
         
-        let textoResumen = `${eventoActivo.nombre.toUpperCase()}`;
+        let textoResumen = `${eventoActivo.nombre.replace(" - ", " / ").toUpperCase()}`;
         if (tipoAsis === "Cortesía") textoResumen += ` (Invitado de ${invitadoPor})`;
         if (tipoAsis === "Extra") textoResumen += ` (I/P Autorizado)`;
         document.getElementById('resumenProgramaQR').innerText = textoResumen;
@@ -206,7 +208,7 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
         document.getElementById('instruccionesQR').innerHTML = `
             Recuerda guardar este QR (tómale pantallazo) para poder ingresar al canal.<br><br>
             <span class="text-warning">Tienes que estar el día <b>${fechaBonita}</b> a las <b>${horaCitacionMsg} hrs</b> en el canal.</span><br><br>
-            ¡Te esperamos para que puedas disfrutar de <b>${eventoActivo.nombre}</b>!
+            ¡Te esperamos para que puedas disfrutar de <b>${eventoActivo.nombre.replace(" - ", " / ")}</b>!
         `;
         
         document.getElementById('codigoQR').innerHTML = ""; 
