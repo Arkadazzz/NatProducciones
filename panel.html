@@ -53,6 +53,7 @@
         <li class="nav-item" role="presentation"><button class="nav-link active" id="puerta-tab" data-bs-toggle="tab" data-bs-target="#puerta" type="button">📍 Puerta</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 BD & Edición</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="contratos-dt-tab" data-bs-toggle="tab" data-bs-target="#contratosDT" type="button">📝 Contratos DT</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="seguridad-tab" data-bs-toggle="tab" data-bs-target="#seguridad" type="button">🛡️ Seguridad</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="mantenimiento-tab" data-bs-toggle="tab" data-bs-target="#mantenimiento" type="button">⚙️ Mant.</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="sorteo-tab" data-bs-toggle="tab" data-bs-target="#sorteo" type="button">🏆 Sorteos</button></li>
@@ -71,8 +72,8 @@
                         <h5>➕ Abrir Nuevo Programa</h5>
                         <select id="nombrePrograma" class="form-select mb-3" style="font-size: 1.1em; padding: 12px;">
                             <option value="">-- Selecciona el Programa --</option>
-                            <option value="Dale Play">Dale Play</option>
-                            <option value="Detrás del Muro">Detrás del Muro (I/P + Cortesía)</option>
+                            <option value="Público/Dale Play">Público/Dale Play</option>
+                            <option value="Público/Detrás del Muro">Público/Detrás del Muro (I/P + Cortesía)</option>
                         </select>
                         <input type="date" id="fechaPrograma" class="form-control mb-3 fw-bold text-center" style="font-size: 1.3em; padding: 15px; color: #d6b3ff !important; border: 2px solid #b066ff !important;">
                         <div class="row align-items-end mb-4">
@@ -207,6 +208,27 @@
             </div>
         </div>
 
+        <!-- PESTAÑA NUEVA: CONTRATOS DT -->
+        <div class="tab-pane fade" id="contratosDT" role="tabpanel">
+            <div class="card-panel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h4 style="color: #b066ff; margin-bottom: 0;">📝 Panel de Contratos Dirección del Trabajo</h4>
+                        <p style="color: #aaaaaa; margin-bottom: 0;">Conglomerado de asistencias pendientes de contrato DT (con cálculo de impuestos 25%).</p>
+                    </div>
+                    <button class="btn btn-outline-info fw-bold" id="btnCargarContratosDT">🔄 Buscar Pendientes</button>
+                </div>
+                
+                <div id="contenedorContratosDT" class="d-flex flex-column gap-3 mb-4" style="max-height: 60vh; overflow-y: auto; overflow-x: hidden; padding-right: 10px;">
+                    <p class="text-center text-muted">Haz clic en "Buscar Pendientes" para cargar los datos.</p>
+                </div>
+
+                <div class="text-end border-top border-secondary pt-3">
+                    <button class="btn btn-success fw-bold px-5 py-3 fs-5 shadow" id="btnArchivarContratosDT" disabled>📥 Archivar Contratos Finalizados</button>
+                </div>
+            </div>
+        </div>
+
         <!-- PESTAÑA 4: SEGURIDAD -->
         <div class="tab-pane fade" id="seguridad" role="tabpanel">
             <div class="card-panel">
@@ -331,6 +353,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-<script type="module" src="panel.js?v=5.0"></script>
+<script type="module" src="panel.js?v=7.0"></script>
 </body>
 </html>
