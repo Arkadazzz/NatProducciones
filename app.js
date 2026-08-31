@@ -58,7 +58,7 @@ function activarFormulario(programaSeleccionado) {
     const partes = eventoActivo.fecha.split('-');
     if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
 
-    if (eventoActivo.nombre === "Detrás del Muro") {
+    if (eventoActivo.nombre.includes("Detrás del Muro")) {
         document.getElementById('zonaCortesia').classList.remove('d-none');
         document.getElementById('tipoAsistencia').setAttribute('required', 'true');
         document.getElementById('tipoAsistencia').value = ""; 
@@ -90,9 +90,25 @@ document.getElementById('tipoAsistencia').addEventListener('change', (e) => {
 
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
-    const rutRegex = /^[0-9]+-[0-9kK]{1}$/;
-    if (!rutRegex.test(rut)) {
-        return alert("⚠️ FORMATO INCORRECTO ⚠️\nEl RUT debe ser ingresado SIN PUNTOS y CON GUION.\nEjemplo: 12345678-9");
+    
+    // Algoritmo matemático para validar el RUT Chileno
+    function validarRutChileno(rutCompleto) {
+        if (!/^[0-9]+-[0-9kK]{1}$/.test(rutCompleto)) return false;
+        let tmp = rutCompleto.split('-');
+        let digv = tmp[1].toLowerCase();
+        let rutNum = tmp[0];
+        let suma = 0; let multiplo = 2;
+        for (let i = rutNum.length - 1; i >= 0; i--) {
+            suma += parseInt(rutNum.charAt(i)) * multiplo;
+            multiplo = multiplo < 7 ? multiplo + 1 : 2;
+        }
+        let dvEsperado = 11 - (suma % 11);
+        let dvCalculado = (dvEsperado === 11) ? "0" : (dvEsperado === 10) ? "k" : dvEsperado.toString();
+        return digv === dvCalculado;
+    }
+
+    if (!validarRutChileno(rut)) {
+        return alert("⚠️ RUT INVÁLIDO ⚠️\nPor favor verifica que el RUT esté bien escrito, sin puntos y con su guion correcto (Ej: 12345678-9).\nSi hay un error de tipeo, tu contrato saldrá con errores.");
     }
 
     try {
@@ -127,7 +143,7 @@ document.getElementById('formularioRegistro').addEventListener('submit', async (
     if (!eventoActivo) return alert("Error de programa.");
 
     const rut = document.getElementById('rut').value.trim();
-    const esMuro = (eventoActivo.nombre === "Detrás del Muro");
+    const esMuro = (eventoActivo.nombre.includes("Detrás del Muro"));
     const tipoAsis = esMuro ? document.getElementById('tipoAsistencia').value : "Pago";
     const invitadoPor = (tipoAsis === "Cortesía") ? document.getElementById('invitadoPor').value : "";
 
