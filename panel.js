@@ -15,13 +15,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "FALABELLA": "52", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
-
 // ==========================================
 // SISTEMA DE SEGURIDAD POR CORREOS (LISTA VIP)
 // ==========================================
-// Agrega aquí los correos que tienen permiso para ver Finanzas, BD, Seguridad, etc.
-// Asegúrate de escribirlos en minúsculas y entre comillas.
 const CORREOS_ADMINISTRADORES = [
     "nat.producciones2020@gmail.com",
     "pinoelgueta@gmail.com", 
@@ -32,23 +28,23 @@ onAuthStateChanged(auth, (user) => {
     if (!user) {
         window.location.href = "login.html"; 
     } else {
-        // Verificar si el correo que inició sesión está en la lista VIP
-        const esAdmin = CORREOS_ADMINISTRADORES.includes(user.email.toLowerCase());
+        const correoLimpio = user.email.trim().toLowerCase();
+        const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
         
         if (!esAdmin) {
-            // Si el correo NO es administrador, ocultamos las pestañas privadas
-            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'seguridad-tab', 'mantenimiento-tab'];
+            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab'];
             pestanasBloqueadas.forEach(id => {
                 const tab = document.getElementById(id);
-                if (tab && tab.parentElement) {
-                    tab.parentElement.classList.add('d-none'); // Esto desaparece el botón de arriba
-                }
+                if (tab && tab.parentElement) tab.parentElement.classList.add('d-none');
             });
         }
     }
 });
 
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
+
+const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "FALABELLA": "52", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
+
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
 let valorHoraExtraGlobal = 0;
 let html5QrcodeScanner = null; let signaturePad; let rutActual = ""; let claveActual = "";
@@ -114,7 +110,7 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     
     if (!nom || !fec || !mon || !horaSal || !horaCitacion) return alert("Completa todos los campos obligatorios.");
 
-    let pinGenerado = ""; if (nom === "Detrás del Muro") pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
+    let pinGenerado = ""; if (nom.includes("Detrás del Muro")) pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
     
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
@@ -165,7 +161,7 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
                         let [hE, mE] = horaTerminoGeneral.split(':').map(Number);
                         let [hR, mR] = horaSalidaMasiva.split(':').map(Number);
                         let diff = (hR * 60 + mR) - (hE * 60 + mE);
-                        if (diff > 0) bonoExtra = Math.round((diff / 60) * valorHoraExtraGlobal);
+                        if (diff > 0) bonoExtra = Math.floor(diff / 60) * valorHoraExtraGlobal;
                     }
                     const nuevoMontoTotal = (parseInt(asis.monto) || 0) + bonoExtra;
                     
@@ -250,7 +246,7 @@ function activarRadares() {
             tbody.appendChild(tr);
         }
         window.siguienteTicketAutomatico = maxNumero + 1;
-        if (nombrePrograma === "Detrás del Muro") {
+        if (nombrePrograma.includes("Detrás del Muro")) {
             document.getElementById('seccionConteoInvitados').classList.remove('d-none');
             let htmlConteo = "";
             for(const staff in conteoStaff) htmlConteo += `<span class="badge bg-dark border border-warning fs-6 text-white">${staff}: <b class="text-warning fs-5 ms-1">${conteoStaff[staff]}</b></span>`;
@@ -289,7 +285,7 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
         let bonoSugerido = 0;
         if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
             let [hE, mE] = horaTerminoGeneral.split(':').map(Number); let [hR, mR] = horaSalida.split(':').map(Number);
-            let diff = (hR * 60 + mR) - (hE * 60 + mE); if (diff > 0) bonoSugerido = Math.round((diff / 60) * valorHoraExtraGlobal);
+            let diff = (hR * 60 + mR) - (hE * 60 + mE); if (diff > 0) bonoSugerido = Math.floor(diff / 60) * valorHoraExtraGlobal;
         }
         
         let msj = bonoSugerido > 0 ? `¡ATENCIÓN! La persona se pasó de la hora.\nCÁLCULO AUTOMÁTICO: $${bonoSugerido}\nPuedes aceptar o escribir otro valor:` : `Ingresa el monto de bono por horas extra (si no, pon 0):`;
@@ -627,7 +623,6 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
         const todas = snap.val();
         let programasPendientes = {};
 
-        // Buscar qué programas tienen personas en estado "Pendiente"
         for (const fecha in todas) {
             for (const prog in todas[fecha]) {
                 let tienePendientes = false;
@@ -698,7 +693,6 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
         let agrupacionPagos = {}; 
         let actualizacionesFirebase = {};
 
-        // Sumar los montos de la misma persona en los distintos programas elegidos
         seleccionados.forEach(clave => {
             const [fecha, prog] = clave.split('|');
             const asistentes = todas[fecha][prog];
@@ -767,6 +761,146 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 });
 
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
+
+// ==========================================
+// PESTAÑA NUEVA: CONTRATOS DT
+// ==========================================
+document.getElementById('contratos-dt-tab').addEventListener('click', () => {
+    document.getElementById('btnCargarContratosDT').click();
+});
+
+let agrupacionDTGlobal = {};
+let rutsFinalizadosDT = new Set();
+
+document.getElementById('btnCargarContratosDT').addEventListener('click', async () => {
+    const contenedor = document.getElementById('contenedorContratosDT');
+    contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
+    document.getElementById('btnArchivarContratosDT').disabled = true;
+    rutsFinalizadosDT.clear();
+
+    try {
+        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
+        if (!asisSnap.exists()) {
+            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay personas pendientes de contrato DT.</div>";
+            return;
+        }
+
+        const todas = asisSnap.val();
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        agrupacionDTGlobal = {};
+
+        for (const fecha in todas) {
+            for (const prog in todas[fecha]) {
+                for (const r in todas[fecha][prog]) {
+                    const asis = todas[fecha][prog][r];
+                    
+                    if (asis.tipo_ingreso !== "Cortesía" && asis.aplica_contrato !== false && !asis.dt_liquidado) {
+                        if (!agrupacionDTGlobal[r]) {
+                            agrupacionDTGlobal[r] = { montoTotal: 0, programas: [], rutasFirebase: [] };
+                        }
+                        agrupacionDTGlobal[r].montoTotal += (parseInt(asis.monto) || 0);
+                        agrupacionDTGlobal[r].programas.push(`${prog} (${fecha})`);
+                        agrupacionDTGlobal[r].rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${r}/dt_liquidado`);
+                    }
+                }
+            }
+        }
+
+        if (Object.keys(agrupacionDTGlobal).length === 0) {
+            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes de procesar.</div>";
+            return;
+        }
+
+        let html = "";
+        for (const rut in agrupacionDTGlobal) {
+            const datos = agrupacionDTGlobal[rut];
+            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
+            const montoImpuesto = Math.round(datos.montoTotal * 1.25);
+            const progsUnicos = [...new Set(datos.programas)].join(" | ");
+
+            html += `
+            <div class="card p-3 shadow-sm bloque-dt" id="bloqueDT_${rut}" style="background: #1a1a1a; border: 1px solid #444; border-radius: 10px; transition: 0.3s; margin-bottom: 10px;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="text-white mb-1">${tr.nombres} ${tr.apellidos} <span class="badge bg-secondary ms-2">${rut}</span></h5>
+                        <p class="text-info mb-1" style="font-size: 0.9em;">🎬 <b>Asistencias agrupadas:</b> ${progsUnicos}</p>
+                        <div class="d-flex gap-4 mt-2">
+                            <span class="text-muted">Monto Base Total: <b class="text-white">$${datos.montoTotal}</b></span>
+                            <span class="text-warning">Contrato (Monto + 25%): <b class="fs-5">$${montoImpuesto}</b></span>
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-success fw-bold px-4 py-3 btn-marcar-dt" onclick="window.marcarContratoDTListo('${rut}')" id="btnDT_${rut}">
+                        ✓ Contrato Finalizado
+                    </button>
+                </div>
+            </div>`;
+        }
+        contenedor.innerHTML = html;
+
+    } catch (e) {
+        contenedor.innerHTML = "<p class='text-danger text-center'>Error al cargar los datos.</p>";
+    }
+});
+
+window.marcarContratoDTListo = function(rut) {
+    const bloque = document.getElementById(`bloqueDT_${rut}`);
+    const btn = document.getElementById(`btnDT_${rut}`);
+    
+    if (rutsFinalizadosDT.has(rut)) {
+        rutsFinalizadosDT.delete(rut);
+        bloque.style.background = "#1a1a1a";
+        bloque.style.borderColor = "#444";
+        btn.classList.remove("btn-success");
+        btn.classList.add("btn-outline-success");
+        btn.innerText = "✓ Contrato Finalizado";
+    } else {
+        rutsFinalizadosDT.add(rut);
+        bloque.style.background = "rgba(0, 210, 106, 0.1)";
+        bloque.style.borderColor = "#00d26a";
+        btn.classList.remove("btn-outline-success");
+        btn.classList.add("btn-success");
+        btn.innerText = "✅ Listo";
+    }
+
+    document.getElementById('btnArchivarContratosDT').disabled = rutsFinalizadosDT.size === 0;
+}
+
+document.getElementById('btnArchivarContratosDT').addEventListener('click', async () => {
+    if (rutsFinalizadosDT.size === 0) return;
+    if (!confirm(`¿Archivar y guardar los ${rutsFinalizadosDT.size} contratos finalizados?\nDesaparecerán de esta lista y se marcarán como liquidados.`)) return;
+
+    let actualizacionesFirebase = {};
+    let resumenHistorico = {
+        fecha_archivo: new Date().toISOString(),
+        cantidad_personas: rutsFinalizadosDT.size,
+        personas: {}
+    };
+
+    for (const rut of rutsFinalizadosDT) {
+        const datos = agrupacionDTGlobal[rut];
+        datos.rutasFirebase.forEach(ruta => {
+            actualizacionesFirebase[ruta] = true;
+        });
+        
+        resumenHistorico.personas[rut] = {
+            monto_base: datos.montoTotal,
+            monto_impuestos: Math.round(datos.montoTotal * 1.25),
+            programas: datos.programas
+        };
+    }
+
+    const idHistorico = Date.now().toString();
+    actualizacionesFirebase[`5_historial_dt/archivos/${idHistorico}`] = resumenHistorico;
+
+    try {
+        await update(ref(db), actualizacionesFirebase);
+        alert("¡Contratos archivados con éxito en la base de datos!");
+        document.getElementById('btnCargarContratosDT').click(); 
+    } catch (e) {
+        alert("Error al archivar en la base de datos.");
+    }
+});
+
 
 // ==========================================
 // PESTAÑA 4: SEGURIDAD (LISTADOS EXCEL)
@@ -913,8 +1047,10 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
         let fechasDalePlay = [];
         
         for (const fecha in todas) {
-            if (todas[fecha]["Dale Play"]) {
-                fechasDalePlay.push(fecha);
+            for (const prog in todas[fecha]) {
+                if (prog.includes("Dale Play")) {
+                    if (!fechasDalePlay.includes(fecha)) fechasDalePlay.push(fecha);
+                }
             }
         }
         
@@ -964,9 +1100,13 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
             let asistenciasConfirmadas = 0;
             
             fechasSeleccionadas.forEach(fecha => {
-                if (todas[fecha] && todas[fecha]["Dale Play"] && todas[fecha]["Dale Play"][rut]) {
-                    asistenciasConfirmadas++;
+                let asistioEnEstaFecha = false;
+                for (const prog in todas[fecha]) {
+                    if (prog.includes("Dale Play") && todas[fecha][prog][rut]) {
+                        asistioEnEstaFecha = true;
+                    }
                 }
+                if (asistioEnEstaFecha) asistenciasConfirmadas++;
             });
             
             if (asistenciasConfirmadas === totalFechasRequeridas) {
