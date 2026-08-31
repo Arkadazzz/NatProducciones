@@ -43,7 +43,7 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { signOut(auth).then(() => { window.location.href = "login.html"; }); });
 
-const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "FALABELLA": "52", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
+const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
 
 let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
 let valorHoraExtraGlobal = 0;
@@ -327,7 +327,6 @@ async function onScanSuccess(decodedText) {
             const esCortesia = reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía";
             infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
 
-            // PANEL DINÁMICO DE ADMINISTRACIÓN (EDITAR INVITADOR O CONTRATO)
             const opcionesDiv = document.getElementById('opcionesFirmaAdmin');
             opcionesDiv.classList.remove('d-none');
             
@@ -360,7 +359,6 @@ async function onScanSuccess(decodedText) {
             document.getElementById('seccionFirma').classList.remove('d-none'); 
             document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
             
-            // EL TRUCO PARA EVITAR PDFS CORRUPTOS: FONDO BLANCO OBLIGATORIO
             if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad'), { backgroundColor: 'rgb(255, 255, 255)' }); 
             signaturePad.clear(); document.getElementById('mensajeEscaneo').classList.add('d-none');
         } else { 
@@ -410,7 +408,8 @@ window.generarContratoPDF = async function(rut) {
     const asis = asisSnap.val(); const { jsPDF } = window.jspdf; const doc = new jsPDF({ format: 'legal' });
     dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma);
     
-    let nombreArchivo = asis.tipo_ingreso === "Cortesía" || !asis.aplica_contrato ? `Cesion_Imagen_${rut}.pdf` : `Contrato_${rut}.pdf`;
+    const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
+    let nombreArchivo = asis.tipo_ingreso === "Cortesía" || !asis.aplica_contrato ? `Cesion_Imagen_${nombreCompletoLimpio}_${rut}.pdf` : `Contrato_${nombreCompletoLimpio}_${rut}.pdf`;
     doc.save(nombreArchivo);
 }
 
@@ -769,72 +768,169 @@ document.getElementById('contratos-dt-tab').addEventListener('click', () => {
     document.getElementById('btnCargarContratosDT').click();
 });
 
-let agrupacionDTGlobal = {};
-let rutsFinalizadosDT = new Set();
+window.agrupacionDTGlobal = {};
+
+function getWeekIdentifier(dateStr) {
+    const parts = dateStr.split('-'); 
+    if(parts.length !== 3) return { label: "Fecha Desconocida", sortKey: "0000-00-00" };
+    const d = new Date(parts[0], parts[1]-1, parts[2]);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+    const monday = new Date(d.setDate(diff));
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    
+    const monStr = monday.getDate().toString().padStart(2, '0') + '/' + (monday.getMonth()+1).toString().padStart(2, '0');
+    const sunStr = sunday.getDate().toString().padStart(2, '0') + '/' + (sunday.getMonth()+1).toString().padStart(2, '0');
+    const sortKey = monday.getFullYear() + "-" + (monday.getMonth()+1).toString().padStart(2, '0') + "-" + monday.getDate().toString().padStart(2, '0');
+    
+    return { label: `Semana del ${monStr} al ${sunStr}`, sortKey: sortKey };
+}
 
 document.getElementById('btnCargarContratosDT').addEventListener('click', async () => {
     const contenedor = document.getElementById('contenedorContratosDT');
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
-    document.getElementById('btnArchivarContratosDT').disabled = true;
-    rutsFinalizadosDT.clear();
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
         if (!asisSnap.exists()) {
-            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay personas pendientes de contrato DT.</div>";
+            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes.</div>";
             return;
         }
 
         const todas = asisSnap.val();
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-        agrupacionDTGlobal = {};
+        window.agrupacionDTGlobal = {};
 
         for (const fecha in todas) {
+            const weekInfo = getWeekIdentifier(fecha);
             for (const prog in todas[fecha]) {
-                for (const r in todas[fecha][prog]) {
-                    const asis = todas[fecha][prog][r];
+                if (!window.agrupacionDTGlobal[prog]) window.agrupacionDTGlobal[prog] = {};
+                if (!window.agrupacionDTGlobal[prog][weekInfo.sortKey]) {
+                    window.agrupacionDTGlobal[prog][weekInfo.sortKey] = { label: weekInfo.label, ruts: {} };
+                }
+                
+                for (const rut in todas[fecha][prog]) {
+                    const asis = todas[fecha][prog][rut];
                     
-                    if (asis.tipo_ingreso !== "Cortesía" && asis.aplica_contrato !== false && !asis.dt_liquidado) {
-                        if (!agrupacionDTGlobal[r]) {
-                            agrupacionDTGlobal[r] = { montoTotal: 0, programas: [], rutasFirebase: [] };
+                    if (asis.tipo_ingreso !== "Cortesía" && asis.aplica_contrato !== false && !asis.dt_archivado) {
+                        let objRut = window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut];
+                        if (!objRut) {
+                            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", telefono: "-", direccion: "-" };
+                            objRut = {
+                                nombres: `${tr.nombres} ${tr.apellidos}`,
+                                telefono: tr.telefono || "-",
+                                direccion: tr.direccion || "-",
+                                fechas: [],
+                                rutasFirebase: [],
+                                todoLiquidado: true,
+                                montoSuma: 0
+                            };
+                            window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut] = objRut;
                         }
-                        agrupacionDTGlobal[r].montoTotal += (parseInt(asis.monto) || 0);
-                        agrupacionDTGlobal[r].programas.push(`${prog} (${fecha})`);
-                        agrupacionDTGlobal[r].rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${r}/dt_liquidado`);
+                        objRut.fechas.push(fecha);
+                        objRut.montoSuma += (parseInt(asis.monto) || 0);
+                        objRut.rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${rut}`);
+                        if (!asis.dt_liquidado) objRut.todoLiquidado = false;
                     }
                 }
             }
         }
 
-        if (Object.keys(agrupacionDTGlobal).length === 0) {
-            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes de procesar.</div>";
+        for (const prog in window.agrupacionDTGlobal) {
+            for (const wk in window.agrupacionDTGlobal[prog]) {
+                if (Object.keys(window.agrupacionDTGlobal[prog][wk].ruts).length === 0) {
+                    delete window.agrupacionDTGlobal[prog][wk];
+                }
+            }
+            if (Object.keys(window.agrupacionDTGlobal[prog]).length === 0) {
+                delete window.agrupacionDTGlobal[prog];
+            }
+        }
+
+        if (Object.keys(window.agrupacionDTGlobal).length === 0) {
+            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ Todos los contratos están listos y archivados.</div>";
             return;
         }
 
-        let html = "";
-        for (const rut in agrupacionDTGlobal) {
-            const datos = agrupacionDTGlobal[rut];
-            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
-            const montoImpuesto = Math.round(datos.montoTotal * 1.25);
-            const progsUnicos = [...new Set(datos.programas)].join(" | ");
-
+        let html = '<div class="accordion" id="accProgramas">';
+        let progIdx = 0;
+        
+        const progKeys = Object.keys(window.agrupacionDTGlobal).sort();
+        for (const prog of progKeys) {
+            progIdx++;
             html += `
-            <div class="card p-3 shadow-sm bloque-dt" id="bloqueDT_${rut}" style="background: #1a1a1a; border: 1px solid #444; border-radius: 10px; transition: 0.3s; margin-bottom: 10px;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h5 class="text-white mb-1">${tr.nombres} ${tr.apellidos} <span class="badge bg-secondary ms-2">${rut}</span></h5>
-                        <p class="text-info mb-1" style="font-size: 0.9em;">🎬 <b>Asistencias agrupadas:</b> ${progsUnicos}</p>
-                        <div class="d-flex gap-4 mt-2">
-                            <span class="text-muted">Monto Base Total: <b class="text-white">$${datos.montoTotal}</b></span>
-                            <span class="text-warning">Contrato (Monto + 25%): <b class="fs-5">$${montoImpuesto}</b></span>
+            <div class="accordion-item" style="border: 1px solid #b066ff; margin-bottom: 10px; background: #1a1a1a;">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}" style="background: #2d1b4e; color: white; font-size: 1.1em;">
+                        🎬 Programa: ${prog}
+                    </button>
+                </h2>
+                <div id="colProg_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accProgramas">
+                    <div class="accordion-body" style="background: #141414;">
+                        <div class="accordion" id="accWeeks_${progIdx}">`;
+            
+            let wkIdx = 0;
+            const weekKeys = Object.keys(window.agrupacionDTGlobal[prog]).sort().reverse();
+            for (const wk of weekKeys) {
+                wkIdx++;
+                const weekData = window.agrupacionDTGlobal[prog][wk];
+                const numPersonas = Object.keys(weekData.ruts).length;
+                
+                html += `
+                <div class="accordion-item" style="border: 1px solid #444; margin-bottom: 5px; background: #111;">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}_wk_${wkIdx}" style="background: #1a1a1a; color: #00d26a;">
+                            📅 ${weekData.label} &nbsp; <span class="badge bg-secondary ms-2">${numPersonas} personas pendientes</span>
+                        </button>
+                    </h2>
+                    <div id="colProg_${progIdx}_wk_${wkIdx}" class="accordion-collapse collapse" data-bs-parent="#accWeeks_${progIdx}">
+                        <div class="accordion-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-dark table-hover table-bordered mb-0 align-middle text-center" style="font-size: 0.9em;">
+                                    <thead style="color: #b066ff;">
+                                        <tr><th>RUT</th><th>Nombre</th><th>Teléfono</th><th>Domicilio</th><th>Fechas Asistidas</th><th>Montos (Base / +25%)</th><th>Acción</th></tr>
+                                    </thead>
+                                    <tbody>`;
+                
+                for (const rut in weekData.ruts) {
+                    const asisData = weekData.ruts[rut];
+                    const rowClass = asisData.todoLiquidado ? 'table-success' : '';
+                    const textColor = asisData.todoLiquidado ? 'text-dark' : 'text-white';
+                    const btnClass = asisData.todoLiquidado ? 'btn-success text-dark' : 'btn-outline-success';
+                    const btnText = asisData.todoLiquidado ? '✅ Listo' : 'Marcar Contrato';
+                    const montoImpuestos = Math.round(asisData.montoSuma * 1.25);
+                    
+                    html += `
+                                        <tr class="${rowClass}" style="transition: 0.3s;" id="tr_${progIdx}_${wkIdx}_${rut}">
+                                            <td class="fw-bold ${textColor}">${rut}</td>
+                                            <td class="${textColor}">${asisData.nombres}</td>
+                                            <td class="${textColor}">${asisData.telefono}</td>
+                                            <td class="${textColor}">${asisData.direccion}</td>
+                                            <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
+                                            <td class="${textColor}">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
+                                            <td>
+                                                <button class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana('${rut}', '${prog}', '${wk}')">
+                                                    ${btnText}
+                                                </button>
+                                            </td>
+                                        </tr>`;
+                }
+                html += `
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
-                    <button class="btn btn-outline-success fw-bold px-4 py-3 btn-marcar-dt" onclick="window.marcarContratoDTListo('${rut}')" id="btnDT_${rut}">
-                        ✓ Contrato Finalizado
-                    </button>
+                </div>`;
+            }
+            html += `
+                        </div>
+                    </div>
                 </div>
             </div>`;
         }
+        html += '</div>';
         contenedor.innerHTML = html;
 
     } catch (e) {
@@ -842,65 +938,67 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
     }
 });
 
-window.marcarContratoDTListo = function(rut) {
-    const bloque = document.getElementById(`bloqueDT_${rut}`);
-    const btn = document.getElementById(`btnDT_${rut}`);
+window.toggleContratoSemana = async function(rut, prog, wkSortKey) {
+    const asisData = window.agrupacionDTGlobal[prog][wkSortKey].ruts[rut];
+    const nuevoEstado = !asisData.todoLiquidado;
     
-    if (rutsFinalizadosDT.has(rut)) {
-        rutsFinalizadosDT.delete(rut);
-        bloque.style.background = "#1a1a1a";
-        bloque.style.borderColor = "#444";
-        btn.classList.remove("btn-success");
-        btn.classList.add("btn-outline-success");
-        btn.innerText = "✓ Contrato Finalizado";
-    } else {
-        rutsFinalizadosDT.add(rut);
-        bloque.style.background = "rgba(0, 210, 106, 0.1)";
-        bloque.style.borderColor = "#00d26a";
-        btn.classList.remove("btn-outline-success");
-        btn.classList.add("btn-success");
-        btn.innerText = "✅ Listo";
-    }
+    let updates = {};
+    asisData.rutasFirebase.forEach(ruta => {
+        updates[`${ruta}/dt_liquidado`] = nuevoEstado;
+    });
 
-    document.getElementById('btnArchivarContratosDT').disabled = rutsFinalizadosDT.size === 0;
+    try {
+        await update(ref(db), updates);
+        asisData.todoLiquidado = nuevoEstado;
+        document.getElementById('btnCargarContratosDT').click();
+    } catch (e) {
+        alert("Error al actualizar el estado.");
+    }
 }
 
 document.getElementById('btnArchivarContratosDT').addEventListener('click', async () => {
-    if (rutsFinalizadosDT.size === 0) return;
-    if (!confirm(`¿Archivar y guardar los ${rutsFinalizadosDT.size} contratos finalizados?\nDesaparecerán de esta lista y se marcarán como liquidados.`)) return;
+    if (!window.agrupacionDTGlobal || Object.keys(window.agrupacionDTGlobal).length === 0) return;
+    
+    let updates = {};
+    let rutsArchivados = 0;
+    let resumenProgramas = new Set();
 
-    let actualizacionesFirebase = {};
-    let resumenHistorico = {
-        fecha_archivo: new Date().toISOString(),
-        cantidad_personas: rutsFinalizadosDT.size,
-        personas: {}
-    };
-
-    for (const rut of rutsFinalizadosDT) {
-        const datos = agrupacionDTGlobal[rut];
-        datos.rutasFirebase.forEach(ruta => {
-            actualizacionesFirebase[ruta] = true;
-        });
-        
-        resumenHistorico.personas[rut] = {
-            monto_base: datos.montoTotal,
-            monto_impuestos: Math.round(datos.montoTotal * 1.25),
-            programas: datos.programas
-        };
+    for (const prog in window.agrupacionDTGlobal) {
+        for (const wk in window.agrupacionDTGlobal[prog]) {
+            for (const rut in window.agrupacionDTGlobal[prog][wk].ruts) {
+                const asisData = window.agrupacionDTGlobal[prog][wk].ruts[rut];
+                if (asisData.todoLiquidado) {
+                    rutsArchivados++;
+                    resumenProgramas.add(prog);
+                    asisData.rutasFirebase.forEach(ruta => {
+                        updates[`${ruta}/dt_archivado`] = true;
+                    });
+                }
+            }
+        }
     }
+
+    if (rutsArchivados === 0) {
+        return alert("No hay contratos marcados en verde (Listos) para archivar.");
+    }
+
+    if (!confirm(`¿Archivar definitivamente los ${rutsArchivados} contratos que están en verde?\nEsto los quitará de la vista de pendientes.`)) return;
 
     const idHistorico = Date.now().toString();
-    actualizacionesFirebase[`5_historial_dt/archivos/${idHistorico}`] = resumenHistorico;
+    updates[`5_historial_dt/archivos/${idHistorico}`] = {
+        fecha_archivo: new Date().toISOString(),
+        cantidad_archivos: rutsArchivados,
+        programas: Array.from(resumenProgramas)
+    };
 
     try {
-        await update(ref(db), actualizacionesFirebase);
-        alert("¡Contratos archivados con éxito en la base de datos!");
-        document.getElementById('btnCargarContratosDT').click(); 
+        await update(ref(db), updates);
+        alert(`✅ ¡Éxito! Se archivaron ${rutsArchivados} contratos de los programas:\n${Array.from(resumenProgramas).join(', ')}`);
+        document.getElementById('btnCargarContratosDT').click();
     } catch (e) {
-        alert("Error al archivar en la base de datos.");
+        alert("Error al archivar en Firebase.");
     }
 });
-
 
 // ==========================================
 // PESTAÑA 4: SEGURIDAD (LISTADOS EXCEL)
@@ -1009,7 +1107,8 @@ document.getElementById('btnRespaldoPDFs').addEventListener('click', async () =>
                 const asis = todas[fecha][prog][r]; const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
                 if (asis.firma_digital) {
                     const doc = new jsPDF({ format: 'legal' }); dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog);
-                    const nombreArchivo = asis.tipo_ingreso === "Cortesía" || !asis.aplica_contrato ? `Cesion_Imagen_${r}.pdf` : `Contrato_${r}.pdf`;
+                    const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
+                    const nombreArchivo = asis.tipo_ingreso === "Cortesía" || !asis.aplica_contrato ? `Cesion_Imagen_${nombreCompletoLimpio}_${r}.pdf` : `Contrato_${nombreCompletoLimpio}_${r}.pdf`;
                     const pdfBlob = doc.output('blob'); carpetaPrograma.file(nombreArchivo, pdfBlob); pdfsGenerados++;
                 }
             }
