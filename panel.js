@@ -54,7 +54,6 @@ let totalEsperados = 0; let totalFirmados = 0; window.siguienteTicketAutomatico 
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; let unsubscribeAsistencias = null;
 
-// Llenar selectores estrictamente de 08:00 AM a 01:30 AM
 function poblarSelectoresHora() {
     let opcionesHTML = '<option value="">-- Selecciona --</option>';
     const horas = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1];
@@ -84,7 +83,6 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
         for (const clave in programas) {
             const p = programas[clave];
             let badgePin = p.pin ? `<span class="badge bg-warning text-dark ms-2 fw-bold fs-6">PIN I/P: ${p.pin}</span>` : "";
-            // Mostramos con slash al administrador, pero internamente tiene el guion
             container.innerHTML += `
                 <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
                     <div>
@@ -142,24 +140,18 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
-// CÁLCULO DE HORAS EXTRA ESTRICTO (SOLO HORA COMPLETA USANDO LA FECHA DEL PROGRAMA Y LA HORA REAL)
 function calcularBonoExtraUsandoNow(horaTerminoProg, valorHoraExtra, fechaProg) {
     if (!horaTerminoProg || !valorHoraExtra || valorHoraExtra <= 0) return 0;
     let [y, m, d] = fechaProg.split('-');
     let [hE, mE] = horaTerminoProg.split(':').map(Number);
     let expectedEnd = new Date(y, m - 1, d, hE, mE);
     
-    // Si la hora de término es 00 o 01, lógicamente pertenece al día siguiente de la fecha del evento
-    if (hE === 0 || hE === 1) {
-        expectedEnd.setDate(expectedEnd.getDate() + 1);
-    }
+    if (hE === 0 || hE === 1) expectedEnd.setDate(expectedEnd.getDate() + 1);
     
     const now = new Date();
     let diffMins = Math.floor((now - expectedEnd) / 60000);
     
-    if (diffMins >= 60) { // Solo si pasó al menos 1 hora completa
-        return Math.floor(diffMins / 60) * valorHoraExtra;
-    }
+    if (diffMins >= 60) return Math.floor(diffMins / 60) * valorHoraExtra;
     return 0;
 }
 
@@ -845,7 +837,7 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                                 direccion: tr.direccion || "-",
                                 fechas: [],
                                 rutasFirebase: [],
-                                todoLiquidado: true,
+                                todoLiquidado: !!asis.dt_liquidado,
                                 montoSuma: 0
                             };
                             window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut] = objRut;
@@ -853,6 +845,7 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                         objRut.fechas.push(fecha);
                         objRut.montoSuma += (parseInt(asis.monto) || 0);
                         objRut.rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${rut}`);
+                        // Si encuentra alguno falso, marca el grupo como false
                         if (!asis.dt_liquidado) objRut.todoLiquidado = false;
                     }
                 }
@@ -923,16 +916,19 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                     const btnText = asisData.todoLiquidado ? '✅ Listo' : 'Marcar Contrato';
                     const montoImpuestos = Math.round(asisData.montoSuma * 1.25);
                     
+                    const trId = `tr_${progIdx}_${wkIdx}_${rut}`;
+                    const btnId = `btn_${progIdx}_${wkIdx}_${rut}`;
+
                     html += `
-                                        <tr class="${rowClass}" style="transition: 0.3s;" id="tr_${progIdx}_${wkIdx}_${rut}">
-                                            <td class="fw-bold ${textColor}">${rut}</td>
-                                            <td class="${textColor}">${asisData.nombres}</td>
-                                            <td class="${textColor}">${asisData.telefono}</td>
-                                            <td class="${textColor}">${asisData.direccion}</td>
+                                        <tr class="${rowClass}" style="transition: 0.3s;" id="${trId}">
+                                            <td class="fw-bold ${textColor} dt-text-element">${rut}</td>
+                                            <td class="${textColor} dt-text-element">${asisData.nombres}</td>
+                                            <td class="${textColor} dt-text-element">${asisData.telefono}</td>
+                                            <td class="${textColor} dt-text-element">${asisData.direccion}</td>
                                             <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
-                                            <td class="${textColor}">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
+                                            <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
                                             <td>
-                                                <button class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana('${rut}', '${prog}', '${wk}')">
+                                                <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana('${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
                                                     ${btnText}
                                                 </button>
                                             </td>
@@ -960,10 +956,31 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
     }
 });
 
-window.toggleContratoSemana = async function(rut, prog, wkSortKey) {
+// FUNCIÓN DE ACTUALIZACIÓN VISUAL EN TIEMPO REAL (SIN RECARGAR LA LISTA)
+window.toggleContratoSemana = async function(rut, prog, wkSortKey, trId, btnId) {
     const asisData = window.agrupacionDTGlobal[prog][wkSortKey].ruts[rut];
     const nuevoEstado = !asisData.todoLiquidado;
     
+    // 1. Modificar visualmente la tabla de inmediato sin recargar
+    const tr = document.getElementById(trId);
+    const btn = document.getElementById(btnId);
+    const textElements = tr.querySelectorAll('.dt-text-element'); 
+
+    if (nuevoEstado) {
+        tr.classList.add('table-success');
+        textElements.forEach(el => { el.classList.remove('text-white'); el.classList.add('text-dark'); });
+        btn.classList.remove('btn-outline-success');
+        btn.classList.add('btn-success', 'text-dark');
+        btn.innerText = '✅ Listo';
+    } else {
+        tr.classList.remove('table-success');
+        textElements.forEach(el => { el.classList.remove('text-dark'); el.classList.add('text-white'); });
+        btn.classList.remove('btn-success', 'text-dark');
+        btn.classList.add('btn-outline-success');
+        btn.innerText = 'Marcar Contrato';
+    }
+
+    // 2. Guardar en base de datos en segundo plano
     let updates = {};
     asisData.rutasFirebase.forEach(ruta => {
         updates[`${ruta}/dt_liquidado`] = nuevoEstado;
@@ -972,9 +989,9 @@ window.toggleContratoSemana = async function(rut, prog, wkSortKey) {
     try {
         await update(ref(db), updates);
         asisData.todoLiquidado = nuevoEstado;
-        document.getElementById('btnCargarContratosDT').click();
     } catch (e) {
-        alert("Error al actualizar el estado.");
+        alert("Error al actualizar el estado. Se recargará la lista.");
+        document.getElementById('btnCargarContratosDT').click(); // Solo recarga si falla la conexión
     }
 }
 
@@ -991,7 +1008,7 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
                 const asisData = window.agrupacionDTGlobal[prog][wk].ruts[rut];
                 if (asisData.todoLiquidado) {
                     rutsArchivados++;
-                    resumenProgramas.add(prog);
+                    resumenProgramas.add(prog.replace(" - ", " / "));
                     asisData.rutasFirebase.forEach(ruta => {
                         updates[`${ruta}/dt_archivado`] = true;
                     });
