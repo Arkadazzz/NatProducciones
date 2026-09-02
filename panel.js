@@ -19,9 +19,11 @@ const db = getDatabase(app);
 // SISTEMA DE SEGURIDAD POR CORREOS (LISTA VIP)
 // ==========================================
 const CORREOS_ADMINISTRADORES = [
-    "nat.producciones2020@gmail.com",
+    "cami.fevreseguel@gmail.com",
     "pinoelgueta@gmail.com", 
-    "correo_jefa_1@gmail.com"
+    "natalyseguel.va@gmail.com",
+    "javier.rojas.fer@gmail.com",
+    "luisemilio.jorquera.avaria@gmail.com",
 ];
 
 onAuthStateChanged(auth, (user) => { 
