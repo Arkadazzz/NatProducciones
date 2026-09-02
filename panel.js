@@ -839,43 +839,50 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
     if (signaturePadEfectivo.isEmpty()) return alert("El trabajador debe firmar el recibo para constancia legal.");
     if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoTotal} en efectivo?`)) return;
     
-    const firmaBase64 = signaturePadEfectivo.toDataURL('image/jpeg');
-    const nowIso = new Date().toISOString();
-    const idRecibo = Date.now().toString();
-    
-    let updates = {};
-    deudaEfectivoActual.rutas.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
-    
-    updates[`7_pagos_efectivo/${idRecibo}`] = {
-        rut: rutEfectivoActual,
-        monto: deudaEfectivoActual.montoTotal,
-        fecha: nowIso,
-        firma: firmaBase64,
-        programas: deudaEfectivoActual.programas
-    };
-    
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-    doc.text("COMPROBANTE DE PAGO EN EFECTIVO", 105, 20, null, null, "center");
-    
-    doc.setFontSize(12); doc.setFont("helvetica", "normal");
-    const textoCentral = `En Santiago, con fecha ${new Date().toLocaleDateString()}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago íntegro en EFECTIVO por la suma de $${deudaEfectivoActual.montoTotal} pesos a don/ña ${document.getElementById('nombreEfectivo').innerText}, Cédula de Identidad N° ${rutEfectivoActual}.\n\nEste pago corresponde a la liquidación de honorarios por su participación como público / extra en los siguientes programas:\n\n${deudaEfectivoActual.programas.join('\n')}\n\nEl trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfacción, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de índole civil ni laboral.`;
-    
-    const lineas = doc.splitTextToSize(textoCentral, 170);
-    doc.text(lineas, 20, 40);
-    
-    doc.addImage(firmaBase64, 'JPEG', 65, 130, 80, 25);
-    doc.setFont("helvetica", "bold");
-    doc.text("_________________________________", 105, 160, null, null, "center");
-    doc.text("Firma Recibí Conforme", 105, 165, null, null, "center");
-    doc.setFont("helvetica", "normal");
-    doc.text(document.getElementById('nombreEfectivo').innerText, 105, 170, null, null, "center");
-    doc.text(rutEfectivoActual, 105, 175, null, null, "center");
-    
+    const btn = document.getElementById('btnConfirmarPagoEfectivo');
+    btn.disabled = true;
+    btn.innerText = "⏳ Procesando...";
+
     try {
+        const firmaBase64 = signaturePadEfectivo.toDataURL('image/jpeg');
+        const nowIso = new Date().toISOString();
+        const idRecibo = Date.now().toString();
+        
+        // PASO 1: Guardar comprobante legal de efectivo en su propia ruta
+        await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
+            rut: rutEfectivoActual,
+            monto: deudaEfectivoActual.montoTotal,
+            fecha: nowIso,
+            firma: firmaBase64,
+            programas: deudaEfectivoActual.programas
+        });
+        
+        // PASO 2: Actualizar las deudas para que no vuelvan a cobrarse
+        let updates = {};
+        deudaEfectivoActual.rutas.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
         await update(ref(db), updates);
+
+        // PASO 3: Generar PDF sin tildes para evitar fallas
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+        doc.text("COMPROBANTE DE PAGO EN EFECTIVO", 105, 20, null, null, "center");
+        
+        doc.setFontSize(12); doc.setFont("helvetica", "normal");
+        const textoCentral = `En Santiago, con fecha ${new Date().toLocaleDateString()}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago integro en EFECTIVO por la suma de $${deudaEfectivoActual.montoTotal} pesos a don/na ${document.getElementById('nombreEfectivo').innerText}, Cedula de Identidad N° ${rutEfectivoActual}.\n\nEste pago corresponde a la liquidacion de honorarios por su participacion como publico / extra en los siguientes programas:\n\n${deudaEfectivoActual.programas.join('\n')}\n\nEl trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfaccion, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de indole civil ni laboral.`;
+        
+        const lineas = doc.splitTextToSize(textoCentral, 170);
+        doc.text(lineas, 20, 40);
+        
+        doc.addImage(firmaBase64, 'JPEG', 65, 130, 80, 25);
+        doc.setFont("helvetica", "bold");
+        doc.text("_________________________________", 105, 160, null, null, "center");
+        doc.text("Firma Recibi Conforme", 105, 165, null, null, "center");
+        doc.setFont("helvetica", "normal");
+        doc.text(document.getElementById('nombreEfectivo').innerText, 105, 170, null, null, "center");
+        doc.text(rutEfectivoActual, 105, 175, null, null, "center");
+        
         const nombreCompletoLimpio = document.getElementById('nombreEfectivo').innerText.replace(/[^a-zA-Z0-9_]/g, "_");
         doc.save(`Recibo_Efectivo_${nombreCompletoLimpio}_${rutEfectivoActual}.pdf`);
         
@@ -883,8 +890,13 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
         document.getElementById('panelPagoEfectivo').classList.add('d-none');
         document.getElementById('rutEfectivo').value = "";
         rutEfectivoActual = "";
+        
     } catch (e) {
-        alert("Error crítico al intentar guardar el pago en la base de datos.");
+        console.error(e);
+        alert("Error detallado: " + e.message + "\n\nSácale pantallazo a este mensaje si vuelve a fallar.");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "💾 Procesar Pago y Generar PDF";
     }
 });
 
