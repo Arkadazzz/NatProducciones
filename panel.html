@@ -22,7 +22,7 @@
         .btn-custom { background: linear-gradient(135deg, #7b2cbf, #5a189a); border: none; font-weight: bold; padding: 12px; border-radius: 8px; color: white; transition: 0.3s; }
         .led-green { width: 12px; height: 12px; background-color: #00ff00; border-radius: 50%; display: inline-block; box-shadow: 0 0 10px #00ff00; margin-right: 8px; animation: blink 1.5s infinite alternate; }
         @keyframes blink { 0% { opacity: 1; box-shadow: 0 0 15px #00ff00; } 100% { opacity: 0.4; box-shadow: 0 0 2px #00ff00; } }
-        canvas#signature-pad { background-color: #ffffff; border-radius: 10px; width: 100%; height: 250px; border: 2px solid #b066ff; touch-action: none; }
+        canvas.signature-pad-class { background-color: #ffffff; border-radius: 10px; width: 100%; height: 250px; border: 2px solid #b066ff; touch-action: none; }
         #reader { width: 100%; border-radius: 10px; border: 2px solid #444444; background-color: #000000; }
         .table-dark { --bs-table-bg: #141414; --bs-table-border-color: #2a2a2a; }
         .metric-box { background: #1a1a1a; border: 1px solid #444444; border-radius: 10px; padding: 10px; text-align: center; }
@@ -53,6 +53,7 @@
         <li class="nav-item" role="presentation"><button class="nav-link active" id="puerta-tab" data-bs-toggle="tab" data-bs-target="#puerta" type="button">📍 Puerta</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 BD & Edición</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="finanzas-tab" data-bs-toggle="tab" data-bs-target="#finanzas" type="button">💰 Finanzas</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="efectivo-tab" data-bs-toggle="tab" data-bs-target="#efectivo" type="button">💵 Efectivo</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="contratos-dt-tab" data-bs-toggle="tab" data-bs-target="#contratosDT" type="button">📝 Contratos DT</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="seguridad-tab" data-bs-toggle="tab" data-bs-target="#seguridad" type="button">🛡️ Seguridad</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="mantenimiento-tab" data-bs-toggle="tab" data-bs-target="#mantenimiento" type="button">⚙️ Mant.</button></li>
@@ -116,11 +117,10 @@
                                 <small style="color: #aaaaaa;">Dile este número a la persona</small>
                             </div>
 
-                            <!-- ZONA PARA EDITAR INVITADOS O CONTRATOS -->
                             <div id="opcionesFirmaAdmin" class="mb-3 p-3 bg-dark rounded border border-warning d-none"></div>
                             
                             <p style="color: #aaaaaa; margin-bottom: 5px;">Firma del trabajador:</p>
-                            <canvas id="signature-pad"></canvas>
+                            <canvas id="signature-pad" class="signature-pad-class"></canvas>
                             <div class="d-flex justify-content-between mt-3">
                                 <button class="btn btn-outline-danger btn-sm fw-bold" id="btnLimpiarFirma">Borrar Firma</button>
                                 <button class="btn btn-success px-4 fw-bold" id="btnGuardarIngreso">Confirmar Ingreso</button>
@@ -208,6 +208,36 @@
             </div>
         </div>
 
+        <!-- PESTAÑA NUEVA: EFECTIVO -->
+        <div class="tab-pane fade" id="efectivo" role="tabpanel">
+            <div class="card-panel">
+                <h4 style="color: #00d26a; margin-bottom: 0;">💵 Pagos en Efectivo</h4>
+                <p style="color: #aaaaaa; margin-bottom: 20px;">Busca a la persona por su RUT. El sistema calculará toda su deuda pendiente, generará un recibo en PDF y dejará constancia legal de la firma.</p>
+                
+                <div class="input-group mb-4">
+                    <input type="text" id="rutEfectivo" class="form-control bg-dark text-white fw-bold fs-5 text-center" placeholder="RUT (Ej: 12345678-9)">
+                    <button class="btn btn-success fw-bold px-4" id="btnBuscarEfectivo">🔍 Buscar Deuda</button>
+                </div>
+
+                <div id="panelPagoEfectivo" class="d-none">
+                    <div class="alert mb-4 text-center" style="background: #1a1a1a; border: 1px solid #00d26a;">
+                        <h3 class="text-white fw-bold mb-2" id="nombreEfectivo"></h3>
+                        <p class="mb-2 text-muted fs-5">Monto Total a Pagar en Efectivo:</p>
+                        <h1 class="text-success fw-bold mb-3" id="montoEfectivo" style="font-size: 4rem;">$0</h1>
+                        <p class="text-info mb-0" id="detalleProgramasEfectivo"></p>
+                    </div>
+                    
+                    <p style="color: #aaaaaa; margin-bottom: 5px;">Firma del trabajador <b class="text-white">(Recibí Conforme)</b>:</p>
+                    <canvas id="signature-pad-efectivo" class="signature-pad-class" style="border-color: #00d26a;"></canvas>
+                    
+                    <div class="d-flex justify-content-between mt-3">
+                        <button class="btn btn-outline-danger fw-bold" id="btnLimpiarFirmaEfectivo">Borrar Firma</button>
+                        <button class="btn btn-success px-5 fw-bold fs-5 shadow" id="btnConfirmarPagoEfectivo">💾 Procesar Pago y Generar PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- PESTAÑA NUEVA: CONTRATOS DT -->
         <div class="tab-pane fade" id="contratosDT" role="tabpanel">
             <div class="card-panel">
@@ -291,68 +321,14 @@
     </div>
 </div>
 
-<!-- MODAL EDICIÓN -->
-<div class="modal fade" id="modalFicha" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #444;">
-            <div class="modal-header" style="border-bottom: 1px solid #333;">
-                <h5 class="modal-title" style="color: #b066ff; font-weight: bold;">Editar Datos del Trabajador</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="contenidoFicha" style="font-size: 0.95em;"></div>
-            <div class="modal-footer" style="border-top: 1px solid #333; display: flex; flex-wrap: wrap; justify-content: space-between;">
-                <div class="w-100 mb-3" style="border-bottom: 1px dashed #333; padding-bottom: 10px;">
-                    <button type="button" class="btn btn-success fw-bold w-100" id="btnGuardarEdicion">💾 Guardar Cambios Correctivos</button>
-                </div>
-                <div class="w-100 text-center mb-2"><small class="text-danger fw-bold">ZONA DE RESTRICCIÓN</small></div>
-                <div class="input-group mb-2">
-                    <input type="text" id="motivoBloqueo" class="form-control bg-dark border-danger text-white" placeholder="Motivo de bloqueo">
-                    <button type="button" class="btn btn-warning fw-bold" id="btnBloquear">Bloquear (Blacklist)</button>
-                    <button type="button" class="btn btn-outline-warning fw-bold d-none" id="btnDesbloquear">Quitar Blacklist</button>
-                </div>
-                <button type="button" class="btn btn-danger w-100 fw-bold" id="btnEliminarTrabajador">❌ Eliminar Trabajador</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL LIMPIEZA -->
-<div class="modal fade" id="modalLimpieza" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="background-color: #1a0a0a; color: white; border: 2px solid #ff3333;">
-            <div class="modal-header" style="border-bottom: 1px solid #ff3333;"><h5 class="modal-title text-danger fw-bold">⚠️ ADVERTENCIA CRÍTICA ⚠️</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body text-center">
-                <p>Estás a punto de <b>ELIMINAR PARA SIEMPRE</b> todo el historial de la base de datos.</p>
-                <p class="text-warning">Asegúrate de que tus PDFs ya estén subidos a Dropbox y que hayas descargado el Excel Maestro.</p>
-                <hr style="border-color: #333;">
-                <p class="mb-2">Para confirmar, escribe <b>LIMPIAR</b> en la casilla de abajo:</p>
-                <input type="text" id="inputConfirmarLimpieza" class="form-control text-center fw-bold text-danger fs-5" placeholder="Escribe LIMPIAR aquí">
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid #333;"><button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-danger fw-bold" id="btnEjecutarLimpieza" disabled>Eliminar Datos de la Nube</button></div>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL PAGOS BANCO (NÓMINA AGRUPADA) -->
-<div class="modal fade" id="modalPagosBanco" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #00d26a;">
-            <div class="modal-header" style="border-bottom: 1px solid #333;"><h5 class="modal-title" style="color: #00d26a; font-weight: bold;">🏦 Generar Nómina de Pago</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <p class="text-muted" style="font-size: 0.95em;">Selecciona los programas que deseas incluir en esta nómina. Si una persona asistió a más de un programa seleccionado, <b>sus montos se sumarán automáticamente</b> en un solo depósito.</p>
-                <div id="listaProgramasPendientes" class="d-flex flex-column gap-2 mt-3" style="max-height: 400px; overflow-y: auto;"></div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid #333;">
-                <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success fw-bold" id="btnGenerarNominaBanco">📥 Descargar Nómina y Marcar Pagados</button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- MODALES (Ficha, Limpieza, Banco) -->
+<div class="modal fade" id="modalFicha" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #444;"><div class="modal-header" style="border-bottom: 1px solid #333;"><h5 class="modal-title" style="color: #b066ff; font-weight: bold;">Editar Datos del Trabajador</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body" id="contenidoFicha" style="font-size: 0.95em;"></div><div class="modal-footer" style="border-top: 1px solid #333; display: flex; flex-wrap: wrap; justify-content: space-between;"><div class="w-100 mb-3" style="border-bottom: 1px dashed #333; padding-bottom: 10px;"><button type="button" class="btn btn-success fw-bold w-100" id="btnGuardarEdicion">💾 Guardar Cambios Correctivos</button></div><div class="w-100 text-center mb-2"><small class="text-danger fw-bold">ZONA DE RESTRICCIÓN</small></div><div class="input-group mb-2"><input type="text" id="motivoBloqueo" class="form-control bg-dark border-danger text-white" placeholder="Motivo de bloqueo"><button type="button" class="btn btn-warning fw-bold" id="btnBloquear">Bloquear (Blacklist)</button><button type="button" class="btn btn-outline-warning fw-bold d-none" id="btnDesbloquear">Quitar Blacklist</button></div><button type="button" class="btn btn-danger w-100 fw-bold" id="btnEliminarTrabajador">❌ Eliminar Trabajador</button></div></div></div></div>
+<div class="modal fade" id="modalLimpieza" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background-color: #1a0a0a; color: white; border: 2px solid #ff3333;"><div class="modal-header" style="border-bottom: 1px solid #ff3333;"><h5 class="modal-title text-danger fw-bold">⚠️ ADVERTENCIA CRÍTICA ⚠️</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body text-center"><p>Estás a punto de <b>ELIMINAR PARA SIEMPRE</b> todo el historial de la base de datos.</p><p class="text-warning">Asegúrate de que tus PDFs ya estén subidos a Dropbox y que hayas descargado el Excel Maestro.</p><hr style="border-color: #333;"><p class="mb-2">Para confirmar, escribe <b>LIMPIAR</b> en la casilla de abajo:</p><input type="text" id="inputConfirmarLimpieza" class="form-control text-center fw-bold text-danger fs-5" placeholder="Escribe LIMPIAR aquí"></div><div class="modal-footer" style="border-top: 1px solid #333;"><button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-danger fw-bold" id="btnEjecutarLimpieza" disabled>Eliminar Datos de la Nube</button></div></div></div></div>
+<div class="modal fade" id="modalPagosBanco" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" style="background-color: #141414; color: white; border: 1px solid #00d26a;"><div class="modal-header" style="border-bottom: 1px solid #333;"><h5 class="modal-title" style="color: #00d26a; font-weight: bold;">🏦 Generar Nómina de Pago</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div><div class="modal-body"><p class="text-muted" style="font-size: 0.95em;">Selecciona los programas que deseas incluir en esta nómina. Si una persona asistió a más de un programa seleccionado, <b>sus montos se sumarán automáticamente</b> en un solo depósito.</p><div id="listaProgramasPendientes" class="d-flex flex-column gap-2 mt-3" style="max-height: 400px; overflow-y: auto;"></div></div><div class="modal-footer" style="border-top: 1px solid #333;"><button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Cancelar</button><button type="button" class="btn btn-success fw-bold" id="btnGenerarNominaBanco">📥 Descargar Nómina y Marcar Pagados</button></div></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-<script type="module" src="panel.js?v=10.0"></script>
+<script type="module" src="panel.js?v=11.0"></script>
 </body>
 </html>
