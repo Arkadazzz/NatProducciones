@@ -45,7 +45,7 @@ document.getElementById('btnCerrarSesion').addEventListener('click', () => { sig
 
 const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
 
-let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let pinActivo = "";
+let nombrePrograma = ""; let fechaPrograma = ""; let montoPago = 0; let horaTerminoGeneral = ""; let horaCitacionGeneral = ""; let pinActivo = "";
 let valorHoraExtraGlobal = 0;
 let html5QrcodeScanner = null; let signaturePad; let rutActual = ""; let claveActual = "";
 let listaGlobalCRM = {}; let blacklistGlobal = {}; let modalFichaInstance;
@@ -90,7 +90,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                         <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'} | H.Extra: $${p.valor_hora_extra || 0}</small>
                     </div>
                     <div>
-                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}')">🚪 Entrar</button>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}', '${p.hora_citacion || ''}')">🚪 Entrar</button>
                         <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
                     </div>
                 </div>`;
@@ -117,12 +117,13 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
         nombre: nom, fecha: fec, monto: mon, pin: pinGenerado, hora_termino: horaSal, valor_hora_extra: valorHE, hora_citacion: horaCitacion 
     });
-    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE);
+    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion);
 });
 
-window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE) {
+window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaCit) {
     claveActual = clave; nombrePrograma = nom; fechaPrograma = fec; montoPago = mon; 
     pinActivo = pin || ""; horaTerminoGeneral = horaSal || ""; valorHoraExtraGlobal = parseInt(valorHE) || 0;
+    horaCitacionGeneral = horaCit || "";
     
     let titulo = `Sala: ${nom.replace(" - ", " / ")}`; if (pinActivo) titulo += ` <span class="badge bg-warning text-dark ms-2">PIN: ${pinActivo}</span>`;
     document.getElementById('tituloEscaner').innerHTML = titulo;
@@ -140,17 +141,52 @@ window.cerrarProgramaGlobal = async function(clave) {
     if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
 }
 
-function calcularBonoExtraUsandoNow(horaTerminoProg, valorHoraExtra, fechaProg) {
-    if (!horaTerminoProg || !valorHoraExtra || valorHoraExtra <= 0) return 0;
-    let [y, m, d] = fechaProg.split('-');
-    let [hE, mE] = horaTerminoProg.split(':').map(Number);
-    let expectedEnd = new Date(y, m - 1, d, hE, mE);
-    if (hE === 0 || hE === 1) expectedEnd.setDate(expectedEnd.getDate() + 1);
+// ==========================================
+// CEREBRO DE CÁLCULO DE PAGOS Y HORAS EXTRA
+// ==========================================
+function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBaseOriginal, valorHE, fechaProg) {
+    let nuevoMontoBase = parseInt(montoBaseOriginal) || 0;
+    let bonoExtra = 0;
+
+    if (!horaCitacion || !horaTermino) return { montoBaseNuevo: nuevoMontoBase, bonoExtra: 0 };
+
+    let [y, m, d] = fechaProg.split('-').map(Number);
+    let [hcH, hcM] = horaCitacion.split(':').map(Number);
+    let [htH, htM] = horaTermino.split(':').map(Number);
+    let [hsH, hsM] = horaSalidaReal.split(':').map(Number);
+
+    let tCit = new Date(y, m - 1, d, hcH, hcM);
     
-    const now = new Date();
-    let diffMins = Math.floor((now - expectedEnd) / 60000);
-    if (diffMins >= 60) return Math.floor(diffMins / 60) * valorHoraExtra;
-    return 0;
+    let tTer = new Date(y, m - 1, d, htH, htM);
+    if (htH === 0 || htH === 1) tTer.setDate(tTer.getDate() + 1);
+    
+    let tSal = new Date(y, m - 1, d, hsH, hsM);
+    // Si la salida es en la madrugada pero la citación fue de día, pertenece al día siguiente
+    if (hsH < 8 && hcH >= 8) tSal.setDate(tSal.getDate() + 1);
+
+    let expectedDuration = (tTer - tCit) / 60000; 
+    let actualDuration = (tSal - tCit) / 60000;
+
+    // Penalizaciones por Retiro Anticipado
+    if (actualDuration < (expectedDuration / 2)) {
+        nuevoMontoBase = 0; // Se fue antes de la mitad de la jornada
+    } else if (actualDuration < expectedDuration) {
+        nuevoMontoBase = Math.round(nuevoMontoBase / 2); // Se fue entre la mitad y el cierre final
+    } else {
+        // Cumplió la jornada completa, calcular horas extras
+        let diffMins = Math.floor((tSal - tTer) / 60000);
+        if (diffMins > 0 && valorHE > 0) {
+            let horasCompletas = Math.floor(diffMins / 60);
+            let minRestantes = diffMins % 60;
+            // Si sobran más de 30 minutos, se redondea a una hora completa más
+            if (minRestantes > 30) {
+                horasCompletas++;
+            }
+            bonoExtra = horasCompletas * parseInt(valorHE);
+        }
+    }
+
+    return { montoBaseNuevo: nuevoMontoBase, bonoExtra: bonoExtra };
 }
 
 document.getElementById('btnEsUnDia').addEventListener('click', async () => {
@@ -158,7 +194,7 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     const now = new Date();
     const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras para todos.\n\n¿Proceder?`)) return;
+    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
 
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
@@ -167,20 +203,23 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
             let actualizacionesFirebase = {};
             let procesados = 0;
 
-            let bonoExtraMasivo = 0;
-            if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
-                bonoExtraMasivo = calcularBonoExtraUsandoNow(horaTerminoGeneral, valorHoraExtraGlobal, fechaPrograma);
-            }
-
             for (const rut in asistencias) {
                 const asis = asistencias[rut];
                 if (!asis.hora_salida) {
-                    let bonoFinal = (asis.tipo_ingreso !== "Cortesía") ? bonoExtraMasivo : 0;
-                    const nuevoMontoTotal = (parseInt(asis.monto) || 0) + bonoFinal;
+                    let pagoFinal = 0;
+                    let bonoFinal = 0;
+
+                    if (asis.tipo_ingreso === "Cortesía") {
+                        pagoFinal = 0;
+                    } else {
+                        let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalidaMasiva, asis.monto, valorHoraExtraGlobal, fechaPrograma);
+                        pagoFinal = calculo.montoBaseNuevo + calculo.bonoExtra;
+                        bonoFinal = calculo.bonoExtra;
+                    }
                     
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
                     actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoFinal;
-                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = nuevoMontoTotal;
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = pagoFinal;
                     procesados++;
                 }
             }
@@ -198,7 +237,7 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
 
 document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
 function salirDeSala() {
-    claveActual = ""; nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = ""; horaTerminoGeneral = ""; valorHoraExtraGlobal = 0;
+    claveActual = ""; nombrePrograma = ""; fechaPrograma = ""; montoPago = 0; pinActivo = ""; horaTerminoGeneral = ""; horaCitacionGeneral = ""; valorHoraExtraGlobal = 0;
     document.getElementById('seccionConfiguracion').classList.remove('d-none');
     document.getElementById('seccionEscaner').classList.add('d-none');
     document.getElementById('seccionFirma').classList.add('d-none');
@@ -290,23 +329,42 @@ window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
 window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     const now = new Date();
     const horaSalida = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    let bonoExtra = 0;
     
     if (tipoIngreso === "Cortesía") {
         if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
-    } else {
-        let bonoSugerido = 0;
-        if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
-            bonoSugerido = calcularBonoExtraUsandoNow(horaTerminoGeneral, valorHoraExtraGlobal, fechaPrograma);
-        }
-        let msj = bonoSugerido > 0 ? `¡ATENCIÓN! La persona completó horas extras.\nCÁLCULO AUTOMÁTICO: $${bonoSugerido}\nPuedes aceptar o escribir otro valor:` : `Ingresa el monto de bono por horas extra (si no, pon 0):`;
-        let respuesta = prompt(msj, bonoSugerido);
-        if (respuesta === null) return; bonoExtra = parseInt(respuesta) || 0;
-    }
+        try { await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: 0, monto: 0 }); } catch (e) {}
+        return;
+    } 
     
-    const nuevoMontoTotal = (parseInt(montoBaseActual) || 0) + bonoExtra;
-    try { await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: bonoExtra, monto: nuevoMontoTotal }); } 
-    catch (error) { alert("Error al marcar salida."); }
+    // Cálculo inteligente para Pago
+    let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalida, montoBaseActual, valorHoraExtraGlobal, fechaPrograma);
+    
+    let msj = `Hora de salida marcada: ${horaSalida}\n\n`;
+    if (calculo.montoBaseNuevo === 0) {
+        msj += `⚠️ ABANDONO ANTICIPADO ⚠️\nSe retiró antes de cumplir la mitad de la jornada. El sistema ajustará su pago base a $0.\n`;
+    } else if (calculo.montoBaseNuevo < parseInt(montoBaseActual)) {
+        msj += `⚠️ RETIRO ANTICIPADO ⚠️\nSe retiró pasada la media jornada, pero no la completó. El sistema ajustará su pago base a la mitad: $${calculo.montoBaseNuevo}.\n`;
+    } else if (calculo.bonoExtra > 0) {
+        msj += `✅ Completó Horas Extras.\nBono extra calculado automáticamente: $${calculo.bonoExtra}\n`;
+    } else {
+        msj += `Jornada regular completada. Sin horas extra.\n`;
+    }
+
+    msj += `\nConfirma el BONO EXTRA que recibirá (Su pago base será modificado a $${calculo.montoBaseNuevo}):`;
+    
+    let respuesta = prompt(msj, calculo.bonoExtra);
+    if (respuesta === null) return; 
+    let bonoExtraConfirmado = parseInt(respuesta) || 0;
+    
+    const nuevoMontoTotal = calculo.montoBaseNuevo + bonoExtraConfirmado;
+
+    try { 
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
+            hora_salida: horaSalida, 
+            bono_horas_extras: bonoExtraConfirmado, 
+            monto: nuevoMontoTotal 
+        }); 
+    } catch (error) { alert("Error al marcar salida."); }
 }
 
 document.getElementById('btnIngresoManual').addEventListener('click', () => {
@@ -1174,11 +1232,11 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         
         const asistentes = asisSnap.val();
-        let csv = "\uFEFFPROGRAMA;FECHA;RUT;NOMBRES;APELLIDOS\n";
+        let csv = "\uFEFFPROGRAMA;FECHA;RUT;NOMBRES;APELLIDOS;DIRECCIÓN\n";
         
         for (const rut in asistentes) {
             const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-            csv += `${programaElegido.replace(" - ", " / ")};${fechaElegida};${rut};${tr.nombres};${tr.apellidos}\n`;
+            csv += `${programaElegido.replace(" - ", " / ")};${fechaElegida};${rut};${tr.nombres};${tr.apellidos};${tr.direccion || '-'}\n`;
         }
         
         descargarCSV(csv, `Lista_Seguridad_${programaElegido.replace(/[ \/]/g, "_")}_${fechaElegida}.csv`);
@@ -1265,7 +1323,6 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
         for (const fecha in todas) {
             for (const prog in todas[fecha]) {
                 if (prog.includes("Dale Play")) {
-                    // Solo agregamos la fecha a la tómbola si NO ha sido usada en un sorteo anterior
                     if (!fechasUsadas[fecha] && !fechasDalePlay.includes(fecha)) {
                         fechasDalePlay.push(fecha);
                     }
@@ -1350,7 +1407,6 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         const rutGanador = candidatosPerfectos[indiceAleatorio];
         const trabGanador = trabajadores[rutGanador];
         
-        // Guardamos las fechas usadas en Firebase para que no se repitan en futuros sorteos
         let updatesSorteo = {};
         fechasSeleccionadas.forEach(f => updatesSorteo[`6_sorteos_fechas_usadas/${f}`] = true);
         await update(ref(db), updatesSorteo);
