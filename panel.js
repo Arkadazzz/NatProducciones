@@ -19,11 +19,9 @@ const db = getDatabase(app);
 // SISTEMA DE SEGURIDAD POR CORREOS (LISTA VIP)
 // ==========================================
 const CORREOS_ADMINISTRADORES = [
-    "cami.fevreseguel@gmail.com",
+    "nat.producciones2020@gmail.com",
     "pinoelgueta@gmail.com", 
-    "natalyseguel.va@gmail.com",
-    "javier.rojas.fer@gmail.com",
-    "luisemilio.jorquera.avaria@gmail.com",
+    "correo_jefa_1@gmail.com"
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -34,7 +32,7 @@ onAuthStateChanged(auth, (user) => {
         const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
         
         if (!esAdmin) {
-            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab'];
+            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab'];
             pestanasBloqueadas.forEach(id => {
                 const tab = document.getElementById(id);
                 if (tab && tab.parentElement) tab.parentElement.classList.add('d-none');
@@ -147,12 +145,10 @@ function calcularBonoExtraUsandoNow(horaTerminoProg, valorHoraExtra, fechaProg) 
     let [y, m, d] = fechaProg.split('-');
     let [hE, mE] = horaTerminoProg.split(':').map(Number);
     let expectedEnd = new Date(y, m - 1, d, hE, mE);
-    
     if (hE === 0 || hE === 1) expectedEnd.setDate(expectedEnd.getDate() + 1);
     
     const now = new Date();
     let diffMins = Math.floor((now - expectedEnd) / 60000);
-    
     if (diffMins >= 60) return Math.floor(diffMins / 60) * valorHoraExtra;
     return 0;
 }
@@ -303,9 +299,7 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
         if (horaTerminoGeneral && valorHoraExtraGlobal > 0) {
             bonoSugerido = calcularBonoExtraUsandoNow(horaTerminoGeneral, valorHoraExtraGlobal, fechaPrograma);
         }
-        
         let msj = bonoSugerido > 0 ? `¡ATENCIÓN! La persona completó horas extras.\nCÁLCULO AUTOMÁTICO: $${bonoSugerido}\nPuedes aceptar o escribir otro valor:` : `Ingresa el monto de bono por horas extra (si no, pon 0):`;
-        
         let respuesta = prompt(msj, bonoSugerido);
         if (respuesta === null) return; bonoExtra = parseInt(respuesta) || 0;
     }
@@ -622,54 +616,36 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
 });
 
 let modalPagosInstance;
-
 document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     const btn = document.getElementById('btnExcelBanco');
     btn.innerText = "⏳ Buscando pendientes..."; btn.disabled = true;
 
     try {
         const snap = await get(ref(db, '2_asistencias'));
-        if (!snap.exists()) {
-            alert("No hay asistencias registradas en el sistema.");
-            btn.innerText = "Generar Nómina de Pago"; btn.disabled = false;
-            return;
-        }
+        if (!snap.exists()) { alert("No hay asistencias registradas en el sistema."); btn.innerText = "Generar Nómina de Pago"; btn.disabled = false; return; }
 
-        const todas = snap.val();
-        let programasPendientes = {};
-
+        const todas = snap.val(); let programasPendientes = {};
         for (const fecha in todas) {
             for (const prog in todas[fecha]) {
-                let tienePendientes = false;
-                let cantidadPersonas = 0;
-                let montoTotalPrograma = 0;
-
+                let tienePendientes = false; let cantidadPersonas = 0; let montoTotalPrograma = 0;
                 for (const r in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][r];
                     if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
-                        tienePendientes = true;
-                        cantidadPersonas++;
-                        montoTotalPrograma += parseInt(asis.monto);
+                        tienePendientes = true; cantidadPersonas++; montoTotalPrograma += parseInt(asis.monto);
                     }
                 }
-
-                if (tienePendientes) {
-                    programasPendientes[`${fecha}|${prog}`] = { fecha, prog, cantidadPersonas, montoTotalPrograma };
-                }
+                if (tienePendientes) programasPendientes[`${fecha}|${prog}`] = { fecha, prog, cantidadPersonas, montoTotalPrograma };
             }
         }
 
         const contenedor = document.getElementById('listaProgramasPendientes');
-        
         if (Object.keys(programasPendientes).length === 0) {
             contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay pagos pendientes en el sistema. Todo está al día.</div>";
             document.getElementById('btnGenerarNominaBanco').classList.add('d-none');
         } else {
             document.getElementById('btnGenerarNominaBanco').classList.remove('d-none');
             let html = "";
-            const sortedKeys = Object.keys(programasPendientes).sort().reverse();
-            
-            sortedKeys.forEach(key => {
+            Object.keys(programasPendientes).sort().reverse().forEach(key => {
                 const p = programasPendientes[key];
                 html += `
                 <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px;">
@@ -682,14 +658,9 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
             });
             contenedor.innerHTML = html;
         }
-
         if (!modalPagosInstance) modalPagosInstance = new bootstrap.Modal(document.getElementById('modalPagosBanco'));
         modalPagosInstance.show();
-
-    } catch (e) {
-        alert("Error al cargar los pagos pendientes.");
-    }
-    
+    } catch (e) { alert("Error al cargar los pagos pendientes."); }
     btn.innerText = "Generar Nómina de Pago"; btn.disabled = false;
 });
 
@@ -702,27 +673,18 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
-        const todas = asisSnap.val();
-        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-
-        let agrupacionPagos = {}; 
-        let actualizacionesFirebase = {};
+        const todas = asisSnap.val(); const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        let agrupacionPagos = {}; let actualizacionesFirebase = {};
 
         seleccionados.forEach(clave => {
             const [fecha, prog] = clave.split('|');
             const asistentes = todas[fecha][prog];
-            
             for (const r in asistentes) {
                 const asis = asistentes[r];
                 if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
-                    if (!agrupacionPagos[r]) {
-                        agrupacionPagos[r] = { montoTotal: 0, programas: [], rutasFirebase: [] };
-                    }
+                    if (!agrupacionPagos[r]) agrupacionPagos[r] = { montoTotal: 0, programas: [], rutasFirebase: [] };
                     agrupacionPagos[r].montoTotal += parseInt(asis.monto);
-                    
-                    if (!agrupacionPagos[r].programas.includes(prog)) {
-                        agrupacionPagos[r].programas.push(prog);
-                    }
+                    if (!agrupacionPagos[r].programas.includes(prog)) agrupacionPagos[r].programas.push(prog);
                     agrupacionPagos[r].rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${r}/estado_pago`);
                 }
             }
@@ -731,28 +693,17 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
         let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
 
         for (const rut in agrupacionPagos) {
-            const datosPago = agrupacionPagos[rut];
-            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
-            const rutSin = rut.replace(/[^0-9kK]/g, '');
-            const glosaProg = datosPago.programas.join(', ').substring(0, 40);
-
+            const datosPago = agrupacionPagos[rut]; const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
+            const rutSin = rut.replace(/[^0-9kK]/g, ''); const glosaProg = datosPago.programas.join(', ').substring(0, 40);
             csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${datosPago.montoTotal};;${tr.email || ''};;${glosaProg};PAGO NAT\n`;
-
-            datosPago.rutasFirebase.forEach(ruta => {
-                actualizacionesFirebase[ruta] = "Pagado";
-            });
+            datosPago.rutasFirebase.forEach(ruta => { actualizacionesFirebase[ruta] = "Pagado"; });
         }
 
         await update(ref(db), actualizacionesFirebase);
         descargarCSV(csv, `Nomina_Banco_Agrupada_${new Date().toISOString().split('T')[0]}.csv`);
         alert("¡Nómina generada con éxito! Revisa tus descargas.");
-        
-        modalPagosInstance.hide();
-        document.getElementById('finanzas-tab').click();
-
-    } catch (e) {
-        alert("Error al procesar y descargar los pagos.");
-    }
+        modalPagosInstance.hide(); document.getElementById('finanzas-tab').click();
+    } catch (e) { alert("Error al procesar y descargar los pagos."); }
 });
 
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
@@ -776,6 +727,108 @@ document.getElementById('btnExcelContador').addEventListener('click', async () =
 });
 
 function descargarCSV(c, n) { const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); const a = document.createElement("a"); a.href = url; a.download = n; a.click(); }
+
+// ==========================================
+// PESTAÑA NUEVA: EFECTIVO
+// ==========================================
+let signaturePadEfectivo = null;
+let rutEfectivoActual = "";
+let deudaEfectivoActual = null;
+
+document.getElementById('btnBuscarEfectivo').addEventListener('click', async () => {
+    const rut = document.getElementById('rutEfectivo').value.trim();
+    if (!rut) return alert("Por favor ingresa un RUT válido.");
+    
+    const snap = await get(ref(db, '2_asistencias'));
+    if (!snap.exists()) return alert("No hay registros de asistencias en el sistema.");
+    
+    const todas = snap.val();
+    let deuda = { montoTotal: 0, programas: [], rutas: [] };
+    
+    for (const f in todas) {
+        for (const p in todas[f]) {
+            if (todas[f][p][rut]) {
+                const asis = todas[f][p][rut];
+                if (asis.estado_pago === "Pendiente" && asis.monto > 0) {
+                    deuda.montoTotal += parseInt(asis.monto);
+                    deuda.programas.push(`${p.replace(" - ", " / ")} (${f})`);
+                    deuda.rutas.push(`2_asistencias/${f}/${p}/${rut}`);
+                }
+            }
+        }
+    }
+    
+    if (deuda.montoTotal === 0) return alert("✅ Esta persona NO tiene pagos de honorarios pendientes.");
+    
+    const trabSnap = await get(child(ref(db), `1_trabajadores/${rut}`));
+    const trab = trabSnap.exists() ? trabSnap.val() : {nombres: "Trabajador", apellidos: "No Registrado"};
+    
+    document.getElementById('nombreEfectivo').innerText = `${trab.nombres} ${trab.apellidos}`;
+    document.getElementById('montoEfectivo').innerText = `$${deuda.montoTotal}`;
+    document.getElementById('detalleProgramasEfectivo').innerText = `Asistencias a pagar:\n${deuda.programas.join(' | ')}`;
+    document.getElementById('panelPagoEfectivo').classList.remove('d-none');
+    
+    if(!signaturePadEfectivo) signaturePadEfectivo = new SignaturePad(document.getElementById('signature-pad-efectivo'), { backgroundColor: 'rgb(255, 255, 255)' });
+    signaturePadEfectivo.clear();
+    
+    rutEfectivoActual = rut;
+    deudaEfectivoActual = deuda;
+});
+
+document.getElementById('btnLimpiarFirmaEfectivo').addEventListener('click', () => { if(signaturePadEfectivo) signaturePadEfectivo.clear(); });
+
+document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
+    if (signaturePadEfectivo.isEmpty()) return alert("El trabajador debe firmar el recibo para constancia legal.");
+    if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoTotal} en efectivo?`)) return;
+    
+    const firmaBase64 = signaturePadEfectivo.toDataURL('image/jpeg');
+    const nowIso = new Date().toISOString();
+    const idRecibo = Date.now().toString();
+    
+    let updates = {};
+    deudaEfectivoActual.rutas.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
+    
+    updates[`7_pagos_efectivo/${idRecibo}`] = {
+        rut: rutEfectivoActual,
+        monto: deudaEfectivoActual.montoTotal,
+        fecha: nowIso,
+        firma: firmaBase64,
+        programas: deudaEfectivoActual.programas
+    };
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+    doc.text("COMPROBANTE DE PAGO EN EFECTIVO", 105, 20, null, null, "center");
+    
+    doc.setFontSize(12); doc.setFont("helvetica", "normal");
+    const textoCentral = `En Santiago, con fecha ${new Date().toLocaleDateString()}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago íntegro en EFECTIVO por la suma de $${deudaEfectivoActual.montoTotal} pesos a don/ña ${document.getElementById('nombreEfectivo').innerText}, Cédula de Identidad N° ${rutEfectivoActual}.\n\nEste pago corresponde a la liquidación de honorarios por su participación como público / extra en los siguientes programas:\n\n${deudaEfectivoActual.programas.join('\n')}\n\nEl trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfacción, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de índole civil ni laboral.`;
+    
+    const lineas = doc.splitTextToSize(textoCentral, 170);
+    doc.text(lineas, 20, 40);
+    
+    doc.addImage(firmaBase64, 'JPEG', 65, 130, 80, 25);
+    doc.setFont("helvetica", "bold");
+    doc.text("_________________________________", 105, 160, null, null, "center");
+    doc.text("Firma Recibí Conforme", 105, 165, null, null, "center");
+    doc.setFont("helvetica", "normal");
+    doc.text(document.getElementById('nombreEfectivo').innerText, 105, 170, null, null, "center");
+    doc.text(rutEfectivoActual, 105, 175, null, null, "center");
+    
+    try {
+        await update(ref(db), updates);
+        const nombreCompletoLimpio = document.getElementById('nombreEfectivo').innerText.replace(/[^a-zA-Z0-9_]/g, "_");
+        doc.save(`Recibo_Efectivo_${nombreCompletoLimpio}_${rutEfectivoActual}.pdf`);
+        
+        alert("✅ Pago registrado exitosamente en la base de datos y PDF descargado.");
+        document.getElementById('panelPagoEfectivo').classList.add('d-none');
+        document.getElementById('rutEfectivo').value = "";
+        rutEfectivoActual = "";
+    } catch (e) {
+        alert("Error crítico al intentar guardar el pago en la base de datos.");
+    }
+});
 
 // ==========================================
 // PESTAÑA NUEVA: CONTRATOS DT
@@ -823,33 +876,38 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
             for (const prog in todas[fecha]) {
                 if (!window.agrupacionDTGlobal[prog]) window.agrupacionDTGlobal[prog] = {};
                 if (!window.agrupacionDTGlobal[prog][weekInfo.sortKey]) {
-                    window.agrupacionDTGlobal[prog][weekInfo.sortKey] = { label: weekInfo.label, ruts: {} };
+                    window.agrupacionDTGlobal[prog][weekInfo.sortKey] = { label: weekInfo.label, ruts: {}, totalAplica: 0, totalArchivados: 0 };
                 }
                 
                 for (const rut in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][rut];
                     
-                    if (asis.tipo_ingreso !== "Cortesía" && asis.aplica_contrato !== false && !asis.dt_archivado) {
-                        let objRut = window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut];
-                        if (!objRut) {
-                            const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", email: "-", telefono: "-", direccion: "-" };
-                            objRut = {
-                                nombres: `${tr.nombres} ${tr.apellidos}`,
-                                email: tr.email || "-",
-                                telefono: tr.telefono || "-",
-                                direccion: tr.direccion || "-",
-                                fechas: [],
-                                rutasFirebase: [],
-                                todoLiquidado: !!asis.dt_liquidado,
-                                montoSuma: 0
-                            };
-                            window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut] = objRut;
+                    if (asis.tipo_ingreso !== "Cortesía" && asis.aplica_contrato !== false) {
+                        window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalAplica++;
+                        
+                        if (asis.dt_archivado) {
+                            window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalArchivados++;
+                        } else {
+                            let objRut = window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut];
+                            if (!objRut) {
+                                const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", email: "-", telefono: "-", direccion: "-" };
+                                objRut = {
+                                    nombres: `${tr.nombres} ${tr.apellidos}`,
+                                    email: tr.email || "-",
+                                    telefono: tr.telefono || "-",
+                                    direccion: tr.direccion || "-",
+                                    fechas: [],
+                                    rutasFirebase: [],
+                                    todoLiquidado: !!asis.dt_liquidado,
+                                    montoSuma: 0
+                                };
+                                window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut] = objRut;
+                            }
+                            objRut.fechas.push(fecha);
+                            objRut.montoSuma += (parseInt(asis.monto) || 0);
+                            objRut.rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${rut}`);
+                            if (!asis.dt_liquidado) objRut.todoLiquidado = false;
                         }
-                        objRut.fechas.push(fecha);
-                        objRut.montoSuma += (parseInt(asis.monto) || 0);
-                        objRut.rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${rut}`);
-                        // Si encuentra alguno falso, marca el grupo como false
-                        if (!asis.dt_liquidado) objRut.todoLiquidado = false;
                     }
                 }
             }
@@ -857,8 +915,8 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
 
         for (const prog in window.agrupacionDTGlobal) {
             for (const wk in window.agrupacionDTGlobal[prog]) {
-                if (Object.keys(window.agrupacionDTGlobal[prog][wk].ruts).length === 0) {
-                    delete window.agrupacionDTGlobal[prog][wk];
+                if (window.agrupacionDTGlobal[prog][wk].totalAplica === 0) {
+                    delete window.agrupacionDTGlobal[prog][wk]; 
                 }
             }
             if (Object.keys(window.agrupacionDTGlobal[prog]).length === 0) {
@@ -893,58 +951,70 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
             for (const wk of weekKeys) {
                 wkIdx++;
                 const weekData = window.agrupacionDTGlobal[prog][wk];
-                const numPersonas = Object.keys(weekData.ruts).length;
+                const todosArchivados = (weekData.totalArchivados > 0 && weekData.totalArchivados === weekData.totalAplica);
                 
-                html += `
-                <div class="accordion-item" style="border: 1px solid #444; margin-bottom: 5px; background: #111;">
-                    <h2 class="accordion-header">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}_wk_${wkIdx}" style="background: #1a1a1a; color: #00d26a;">
-                            📅 ${weekData.label} &nbsp; <span class="badge bg-secondary ms-2">${numPersonas} personas pendientes</span>
-                        </button>
-                    </h2>
-                    <div id="colProg_${progIdx}_wk_${wkIdx}" class="accordion-collapse collapse" data-bs-parent="#accWeeks_${progIdx}">
-                        <div class="accordion-body p-0">
-                            <div class="table-responsive">
-                                <table class="table table-dark table-hover table-bordered mb-0 align-middle text-center" style="font-size: 0.9em;">
-                                    <thead style="color: #b066ff;">
-                                        <tr><th>RUT</th><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Domicilio</th><th>Fechas Asistidas</th><th>Montos (Base / +25%)</th><th>Acción</th></tr>
-                                    </thead>
-                                    <tbody>`;
-                
-                for (const rut in weekData.ruts) {
-                    const asisData = weekData.ruts[rut];
-                    const rowClass = asisData.todoLiquidado ? 'table-success' : '';
-                    const textColor = asisData.todoLiquidado ? 'text-dark' : 'text-white';
-                    const btnClass = asisData.todoLiquidado ? 'btn-success text-dark' : 'btn-outline-success';
-                    const btnText = asisData.todoLiquidado ? '✅ Listo' : 'Marcar Contrato';
-                    const montoImpuestos = Math.round(asisData.montoSuma * 1.25);
-                    
-                    const trId = `tr_${progIdx}_${wkIdx}_${rut}`;
-                    const btnId = `btn_${progIdx}_${wkIdx}_${rut}`;
-
+                if (todosArchivados) {
                     html += `
-                                        <tr class="${rowClass}" style="transition: 0.3s;" id="${trId}">
-                                            <td class="fw-bold ${textColor} dt-text-element">${rut}</td>
-                                            <td class="${textColor} dt-text-element">${asisData.nombres}</td>
-                                            <td class="${textColor} dt-text-element">${asisData.email}</td>
-                                            <td class="${textColor} dt-text-element">${asisData.telefono}</td>
-                                            <td class="${textColor} dt-text-element">${asisData.direccion}</td>
-                                            <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
-                                            <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
-                                            <td>
-                                                <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana(event, '${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
-                                                    ${btnText}
-                                                </button>
-                                            </td>
-                                        </tr>`;
-                }
-                html += `
-                                    </tbody>
-                                </table>
+                    <div class="accordion-item" style="border: 1px solid #00d26a; margin-bottom: 5px; background: #0a1a0a;">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" style="background: #0a1a0a; color: #00d26a;" disabled>
+                                📅 ${weekData.label} &nbsp; <span class="badge bg-success ms-auto fs-6">✅ Contratos Listos</span>
+                            </button>
+                        </h2>
+                    </div>`;
+                } else {
+                    const numPersonas = Object.keys(weekData.ruts).length;
+                    html += `
+                    <div class="accordion-item" style="border: 1px solid #444; margin-bottom: 5px; background: #111;">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}_wk_${wkIdx}" style="background: #1a1a1a; color: #00d26a;">
+                                📅 ${weekData.label} &nbsp; <span class="badge bg-secondary ms-2">${numPersonas} personas pendientes</span>
+                            </button>
+                        </h2>
+                        <div id="colProg_${progIdx}_wk_${wkIdx}" class="accordion-collapse collapse" data-bs-parent="#accWeeks_${progIdx}">
+                            <div class="accordion-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-hover table-bordered mb-0 align-middle text-center" style="font-size: 0.9em;">
+                                        <thead style="color: #b066ff;">
+                                            <tr><th>RUT</th><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Domicilio</th><th>Fechas Asistidas</th><th>Montos (Base / +25%)</th><th>Acción</th></tr>
+                                        </thead>
+                                        <tbody>`;
+                    
+                    for (const rut in weekData.ruts) {
+                        const asisData = weekData.ruts[rut];
+                        const rowClass = asisData.todoLiquidado ? 'table-success' : '';
+                        const textColor = asisData.todoLiquidado ? 'text-dark' : 'text-white';
+                        const btnClass = asisData.todoLiquidado ? 'btn-success text-dark' : 'btn-outline-success';
+                        const btnText = asisData.todoLiquidado ? '✅ Listo' : 'Marcar Contrato';
+                        const montoImpuestos = Math.round(asisData.montoSuma * 1.25);
+                        
+                        const trId = `tr_${progIdx}_${wkIdx}_${rut}`;
+                        const btnId = `btn_${progIdx}_${wkIdx}_${rut}`;
+
+                        html += `
+                                            <tr class="${rowClass}" style="transition: 0.3s;" id="${trId}">
+                                                <td class="fw-bold ${textColor} dt-text-element">${rut}</td>
+                                                <td class="${textColor} dt-text-element">${asisData.nombres}</td>
+                                                <td class="${textColor} dt-text-element">${asisData.email}</td>
+                                                <td class="${textColor} dt-text-element">${asisData.telefono}</td>
+                                                <td class="${textColor} dt-text-element">${asisData.direccion}</td>
+                                                <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
+                                                <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
+                                                <td>
+                                                    <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana(event, '${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
+                                                        ${btnText}
+                                                    </button>
+                                                </td>
+                                            </tr>`;
+                    }
+                    html += `
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>`;
+                    </div>`;
+                }
             }
             html += `
                         </div>
@@ -962,14 +1032,12 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
 
 // FUNCIÓN DE ACTUALIZACIÓN VISUAL EN TIEMPO REAL (SIN RECARGAR LA LISTA NI COLAPSAR ACORDEÓN)
 window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, btnId) {
-    // Bloquear que el navegador crea que se le hizo clic al acordeón
     event.preventDefault();
     event.stopPropagation();
 
     const asisData = window.agrupacionDTGlobal[prog][wkSortKey].ruts[rut];
     const nuevoEstado = !asisData.todoLiquidado;
     
-    // 1. Modificar visualmente la tabla de inmediato sin recargar nada
     const tr = document.getElementById(trId);
     const btn = document.getElementById(btnId);
     const textElements = tr.querySelectorAll('.dt-text-element'); 
@@ -988,7 +1056,6 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
         btn.innerText = 'Marcar Contrato';
     }
 
-    // 2. Guardar en base de datos en segundo plano silenciosamente
     let updates = {};
     asisData.rutasFirebase.forEach(ruta => {
         updates[`${ruta}/dt_liquidado`] = nuevoEstado;
@@ -1012,6 +1079,7 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
 
     for (const prog in window.agrupacionDTGlobal) {
         for (const wk in window.agrupacionDTGlobal[prog]) {
+            if (!window.agrupacionDTGlobal[prog][wk].ruts) continue;
             for (const rut in window.agrupacionDTGlobal[prog][wk].ruts) {
                 const asisData = window.agrupacionDTGlobal[prog][wk].ruts[rut];
                 if (asisData.todoLiquidado) {
@@ -1029,7 +1097,7 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
         return alert("No hay contratos marcados en verde (Listos) para archivar.");
     }
 
-    if (!confirm(`¿Archivar definitivamente los ${rutsArchivados} contratos que están en verde?\nEsto los quitará de la vista de pendientes.`)) return;
+    if (!confirm(`¿Archivar definitivamente los ${rutsArchivados} contratos que están en verde?\nEsto registrará la semana como 'Lista' y ya no podrás ver las filas internas.`)) return;
 
     const idHistorico = Date.now().toString();
     updates[`5_historial_dt/archivos/${idHistorico}`] = {
@@ -1186,21 +1254,26 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
     contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
     
     try {
-        const snap = await get(ref(db, '2_asistencias'));
-        if (!snap.exists()) return contenedorFechas.innerHTML = "<p class='text-muted'>No hay asistencias registradas.</p>";
+        const [snapAsis, snapSorteos] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '6_sorteos_fechas_usadas')) ]);
         
-        const todas = snap.val();
+        if (!snapAsis.exists()) return contenedorFechas.innerHTML = "<p class='text-muted'>No hay asistencias registradas.</p>";
+        
+        const todas = snapAsis.val();
+        const fechasUsadas = snapSorteos.exists() ? snapSorteos.val() : {};
         let fechasDalePlay = [];
         
         for (const fecha in todas) {
             for (const prog in todas[fecha]) {
                 if (prog.includes("Dale Play")) {
-                    if (!fechasDalePlay.includes(fecha)) fechasDalePlay.push(fecha);
+                    // Solo agregamos la fecha a la tómbola si NO ha sido usada en un sorteo anterior
+                    if (!fechasUsadas[fecha] && !fechasDalePlay.includes(fecha)) {
+                        fechasDalePlay.push(fecha);
+                    }
                 }
             }
         }
         
-        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-muted'>No se han realizado programas 'Dale Play' aún.</p>";
+        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-success fw-bold'>✅ No hay fechas nuevas disponibles para sortear.</p>";
         
         fechasDalePlay.sort().reverse();
         
@@ -1277,6 +1350,11 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         const rutGanador = candidatosPerfectos[indiceAleatorio];
         const trabGanador = trabajadores[rutGanador];
         
+        // Guardamos las fechas usadas en Firebase para que no se repitan en futuros sorteos
+        let updatesSorteo = {};
+        fechasSeleccionadas.forEach(f => updatesSorteo[`6_sorteos_fechas_usadas/${f}`] = true);
+        await update(ref(db), updatesSorteo);
+
         setTimeout(() => {
             document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
             document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
