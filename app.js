@@ -36,7 +36,6 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-outline-light fs-5 py-3 mb-2 w-100 fw-bold';
                 btn.style.borderColor = '#b066ff';
-                // Mostramos el nombre con Slash visualmente al usuario
                 btn.innerText = programasActivos[k].nombre.replace(" - ", " / ");
                 btn.onclick = () => activarFormulario(programasActivos[k]);
                 divBotones.appendChild(btn);
@@ -55,7 +54,6 @@ function activarFormulario(programaSeleccionado) {
     document.getElementById('pantallaSeleccion').classList.add('d-none');
     document.getElementById('formularioPrincipal').classList.remove('d-none');
     
-    // Mostramos visualmente el slash ( / )
     document.getElementById('lblProgramaActivo').innerText = eventoActivo.nombre.replace(" - ", " / ").toUpperCase();
     const partes = eventoActivo.fecha.split('-');
     if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
@@ -93,7 +91,6 @@ document.getElementById('tipoAsistencia').addEventListener('change', (e) => {
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
     
-    // Algoritmo matemático infalible para validar el RUT Chileno (Módulo 11)
     function validarRutChileno(rutCompleto) {
         if (!/^[0-9]+-[0-9kK]{1}$/.test(rutCompleto)) return false;
         let tmp = rutCompleto.split('-');
@@ -129,6 +126,11 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
             trabajadorExistente = true;
             const datos = snapshot.val();
             document.getElementById('encabezadoFormulario').innerText = `¡Hola, ${datos.nombres}!`;
+            
+            // LÍNEA ANTI-FALLOS: Si ya existe, le quitamos la obligación a los campos ocultos.
+            const inputs = document.querySelectorAll('#camposExtras input, #camposExtras select');
+            inputs.forEach(input => input.removeAttribute('required'));
+
         } else {
             trabajadorExistente = false;
             document.getElementById('camposExtras').classList.remove('d-none');
