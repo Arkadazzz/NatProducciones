@@ -98,9 +98,6 @@ get(ref(db, '1_trabajadores')).then(snap => {
     }
 });
 
-// ==========================================
-// PESTAÑA 1: CONTROL DE PROGRAMAS
-// ==========================================
 onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     const container = document.getElementById('contenedorProgramasActivos'); 
     container.innerHTML = "";
@@ -225,9 +222,15 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
         nuevoMontoBase = Math.round(nuevoMontoBase / 2); 
     } else {
         let diffMins = Math.floor((tSal - tTer) / 60000);
-        // REGLA ESTRICTA: Solo horas enteras. (>= 60 minutos exactos)
-        if (diffMins >= 60 && valorHE > 0) {
+        if (diffMins > 0 && valorHE > 0) {
             let horasCompletas = Math.floor(diffMins / 60);
+            let minRestantes = diffMins % 60;
+            
+            // REGLA: Si es mayor o igual a 30 minutos, se suma 1 hora extra. Si es 29 o menos, no.
+            if (minRestantes >= 30) {
+                horasCompletas++;
+            }
+            
             bonoExtra = horasCompletas * parseInt(valorHE);
         }
     }
@@ -257,6 +260,7 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
 
                     if (asis.tipo_ingreso === "Cortesía") {
                         pagoFinal = 0;
+                        bonoFinal = 0;
                     } else {
                         let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalidaMasiva, asis.monto, valorHoraExtraGlobal, fechaPrograma);
                         pagoFinal = calculo.montoBaseNuevo + calculo.bonoExtra;
@@ -344,7 +348,7 @@ function activarRadares() {
             }
             
             let btnDT = "";
-            if (asis.aplica_contrato) {
+            if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato) {
                 if (asis.estado_dt === "Subido") {
                     btnDT = `<button class="btn btn-success btn-sm fw-bold" onclick="window.toggleDT('${rut}', 'Pendiente')">✅ DT Listo</button>`;
                 } else {
@@ -356,7 +360,7 @@ function activarRadares() {
 
             let btnSalidaContrato = "";
             if (asis.hora_salida) {
-                btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 Contrato</button>`;
+                btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
             } else { 
                 window.asistentesSinSalida++; 
                 btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
@@ -430,7 +434,6 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
         return;
     } 
     
-    // Cálculo inteligente para Pago
     let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalida, montoBaseActual, valorHoraExtraGlobal, fechaPrograma);
     
     let msj = `Hora de salida marcada: ${horaSalida}\n\n`;
@@ -597,7 +600,7 @@ window.anularAsistencia = async function(rut) {
 }
 
 // ==========================================
-// CONTRATOS (SIEMPRE SE LLAMAN "CONTRATO")
+// CONTRATOS PDF 
 // ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
@@ -612,7 +615,13 @@ window.generarContratoPDF = async function(rut) {
     dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
     
     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
-    let nombreArchivo = `Contrato_${nombreCompletoLimpio}_${rut}.pdf`;
+    let nombreArchivo = "";
+    
+    if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
+        nombreArchivo = `Cesion_Imagen_${nombreCompletoLimpio}_${rut}.pdf`;
+    } else {
+        nombreArchivo = `Contrato_${nombreCompletoLimpio}_${rut}.pdf`;
+    }
     
     doc.save(nombreArchivo);
 }
@@ -1297,7 +1306,8 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                 for (const rut in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][rut];
                     
-                    if (asis.tipo_ingreso !== "Cortesía" && asis.aplica_contrato !== false) {
+                    // DOBLE FILTRO DE SEGURIDAD: Solo entran los de Pago y que apliquen contrato
+                    if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato !== false) {
                         window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalAplica++;
                         
                         if (asis.dt_archivado) {
@@ -1760,7 +1770,12 @@ document.getElementById('btnRespaldoPDFs').addEventListener('click', async () =>
                         
                         const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
                         
-                        const nombreArchivo = `Contrato_${nombreCompletoLimpio}_${r}.pdf`; 
+                        let nombreArchivo = "";
+                        if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
+                            nombreArchivo = `Cesion_Imagen_${nombreCompletoLimpio}_${r}.pdf`;
+                        } else {
+                            nombreArchivo = `Contrato_${nombreCompletoLimpio}_${r}.pdf`;
+                        }
                         
                         const pdfBlob = doc.output('blob'); 
                         carpetaPrograma.file(nombreArchivo, pdfBlob); 
