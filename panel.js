@@ -1082,47 +1082,156 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
     }
 });
 
+
+// ==========================================
+// PANEL INTELIGENTE DEL CONTADOR
+// ==========================================
 document.getElementById('btnExcelContador').addEventListener('click', async () => {
-    const mes = new Date().toISOString().substring(0, 7); 
-    if (!confirm(`¿Descargar reporte contable de ${mes}?`)) return;
-    
+    const btn = document.getElementById('btnExcelContador');
+    const originalText = btn.innerText;
+    btn.innerText = "⏳ Analizando meses..."; 
+    btn.disabled = true;
+
     try {
         const snap = await get(ref(db, '2_asistencias')); 
-        if (!snap.exists()) return alert("No hay asistencias.");
+        if (!snap.exists()) {
+            alert("No hay asistencias registradas en el sistema.");
+            btn.innerText = originalText; btn.disabled = false;
+            return;
+        }
         
-        let tot = {}; 
         const todas = snap.val();
-        
-        for (const f in todas) { 
-            if (f.startsWith(mes)) { 
-                for (const prog in todas[f]) { 
-                    for (const r in todas[f][prog]) {
-                        if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; 
-                        
-                        const montoLimpio = parseInt(String(todas[f][prog][r].monto).replace(/\D/g, '')) || 0;
-                        tot[r].monto += montoLimpio;
+        let infoMeses = {};
+
+        for (const fecha in todas) {
+            const mes = fecha.substring(0, 7); 
+            if (!infoMeses[mes]) {
+                infoMeses[mes] = { fechas: [], programas: new Set() };
+            }
+            infoMeses[mes].fechas.push(fecha);
+            for (const prog in todas[fecha]) {
+                infoMeses[mes].programas.add(`${fecha}|${prog}`);
+            }
+        }
+
+        let modalContador = document.getElementById('modalDynamicContador');
+        if (!modalContador) {
+            const modalHTML = `
+            <div class="modal fade" id="modalDynamicContador" tabindex="-1" data-bs-theme="dark">
+                <div class="modal-dialog">
+                    <div class="modal-content bg-dark text-white" style="border: 1px solid #b066ff;">
+                        <div class="modal-header" style="border-bottom: 1px solid #444;">
+                            <h5 class="modal-title text-success fw-bold">📊 Cierre Contable Mensual</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label text-warning fw-bold">Selecciona el mes a descargar:</label>
+                            <select id="selectMesContador" class="form-select bg-secondary text-white mb-3 fw-bold"></select>
+                            <div id="resumenMesContador" class="alert d-none" style="background: #1a1a1a; border: 1px solid #444;">
+                            </div>
+                        </div>
+                        <div class="modal-footer" style="border-top: 1px solid #444;">
+                            <button type="button" class="btn btn-primary fw-bold w-100" id="btnDescargarMesElegido">📥 Descargar Excel del Mes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        const selectMes = document.getElementById('selectMesContador');
+        const resumenMes = document.getElementById('resumenMesContador');
+        selectMes.innerHTML = '<option value="">-- Selecciona un mes --</option>';
+
+        const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+        mesesOrdenados.forEach(m => {
+            const [yyyy, mm] = m.split('-');
+            selectMes.innerHTML += `<option value="${m}">Mes: ${mm}-${yyyy}</option>`;
+        });
+
+        selectMes.onchange = (e) => {
+            const m = e.target.value;
+            if (!m) {
+                resumenMes.classList.add('d-none');
+                resumenMes.innerHTML = "";
+                return;
+            }
+            const data = infoMeses[m];
+            const fechasOrd = data.fechas.sort();
+            
+            const primera = fechasOrd[0].split('-').reverse().join('-');
+            const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
+            
+            resumenMes.classList.remove('d-none');
+            resumenMes.innerHTML = `
+                <p class="mb-1" style="font-size: 0.9em;"><strong>Primera fecha registrada:</strong> <span class="text-info">${primera}</span></p>
+                <p class="mb-1" style="font-size: 0.9em;"><strong>Última fecha registrada:</strong> <span class="text-info">${ultima}</span></p>
+                <p class="mb-0" style="font-size: 0.9em;"><strong>Total de programas en el mes:</strong> <span class="text-warning fw-bold">${data.programas.size}</span></p>
+            `;
+        };
+
+        const btnDescargar = document.getElementById('btnDescargarMesElegido');
+        const nuevoBtnDescargar = btnDescargar.cloneNode(true); 
+        btnDescargar.parentNode.replaceChild(nuevoBtnDescargar, btnDescargar);
+
+        nuevoBtnDescargar.addEventListener('click', async () => {
+            const mesElegido = selectMes.value;
+            if (!mesElegido) return alert("Debes seleccionar un mes primero.");
+            
+            nuevoBtnDescargar.innerText = "⏳ Procesando Excel..."; 
+            nuevoBtnDescargar.disabled = true;
+            
+            try {
+                let tot = {}; 
+                for (const f in todas) { 
+                    if (f.startsWith(mesElegido)) { 
+                        for (const prog in todas[f]) { 
+                            for (const r in todas[f][prog]) {
+                                if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; 
+                                
+                                const montoLimpio = parseInt(String(todas[f][prog][r].monto).replace(/\D/g, '')) || 0;
+                                tot[r].monto += montoLimpio;
+                            }
+                        }
                     }
                 }
-            }
-        }
-        
-        let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
-        
-        for (const r in tot) {
-            const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
-            if (tr) {
-                const parts = r.split('-'); 
-                const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
-                const [y, m, d] = (tr.fechaNacimiento||"").split('-');
                 
-                csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${tot[r].fechaIn.split('-').reverse().join('-')};${tot[r].fechaIn.split('-').reverse().join('-')};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
+                let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+                
+                for (const r in tot) {
+                    const tr = listaGlobalCRM[r] || (await get(child(ref(db), `1_trabajadores/${r}`))).val();
+                    if (tr) {
+                        const parts = r.split('-'); 
+                        const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
+                        const [y, m, d] = (tr.fechaNacimiento||"").split('-');
+                        
+                        csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${tot[r].fechaIn.split('-').reverse().join('-')};${tot[r].fechaIn.split('-').reverse().join('-')};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
+                    }
+                }
+                
+                descargarCSV(csv, `Contador_${mesElegido}.csv`);
+                
+                const miModal = bootstrap.Modal.getInstance(document.getElementById('modalDynamicContador'));
+                miModal.hide();
+                
+            } catch (err) {
+                alert("Error al generar el Excel del contador.");
             }
-        }
-        
-        descargarCSV(csv, `Contador_${mes}.csv`);
+            nuevoBtnDescargar.innerText = "📥 Descargar Excel del Mes"; 
+            nuevoBtnDescargar.disabled = false;
+        });
+
+        const myModal = new bootstrap.Modal(document.getElementById('modalDynamicContador'));
+        selectMes.value = "";
+        resumenMes.classList.add('d-none');
+        myModal.show();
+
     } catch (e) { 
-        alert("Error al generar Excel."); 
+        alert("Error al cargar la información contable."); 
     }
+    
+    btn.innerText = originalText; 
+    btn.disabled = false;
 });
 
 function descargarCSV(c, n) { 
@@ -1306,7 +1415,6 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                 for (const rut in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][rut];
                     
-                    // DOBLE FILTRO DE SEGURIDAD: Solo entran los de Pago y que apliquen contrato
                     if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato !== false) {
                         window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalAplica++;
                         
@@ -1952,7 +2060,7 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         setTimeout(() => {
             document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
             document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
-            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
+            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} dates requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
             
             document.getElementById('resultadoSorteo').classList.remove('d-none');
             btnSorteo.innerText = "🔄 Realizar otro Sorteo";
