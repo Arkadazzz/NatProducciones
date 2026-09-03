@@ -16,11 +16,9 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 
 const CORREOS_ADMINISTRADORES = [
-    "cami.fevreseguel@gmail.com",
+    "nat.producciones2020@gmail.com",
     "pinoelgueta@gmail.com", 
-    "natalyseguel.va@gmail.com",
-    "javier.rojas.fer@gmail.com",
-    "luisemilio.jorquera.avaria@gmail.com",
+    "correo_jefa_1@gmail.com"
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -100,9 +98,6 @@ get(ref(db, '1_trabajadores')).then(snap => {
     }
 });
 
-// ==========================================
-// CONTROL DE PROGRAMAS
-// ==========================================
 onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     const container = document.getElementById('contenedorProgramasActivos'); 
     container.innerHTML = "";
