@@ -15,9 +15,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// ==========================================
-// SISTEMA DE SEGURIDAD POR CORREOS (LISTA VIP)
-// ==========================================
 const CORREOS_ADMINISTRADORES = [
     "nat.producciones2020@gmail.com",
     "pinoelgueta@gmail.com", 
@@ -95,7 +92,6 @@ function poblarSelectoresHora() {
 }
 poblarSelectoresHora();
 
-// Carga inicial del CRM para cruzar datos más rápido
 get(ref(db, '1_trabajadores')).then(snap => { 
     if (snap.exists()) {
         listaGlobalCRM = snap.val(); 
@@ -218,27 +214,20 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
     if (htH === 0 || htH === 1) tTer.setDate(tTer.getDate() + 1);
     
     let tSal = new Date(y, m - 1, d, hsH, hsM);
-    // Si la salida es en la madrugada pero la citación fue de día, pertenece al día siguiente
     if (hsH < 8 && hcH >= 8) tSal.setDate(tSal.getDate() + 1);
 
     let expectedDuration = (tTer - tCit) / 60000; 
     let actualDuration = (tSal - tCit) / 60000;
 
-    // Penalizaciones por Retiro Anticipado
     if (actualDuration < (expectedDuration / 2)) {
-        nuevoMontoBase = 0; // Se fue antes de la mitad de la jornada
+        nuevoMontoBase = 0; 
     } else if (actualDuration < expectedDuration) {
-        nuevoMontoBase = Math.round(nuevoMontoBase / 2); // Se fue entre la mitad y el cierre final
+        nuevoMontoBase = Math.round(nuevoMontoBase / 2); 
     } else {
-        // Cumplió la jornada completa, calcular horas extras
         let diffMins = Math.floor((tSal - tTer) / 60000);
-        if (diffMins > 0 && valorHE > 0) {
+        // REGLA ESTRICTA: Solo horas enteras. (>= 60 minutos exactos)
+        if (diffMins >= 60 && valorHE > 0) {
             let horasCompletas = Math.floor(diffMins / 60);
-            let minRestantes = diffMins % 60;
-            // Si sobran más de 30 minutos, se redondea a una hora completa más
-            if (minRestantes > 30) {
-                horasCompletas++;
-            }
             bonoExtra = horasCompletas * parseInt(valorHE);
         }
     }
@@ -367,7 +356,6 @@ function activarRadares() {
 
             let btnSalidaContrato = "";
             if (asis.hora_salida) {
-                // Aquí también aplicamos el arreglo visual: siempre dice "Contrato"
                 btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 Contrato</button>`;
             } else { 
                 window.asistentesSinSalida++; 
@@ -609,7 +597,7 @@ window.anularAsistencia = async function(rut) {
 }
 
 // ==========================================
-// ARREGLO 2: NOMBRES DE ARCHIVO DE CONTRATO (Siempre dicen "Contrato")
+// CONTRATOS (SIEMPRE SE LLAMAN "CONTRATO")
 // ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
@@ -624,8 +612,6 @@ window.generarContratoPDF = async function(rut) {
     dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
     
     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
-    
-    // AQUÍ ESTÁ EL ARREGLO: Ya no verifica si es cesión o contrato para el nombre, siempre será Contrato.
     let nombreArchivo = `Contrato_${nombreCompletoLimpio}_${rut}.pdf`;
     
     doc.save(nombreArchivo);
@@ -646,7 +632,6 @@ function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
     let titulo = ""; 
     let textoContrato = "";
 
-    // Mantenemos el contenido legal distinto por dentro (Cesión vs Contrato DT), pero el archivo se llamará Contrato por fuera.
     if (asis.aplica_contrato === false || asis.tipo_ingreso === "Cortesía") {
         titulo = "Acuerdo de Cesión de Derechos de Imagen y Voz";
         textoContrato = `En Santiago, a ${fechaTexto}, don/a ${nombreCompleto}, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, domiciliado/a en calle ${direccion}, ciudad de Santiago, en adelante “el/la Cedente”, declara y acepta lo siguiente:
@@ -861,7 +846,7 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 
 
 // ==========================================
-// PESTAÑA 3: FINANZAS Y BÓVEDA (ARREGLO 1: SUMA PERFECTA)
+// PESTAÑA 3: FINANZAS Y BÓVEDA
 // ==========================================
 document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); 
@@ -878,7 +863,6 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
             for (const r in todas[fecha][prog]) {
                 const asis = todas[fecha][prog][r];
                 
-                // AQUÍ ESTÁ EL ARREGLO: Limpieza estricta de números
                 const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                 
                 if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
@@ -973,7 +957,6 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
                 
                 for (const r in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][r];
-                    // AQUÍ ESTÁ EL ARREGLO PARA QUE SUME BIEN EN LA VENTANA DE PROGRAMAS
                     const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                     
                     if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
@@ -1047,7 +1030,6 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
             
             for (const r in asistentes) {
                 const asis = asistentes[r];
-                // AQUÍ ESTÁ EL ARREGLO DE LA SUMA PERFECTA AL AGRUPAR
                 const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                 
                 if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
@@ -1339,7 +1321,6 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                             
                             objRut.fechas.push(fecha);
                             
-                            // Aseguramos que la suma en DT también sea limpia
                             const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                             objRut.montoSuma += montoLimpio;
                             
@@ -1556,7 +1537,7 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
 
 
 // ==========================================
-// PESTAÑA 4: SEGURIDAD (ARREGLO 3: MUESTRA QUIEN INVITÓ)
+// PESTAÑA 4: SEGURIDAD 
 // ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
@@ -1630,7 +1611,6 @@ async function cargarReportesDT() {
                 const asis = asistentesDeEseDia[rut];
                 const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
                 
-                // AQUÍ ESTÁ EL ARREGLO DE SEGURIDAD: Muestra explícitamente "Cortesía (Agustin Pino)" o "Trabajador"
                 let badgeCondicion = "";
                 if (asis.tipo_ingreso === "Cortesía") {
                     badgeCondicion = `<span class="badge bg-warning text-dark fw-bold">Cortesía (${asis.invitado_por || '-'})</span>`;
@@ -1695,7 +1675,7 @@ document.getElementById('btnRefrescarSeguridad').addEventListener('click', carga
 
 
 // ==========================================
-// PESTAÑA 5: MANTENIMIENTO (ARREGLO 4: RESPALDO MAESTRO AGRUPADO)
+// PESTAÑA 5: MANTENIMIENTO 
 // ==========================================
 document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
@@ -1705,7 +1685,6 @@ document.getElementById('btnRespaldoMaestro').addEventListener('click', async ()
         const trabSnap = await get(ref(db, '1_trabajadores')); 
         if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
-        // AQUÍ ESTÁ EL ARREGLO: Agrupar a las personas por RUT para que no se repitan filas
         let agrupado = {};
         const todas = snap.val();
         
@@ -1734,7 +1713,6 @@ document.getElementById('btnRespaldoMaestro').addEventListener('click', async ()
             const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
             const asisData = agrupado[r];
             
-            // Juntamos todos los programas separados por barras " | "
             const programasStr = asisData.programas.join(" | ");
             
             csv += `${r};${trab.nombres};${trab.apellidos};${asisData.programas.length};$${asisData.montoTotal};${programasStr}\n`;
@@ -1782,7 +1760,6 @@ document.getElementById('btnRespaldoPDFs').addEventListener('click', async () =>
                         
                         const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
                         
-                        // ARREGLO DE NOMBRE APLICADO AQUI TAMBIÉN (SIEMPRE SERÁ "CONTRATO")
                         const nombreArchivo = `Contrato_${nombreCompletoLimpio}_${r}.pdf`; 
                         
                         const pdfBlob = doc.output('blob'); 
