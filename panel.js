@@ -99,211 +99,6 @@ get(ref(db, '1_trabajadores')).then(snap => {
 });
 
 // ==========================================
-// INYECCIÓN DINÁMICA DEL PANEL CONTADOR
-// ==========================================
-document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => {
-        const tabList = document.querySelector('.nav-tabs');
-        const tabContent = document.querySelector('.tab-content');
-        
-        if (tabList && tabContent && !document.getElementById('contador-tab')) {
-            const li = document.createElement('li');
-            li.className = 'nav-item';
-            li.role = 'presentation';
-            li.innerHTML = '<button class="nav-link fw-bold" id="contador-tab" data-bs-toggle="tab" data-bs-target="#tab-contador" type="button" role="tab" style="color: #00d26a;">📊 Contador</button>';
-            tabList.appendChild(li);
-            
-            const divPane = document.createElement('div');
-            divPane.className = 'tab-pane fade';
-            divPane.id = 'tab-contador';
-            divPane.role = 'tabpanel';
-            divPane.innerHTML = `
-                <div class="card bg-dark text-white border-success mt-3 shadow-lg">
-                    <div class="card-header border-success" style="background: #111;">
-                        <h4 class="mb-0 text-success fw-bold">📊 Cierre Contable Mensual (I.M.T)</h4>
-                    </div>
-                    <div class="card-body" style="background: #1a1a1a;">
-                        <p class="text-muted">Selecciona un mes histórico para analizar los datos financieros y generar el reporte exacto. El sistema agrupará la información excluyendo automáticamente a los invitados de cortesía.</p>
-                        
-                        <div class="row align-items-center mb-4">
-                            <div class="col-md-6">
-                                <label class="form-label text-warning fw-bold">1. Selecciona el Mes:</label>
-                                <select id="selectMesContador" class="form-select bg-secondary text-white fw-bold"></select>
-                            </div>
-                            <div class="col-md-6 text-end mt-4 mt-md-0">
-                                <button type="button" class="btn btn-success fw-bold py-2 px-4 shadow" id="btnDescargarMesElegido" disabled>
-                                    📥 Descargar Excel del Mes
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div id="resumenMesContador" class="alert d-none shadow-sm" style="background: #0a0a0a; border: 1px solid #00d26a; border-left: 5px solid #00d26a;"></div>
-                    </div>
-                </div>
-            `;
-            tabContent.appendChild(divPane);
-            
-            // Redirigir el botón viejo
-            const btnViejoContador = document.getElementById('btnExcelContador');
-            if (btnViejoContador) {
-                btnViejoContador.innerText = "👉 Ir al Nuevo Panel de Contador";
-                btnViejoContador.classList.replace("btn-outline-light", "btn-success");
-                btnViejoContador.style.fontWeight = "bold";
-                
-                const viejoPadre = btnViejoContador.closest('.card-body');
-                if(viejoPadre) {
-                    const pDesc = viejoPadre.querySelector('p');
-                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña dedicada en el panel superior.";
-                }
-
-                btnViejoContador.replaceWith(btnViejoContador.cloneNode(true));
-                document.getElementById('btnExcelContador').addEventListener('click', () => {
-                    document.getElementById('contador-tab').click();
-                });
-            }
-            
-            // Lógica del nuevo tab
-            document.getElementById('contador-tab').addEventListener('click', async () => {
-                const selectMes = document.getElementById('selectMesContador');
-                if(selectMes.options.length > 1) return; 
-                
-                selectMes.innerHTML = '<option value="">⏳ Cargando meses desde el servidor...</option>';
-                
-                try {
-                    const snap = await get(ref(db, '2_asistencias'));
-                    if (!snap.exists()) {
-                        selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
-                        return;
-                    }
-                    const todas = snap.val();
-                    let infoMeses = {};
-
-                    for (const fecha in todas) {
-                        const mes = fecha.substring(0, 7); 
-                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0, rutsUnicos: new Set() };
-                        infoMeses[mes].fechas.push(fecha);
-                        
-                        for (const prog in todas[fecha]) {
-                            infoMeses[mes].programas.add(`${fecha}|${prog}`);
-                            for (const rut in todas[fecha][prog]) {
-                                const asis = todas[fecha][prog][rut];
-                                if(asis.tipo_ingreso !== "Cortesía") {
-                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                                    infoMeses[mes].totalPago += montoLimpio;
-                                    infoMeses[mes].rutsUnicos.add(rut);
-                                }
-                            }
-                        }
-                    }
-                    
-                    window.infoMesesGlobal = infoMeses;
-                    window.todasAsistenciasGlobal = todas;
-                    
-                    selectMes.innerHTML = '<option value="">-- Selecciona un mes para analizar --</option>';
-                    const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
-                    mesesOrdenados.forEach(m => {
-                        const [yyyy, mm] = m.split('-');
-                        selectMes.innerHTML += `<option value="${m}">Reporte Mensual: ${mm}-${yyyy}</option>`;
-                    });
-                    
-                } catch (e) {
-                    selectMes.innerHTML = '<option value="">Error al cargar los datos</option>';
-                }
-            });
-            
-            document.getElementById('selectMesContador').addEventListener('change', (e) => {
-                const m = e.target.value;
-                const resumenMes = document.getElementById('resumenMesContador');
-                const btnDescargar = document.getElementById('btnDescargarMesElegido');
-                
-                if (!m) {
-                    resumenMes.classList.add('d-none');
-                    btnDescargar.disabled = true;
-                    return;
-                }
-                
-                const data = window.infoMesesGlobal[m];
-                const fechasOrd = data.fechas.sort();
-                const primera = fechasOrd[0].split('-').reverse().join('-');
-                const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
-                
-                resumenMes.classList.remove('d-none');
-                resumenMes.innerHTML = `
-                    <div class="row text-center py-2">
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Primera Fecha</h6>
-                            <span class="text-info fw-bold fs-5">${primera}</span>
-                        </div>
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Última Fecha</h6>
-                            <span class="text-info fw-bold fs-5">${ultima}</span>
-                        </div>
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Programas Grabados</h6>
-                            <span class="text-warning fw-bold fs-5">${data.programas.size}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Total Pagos del Mes</h6>
-                            <span class="text-success fw-bold fs-5">$${data.totalPago.toLocaleString('es-CL')}</span>
-                        </div>
-                    </div>
-                `;
-                btnDescargar.disabled = false;
-            });
-            
-            document.getElementById('btnDescargarMesElegido').addEventListener('click', async () => {
-                const mesElegido = document.getElementById('selectMesContador').value;
-                if (!mesElegido) return;
-                
-                const btn = document.getElementById('btnDescargarMesElegido');
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...'; 
-                btn.disabled = true;
-                
-                try {
-                    let tot = {};
-                    const todas = window.todasAsistenciasGlobal;
-                    for (const f in todas) { 
-                        if (f.startsWith(mesElegido)) { 
-                            for (const prog in todas[f]) { 
-                                for (const r in todas[f][prog]) {
-                                    const asis = todas[f][prog][r];
-                                    if(asis.tipo_ingreso === "Cortesía") continue;
-                                    
-                                    if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; 
-                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                                    tot[r].monto += montoLimpio;
-                                }
-                            }
-                        }
-                    }
-                    
-                    let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
-                    
-                    const trabSnap = await get(ref(db, '1_trabajadores'));
-                    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-                    
-                    for (const r in tot) {
-                        const tr = trabajadores[r] || { nombres: "Desconocido", apellidos: "" };
-                        const parts = r.split('-'); 
-                        const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
-                        const [y, m, d] = (tr.fechaNacimiento||"").split('-');
-                        
-                        csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${tot[r].fechaIn.split('-').reverse().join('-')};${tot[r].fechaIn.split('-').reverse().join('-')};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
-                    }
-                    
-                    descargarCSV(csv, `Reporte_Contable_${mesElegido}_NAT.csv`);
-                } catch (e) {
-                    alert("Error generando el archivo contable.");
-                }
-                btn.innerText = "📥 Descargar Excel del Mes"; 
-                btn.disabled = false;
-            });
-
-        }
-    }, 1500); 
-});
-
-// ==========================================
 // CONTROL DE PROGRAMAS
 // ==========================================
 onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
@@ -1283,6 +1078,162 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
     } catch (e) { 
         alert("Error al procesar y descargar los pagos."); 
     }
+});
+
+
+// ==========================================
+// PANEL INTELIGENTE DEL CONTADOR
+// ==========================================
+document.getElementById('btnExcelContador').addEventListener('click', async () => {
+    const btn = document.getElementById('btnExcelContador');
+    const originalText = btn.innerText;
+    btn.innerText = "⏳ Analizando meses..."; 
+    btn.disabled = true;
+
+    try {
+        const snap = await get(ref(db, '2_asistencias')); 
+        if (!snap.exists()) {
+            alert("No hay asistencias registradas en el sistema.");
+            btn.innerText = originalText; btn.disabled = false;
+            return;
+        }
+        
+        const todas = snap.val();
+        let infoMeses = {};
+
+        for (const fecha in todas) {
+            const mes = fecha.substring(0, 7); 
+            if (!infoMeses[mes]) {
+                infoMeses[mes] = { fechas: [], programas: new Set() };
+            }
+            infoMeses[mes].fechas.push(fecha);
+            for (const prog in todas[fecha]) {
+                infoMeses[mes].programas.add(`${fecha}|${prog}`);
+            }
+        }
+
+        let modalContador = document.getElementById('modalDynamicContador');
+        if (!modalContador) {
+            const modalHTML = `
+            <div class="modal fade" id="modalDynamicContador" tabindex="-1" data-bs-theme="dark">
+                <div class="modal-dialog">
+                    <div class="modal-content bg-dark text-white" style="border: 1px solid #b066ff;">
+                        <div class="modal-header" style="border-bottom: 1px solid #444;">
+                            <h5 class="modal-title text-success fw-bold">📊 Cierre Contable Mensual</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label text-warning fw-bold">Selecciona el mes a descargar:</label>
+                            <select id="selectMesContador" class="form-select bg-secondary text-white mb-3 fw-bold"></select>
+                            <div id="resumenMesContador" class="alert d-none" style="background: #1a1a1a; border: 1px solid #444;">
+                            </div>
+                        </div>
+                        <div class="modal-footer" style="border-top: 1px solid #444;">
+                            <button type="button" class="btn btn-primary fw-bold w-100" id="btnDescargarMesElegido">📥 Descargar Excel del Mes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+        }
+
+        const selectMes = document.getElementById('selectMesContador');
+        const resumenMes = document.getElementById('resumenMesContador');
+        selectMes.innerHTML = '<option value="">-- Selecciona un mes --</option>';
+
+        const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+        mesesOrdenados.forEach(m => {
+            const [yyyy, mm] = m.split('-');
+            selectMes.innerHTML += `<option value="${m}">Mes: ${mm}-${yyyy}</option>`;
+        });
+
+        selectMes.onchange = (e) => {
+            const m = e.target.value;
+            if (!m) {
+                resumenMes.classList.add('d-none');
+                resumenMes.innerHTML = "";
+                return;
+            }
+            const data = infoMeses[m];
+            const fechasOrd = data.fechas.sort();
+            
+            const primera = fechasOrd[0].split('-').reverse().join('-');
+            const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
+            
+            resumenMes.classList.remove('d-none');
+            resumenMes.innerHTML = `
+                <p class="mb-1" style="font-size: 0.9em;"><strong>Primera fecha registrada:</strong> <span class="text-info">${primera}</span></p>
+                <p class="mb-1" style="font-size: 0.9em;"><strong>Última fecha registrada:</strong> <span class="text-info">${ultima}</span></p>
+                <p class="mb-0" style="font-size: 0.9em;"><strong>Total de programas en el mes:</strong> <span class="text-warning fw-bold">${data.programas.size}</span></p>
+            `;
+        };
+
+        const btnDescargar = document.getElementById('btnDescargarMesElegido');
+        const nuevoBtnDescargar = btnDescargar.cloneNode(true); 
+        btnDescargar.parentNode.replaceChild(nuevoBtnDescargar, btnDescargar);
+
+        nuevoBtnDescargar.addEventListener('click', async () => {
+            const mesElegido = selectMes.value;
+            if (!mesElegido) return alert("Debes seleccionar un mes primero.");
+            
+            nuevoBtnDescargar.innerText = "⏳ Procesando Excel..."; 
+            nuevoBtnDescargar.disabled = true;
+            
+            try {
+                let tot = {}; 
+                for (const f in todas) { 
+                    if (f.startsWith(mesElegido)) { 
+                        for (const prog in todas[f]) { 
+                            for (const r in todas[f][prog]) {
+                                const asis = todas[f][prog][r];
+                                if(asis.tipo_ingreso === "Cortesía") continue; // Ignorar cortesía
+                                
+                                if (!tot[r]) tot[r] = { monto: 0, fechaIn: f }; 
+                                
+                                const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                                tot[r].monto += montoLimpio;
+                            }
+                        }
+                    }
+                }
+                
+                let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+                
+                const trabSnap = await get(child(ref(db), '1_trabajadores'));
+                const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+                
+                for (const r in tot) {
+                    const tr = trabajadores[r] || { nombres: "Desconocido", apellidos: "" };
+                    const parts = r.split('-'); 
+                    const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
+                    const [y, m, d] = (tr.fechaNacimiento||"").split('-');
+                    
+                    csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${tot[r].fechaIn.split('-').reverse().join('-')};${tot[r].fechaIn.split('-').reverse().join('-')};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
+                }
+                
+                descargarCSV(csv, `Contador_${mesElegido}.csv`);
+                
+                const miModal = bootstrap.Modal.getInstance(document.getElementById('modalDynamicContador'));
+                miModal.hide();
+                
+            } catch (err) {
+                alert("Error al generar el Excel del contador.");
+            }
+            nuevoBtnDescargar.innerText = "📥 Descargar Excel del Mes"; 
+            nuevoBtnDescargar.disabled = false;
+        });
+
+        const myModal = new bootstrap.Modal(document.getElementById('modalDynamicContador'));
+        selectMes.value = "";
+        resumenMes.classList.add('d-none');
+        myModal.show();
+
+    } catch (e) { 
+        alert("Error al cargar la información contable."); 
+    }
+    
+    btn.innerText = originalText; 
+    btn.disabled = false;
 });
 
 function descargarCSV(c, n) { 
