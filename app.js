@@ -36,7 +36,12 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-outline-light fs-5 py-3 mb-2 w-100 fw-bold';
                 btn.style.borderColor = '#b066ff';
-                btn.innerText = programasActivos[k].nombre.replace(" - ", " / ");
+                
+                let nombreBoton = programasActivos[k].nombre.replace(" - ", " / ").toUpperCase();
+                if (nombreBoton.includes("DALE PLAY") && !nombreBoton.includes("PÚBLICO")) nombreBoton = "PÚBLICO / " + nombreBoton;
+                if (nombreBoton.includes("MURO") && !nombreBoton.includes("PÚBLICO")) nombreBoton = "PÚBLICO / " + nombreBoton;
+                
+                btn.innerText = nombreBoton;
                 btn.onclick = () => activarFormulario(programasActivos[k]);
                 divBotones.appendChild(btn);
             });
@@ -54,7 +59,11 @@ function activarFormulario(programaSeleccionado) {
     document.getElementById('pantallaSeleccion').classList.add('d-none');
     document.getElementById('formularioPrincipal').classList.remove('d-none');
     
-    document.getElementById('lblProgramaActivo').innerText = eventoActivo.nombre.replace(" - ", " / ").toUpperCase();
+    let nombreFormulario = eventoActivo.nombre.replace(" - ", " / ").toUpperCase();
+    if (nombreFormulario.includes("DALE PLAY") && !nombreFormulario.includes("PÚBLICO")) nombreFormulario = "PÚBLICO / " + nombreFormulario;
+    if (nombreFormulario.includes("MURO") && !nombreFormulario.includes("PÚBLICO")) nombreFormulario = "PÚBLICO / " + nombreFormulario;
+    
+    document.getElementById('lblProgramaActivo').innerText = nombreFormulario;
     const partes = eventoActivo.fecha.split('-');
     if(partes.length === 3) document.getElementById('lblFechaActiva').innerText = `📅 ${partes[2]}-${partes[1]}-${partes[0]}`;
 
@@ -85,12 +94,15 @@ document.getElementById('tipoAsistencia').addEventListener('change', (e) => {
     } else {
         document.getElementById('divPinSeguridad').classList.add('d-none');
         document.getElementById('divInvitadoPor').classList.add('d-none');
+        document.getElementById('pinAcceso').removeAttribute('required');
+        document.getElementById('invitadoPor').removeAttribute('required');
     }
 });
 
 document.getElementById('btnVerificarRut').addEventListener('click', async () => {
     const rut = document.getElementById('rut').value.trim();
     
+    // Algoritmo matemático estricto del Dígito Verificador Chileno
     function validarRutChileno(rutCompleto) {
         if (!/^[0-9]+-[0-9kK]{1}$/.test(rutCompleto)) return false;
         let tmp = rutCompleto.split('-');
@@ -107,7 +119,7 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
     }
 
     if (!validarRutChileno(rut)) {
-        return alert("⚠️ RUT INVÁLIDO ⚠️\nPor favor verifica que el RUT esté bien escrito, sin puntos y con su guion correcto (Ej: 12345678-9).\nSi hay un error de tipeo, tu contrato y pago saldrán con errores.");
+        return alert("⚠️ RUT INVÁLIDO ⚠️\nPor favor verifica que el RUT esté bien escrito, sin puntos y con su guion correcto (Ej: 12345678-9).\nEl sistema ha detectado que el dígito verificador no coincide matemáticamente.");
     }
 
     try {
@@ -127,7 +139,7 @@ document.getElementById('btnVerificarRut').addEventListener('click', async () =>
             const datos = snapshot.val();
             document.getElementById('encabezadoFormulario').innerText = `¡Hola, ${datos.nombres}!`;
             
-            // LÍNEA ANTI-FALLOS: Si ya existe, le quitamos la obligación a los campos ocultos.
+            // LÍNEA ANTI-FALLOS: Evita que HTML5 bloquee el formulario por los inputs invisibles
             const inputs = document.querySelectorAll('#camposExtras input, #camposExtras select');
             inputs.forEach(input => input.removeAttribute('required'));
 
