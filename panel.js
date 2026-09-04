@@ -27,9 +27,9 @@ onAuthStateChanged(auth, (user) => {
     } else {
         const correoLimpio = user.email.trim().toLowerCase();
         const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
+        window.localStorage.setItem('correoStaffNat', correoLimpio); // Guardamos para uso en tabs dinámicos
         
         if (!esAdmin) {
-            // Se agregó 'contador-tab' a la lista de bloqueos para cuentas No-VIP
             const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab', 'contador-tab'];
             pestanasBloqueadas.forEach(id => {
                 const tab = document.getElementById(id);
@@ -41,6 +41,7 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { 
     signOut(auth).then(() => { 
+        window.localStorage.removeItem('correoStaffNat');
         window.location.href = "login.html"; 
     }); 
 });
@@ -114,10 +115,11 @@ document.addEventListener("DOMContentLoaded", () => {
             li.innerHTML = '<button class="nav-link fw-bold" id="contador-tab" data-bs-toggle="tab" data-bs-target="#tab-contador" type="button" role="tab" style="color: #00d26a;">📊 Contador</button>';
             tabList.appendChild(li);
             
-            // Si no es admin, ocultar este tab recién creado
-            const esAdminLocal = CORREOS_ADMINISTRADORES.includes(auth.currentUser?.email?.trim().toLowerCase());
+            // Si la persona NO es VIP, ocultar la pestaña
+            const authMail = window.localStorage.getItem('correoStaffNat') || "";
+            const esAdminLocal = CORREOS_ADMINISTRADORES.includes(authMail);
             if(!esAdminLocal) li.classList.add('d-none');
-            
+
             const divPane = document.createElement('div');
             divPane.className = 'tab-pane fade';
             divPane.id = 'tab-contador';
@@ -148,6 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
             tabContent.appendChild(divPane);
             
+            // Redirigir el botón viejo de Finanzas hacia la pestaña nueva
             const btnViejoContador = document.getElementById('btnExcelContador');
             if (btnViejoContador) {
                 btnViejoContador.innerText = "👉 Ir al Nuevo Panel de Contador";
@@ -157,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const viejoPadre = btnViejoContador.closest('.card-panel');
                 if(viejoPadre) {
                     const pDesc = viejoPadre.querySelector('p');
-                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña dedicada en el panel superior para mayor precisión.";
+                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña en el menú superior.";
                 }
 
                 btnViejoContador.replaceWith(btnViejoContador.cloneNode(true));
@@ -166,6 +169,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
             
+            // Lógica al presionar la Pestaña Contador
             document.getElementById('contador-tab').addEventListener('click', async () => {
                 const selectMes = document.getElementById('selectMesContador');
                 if(selectMes.options.length > 1) return; 
@@ -183,7 +187,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     for (const fecha in todas) {
                         const mes = fecha.substring(0, 7); 
-                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0, rutsUnicos: new Set() };
+                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
                         infoMeses[mes].fechas.push(fecha);
                         
                         for (const prog in todas[fecha]) {
@@ -193,7 +197,6 @@ document.addEventListener("DOMContentLoaded", () => {
                                 if(asis.tipo_ingreso !== "Cortesía") {
                                     const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                                     infoMeses[mes].totalPago += montoLimpio;
-                                    infoMeses[mes].rutsUnicos.add(rut);
                                 }
                             }
                         }
@@ -202,14 +205,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.infoMesesGlobal = infoMeses;
                     window.todasAsistenciasGlobal = todas;
                     
-                    selectMes.innerHTML = '<option value="">-- Selecciona un mes para analizar --</option>';
+                    selectMes.innerHTML = '<option value="">-- Selecciona el mes a analizar --</option>';
                     const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+                    
                     const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
                     mesesOrdenados.forEach(m => {
                         const [yyyy, mm] = m.split('-');
                         const mesNombre = nombresMeses[parseInt(mm) - 1];
-                        selectMes.innerHTML += `<option value="${m}">Reporte Mensual: ${mesNombre} ${yyyy}</option>`;
+                        selectMes.innerHTML += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
                     });
                     
                 } catch (e) {
@@ -233,24 +237,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 const primera = fechasOrd[0].split('-').reverse().join('-');
                 const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
                 
+                const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                const mesNombreVisual = nombresMeses[parseInt(m.split('-')[1]) - 1];
+                
                 resumenMes.classList.remove('d-none');
                 resumenMes.innerHTML = `
+                    <h5 class="text-success text-center mb-3 border-bottom border-success pb-2">Mes de ${mesNombreVisual} ${m.split('-')[0]}</h5>
                     <div class="row text-center py-2">
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Primera Fecha</h6>
-                            <span class="text-info fw-bold fs-5">${primera}</span>
+                        <div class="col-md-4 border-end border-secondary">
+                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Rango de Fechas</h6>
+                            <span class="text-info fw-bold fs-6">Del ${primera} <br> al ${ultima}</span>
                         </div>
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Última Fecha</h6>
-                            <span class="text-info fw-bold fs-5">${ultima}</span>
-                        </div>
-                        <div class="col-md-3 border-end border-secondary">
+                        <div class="col-md-4 border-end border-secondary">
                             <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Programas Grabados</h6>
-                            <span class="text-warning fw-bold fs-5">${data.programas.size}</span>
+                            <span class="text-warning fw-bold fs-3">${data.programas.size}</span>
                         </div>
-                        <div class="col-md-3">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Total Pagos del Mes</h6>
-                            <span class="text-success fw-bold fs-5">$${data.totalPago.toLocaleString('es-CL')}</span>
+                        <div class="col-md-4">
+                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Total Dinero del Mes</h6>
+                            <span class="text-success fw-bold fs-4">$${data.totalPago.toLocaleString('es-CL')}</span>
                         </div>
                     </div>
                 `;
@@ -262,12 +266,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!mesElegido) return;
                 
                 const btn = document.getElementById('btnDescargarMesElegido');
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...'; 
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando Excel...'; 
                 btn.disabled = true;
                 
                 try {
                     let tot = {};
                     const todas = window.todasAsistenciasGlobal;
+                    
                     for (const f in todas) { 
                         if (f.startsWith(mesElegido)) { 
                             for (const prog in todas[f]) { 
@@ -298,10 +303,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         const fechasOrdenadas = Array.from(tot[r].fechas).sort();
                         const [yP, mP, dP] = fechasOrdenadas[0].split('-');
                         
+                        // CÁLCULO DE FECHAS: Ingreso y Salida sumando dias
                         const fIng = new Date(yP, mP - 1, dP);
                         const fSal = new Date(yP, mP - 1, dP);
-                        
-                        // CÁLCULO DE FECHA DE SALIDA: Se le suma la cantidad de días asistidos
                         fSal.setDate(fSal.getDate() + fechasOrdenadas.length);
                         
                         const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
@@ -452,6 +456,7 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
             let horasCompletas = Math.floor(diffMins / 60);
             let minRestantes = diffMins % 60;
             
+            // Más de 30 minutos = 1 hora extra
             if (minRestantes >= 30) {
                 horasCompletas++;
             }
@@ -624,7 +629,6 @@ function actualizarTablero() {
     let faltan = totalEsperados - totalFirmados; 
     let textoFaltan = faltan < 0 ? 0 : faltan;
     
-    // El monito caminando en pixelart
     if (faltan > 0) {
         textoFaltan += ` <br><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:5px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:2px;">¡EN CAMINO!</span>`;
     }
@@ -847,8 +851,8 @@ window.generarContratoPDF = async function(rut) {
     dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
     
     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
-    
     const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
+    
     let nombreArchivo = "";
     if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
         nombreArchivo = `Cesion_Imagen_${ticketStr}_${nombreCompletoLimpio}_${rut}.pdf`;
@@ -939,7 +943,7 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
     doc.text("Firma Asistente", 155, y + 5, null, null, "center"); 
     doc.setFont("helvetica", "normal"); 
     doc.text(nombreCompleto, 155, y + 10, null, null, "center");
-    // SE AGREGA EL RUT DEBAJO DEL NOMBRE EN EL PDF
+    // RUT INCLUIDO BAJO LA FIRMA
     doc.text(`RUT: ${rut}`, 155, y + 15, null, null, "center"); 
 }
 
