@@ -16,11 +16,9 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 
 const CORREOS_ADMINISTRADORES = [
-  "cami.fevreseguel@gmail.com",
+    "nat.producciones2020@gmail.com",
     "pinoelgueta@gmail.com", 
-    "natalyseguel.va@gmail.com",
-    "javier.rojas.fer@gmail.com",
-    "luisemilio.jorquera.avaria@gmail.com",
+    "correo_jefa_1@gmail.com"
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -31,7 +29,8 @@ onAuthStateChanged(auth, (user) => {
         const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
         
         if (!esAdmin) {
-            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab'];
+            // Se agregó 'contador-tab' a la lista de bloqueos para cuentas No-VIP
+            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab', 'contador-tab'];
             pestanasBloqueadas.forEach(id => {
                 const tab = document.getElementById(id);
                 if (tab && tab.parentElement) tab.parentElement.classList.add('d-none');
@@ -115,6 +114,10 @@ document.addEventListener("DOMContentLoaded", () => {
             li.innerHTML = '<button class="nav-link fw-bold" id="contador-tab" data-bs-toggle="tab" data-bs-target="#tab-contador" type="button" role="tab" style="color: #00d26a;">📊 Contador</button>';
             tabList.appendChild(li);
             
+            // Si no es admin, ocultar este tab recién creado
+            const esAdminLocal = CORREOS_ADMINISTRADORES.includes(auth.currentUser?.email?.trim().toLowerCase());
+            if(!esAdminLocal) li.classList.add('d-none');
+            
             const divPane = document.createElement('div');
             divPane.className = 'tab-pane fade';
             divPane.id = 'tab-contador';
@@ -148,13 +151,13 @@ document.addEventListener("DOMContentLoaded", () => {
             const btnViejoContador = document.getElementById('btnExcelContador');
             if (btnViejoContador) {
                 btnViejoContador.innerText = "👉 Ir al Nuevo Panel de Contador";
-                btnViejoContador.classList.replace("btn-outline-light", "btn-success");
+                btnViejoContador.classList.replace("btn-outline-warning", "btn-success");
                 btnViejoContador.style.fontWeight = "bold";
                 
-                const viejoPadre = btnViejoContador.closest('.card-body');
+                const viejoPadre = btnViejoContador.closest('.card-panel');
                 if(viejoPadre) {
                     const pDesc = viejoPadre.querySelector('p');
-                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña dedicada en el panel superior.";
+                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña dedicada en el panel superior para mayor precisión.";
                 }
 
                 btnViejoContador.replaceWith(btnViejoContador.cloneNode(true));
@@ -201,9 +204,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     
                     selectMes.innerHTML = '<option value="">-- Selecciona un mes para analizar --</option>';
                     const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
                     mesesOrdenados.forEach(m => {
                         const [yyyy, mm] = m.split('-');
-                        selectMes.innerHTML += `<option value="${m}">Reporte Mensual: ${mm}-${yyyy}</option>`;
+                        const mesNombre = nombresMeses[parseInt(mm) - 1];
+                        selectMes.innerHTML += `<option value="${m}">Reporte Mensual: ${mesNombre} ${yyyy}</option>`;
                     });
                     
                 } catch (e) {
@@ -295,7 +301,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         const fIng = new Date(yP, mP - 1, dP);
                         const fSal = new Date(yP, mP - 1, dP);
                         
-                        // CÁLCULO DE FECHA DE SALIDA: Se le suma la cantidad de días que asistió.
+                        // CÁLCULO DE FECHA DE SALIDA: Se le suma la cantidad de días asistidos
                         fSal.setDate(fSal.getDate() + fechasOrdenadas.length);
                         
                         const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
@@ -304,14 +310,16 @@ document.addEventListener("DOMContentLoaded", () => {
                         csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
                     }
                     
-                    descargarCSV(csv, `Reporte_Contable_${mesElegido}_NAT.csv`);
+                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                    const mesNombreDescarga = nombresMeses[parseInt(mesElegido.split('-')[1]) - 1];
+                    
+                    descargarCSV(csv, `Reporte_Contable_${mesNombreDescarga}_${mesElegido.split('-')[0]}_NAT.csv`);
                 } catch (e) {
                     alert("Error generando el archivo contable.");
                 }
                 btn.innerText = "📥 Descargar Excel del Mes"; 
                 btn.disabled = false;
             });
-
         }
     }, 1500); 
 });
@@ -614,7 +622,14 @@ function actualizarTablero() {
     document.getElementById('contEsperados').innerText = totalEsperados;
     document.getElementById('contFirmados').innerText = totalFirmados;
     let faltan = totalEsperados - totalFirmados; 
-    document.getElementById('contFaltan').innerText = faltan < 0 ? 0 : faltan;
+    let textoFaltan = faltan < 0 ? 0 : faltan;
+    
+    // El monito caminando en pixelart
+    if (faltan > 0) {
+        textoFaltan += ` <br><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:5px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:2px;">¡EN CAMINO!</span>`;
+    }
+    
+    document.getElementById('contFaltan').innerHTML = textoFaltan;
 }
 
 window.toggleDT = async function(rut, nuevoEstado) {
@@ -833,11 +848,12 @@ window.generarContratoPDF = async function(rut) {
     
     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
     
+    const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
     let nombreArchivo = "";
     if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
-        nombreArchivo = `Cesion_Imagen_${nombreCompletoLimpio}_${rut}.pdf`;
+        nombreArchivo = `Cesion_Imagen_${ticketStr}_${nombreCompletoLimpio}_${rut}.pdf`;
     } else {
-        nombreArchivo = `Contrato_${nombreCompletoLimpio}_${rut}.pdf`;
+        nombreArchivo = `Contrato_${ticketStr}_${nombreCompletoLimpio}_${rut}.pdf`;
     }
     
     doc.save(nombreArchivo);
@@ -922,7 +938,9 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
     doc.text("_________________________________", 155, y, null, null, "center"); 
     doc.text("Firma Asistente", 155, y + 5, null, null, "center"); 
     doc.setFont("helvetica", "normal"); 
-    doc.text(nombreCompleto, 155, y + 10, null, null, "center"); 
+    doc.text(nombreCompleto, 155, y + 10, null, null, "center");
+    // SE AGREGA EL RUT DEBAJO DEL NOMBRE EN EL PDF
+    doc.text(`RUT: ${rut}`, 155, y + 15, null, null, "center"); 
 }
 
 
@@ -990,10 +1008,60 @@ window.verPerfil = function(rut) {
             <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
             <div class="col-12 mb-2"><label class="text-muted small">Dirección</label><input type="text" class="form-control bg-dark text-white" id="editDir" value="${p.direccion || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">Banco</label><input type="text" class="form-control bg-dark text-white" id="editBanco" value="${p.banco || ''}"></div>
+            
+            <div class="col-6 mb-2"><label class="text-muted small">Sexo</label>
+                <select class="form-select bg-dark text-white" id="editSexo">
+                    <option value="M" ${p.sexo==='M'?'selected':''}>Masculino</option>
+                    <option value="F" ${p.sexo==='F'?'selected':''}>Femenino</option>
+                    <option value="Otro" ${p.sexo==='Otro'?'selected':''}>Otro</option>
+                </select>
+            </div>
+            
+            <div class="col-6 mb-2"><label class="text-muted small">AFP</label>
+                <select class="form-select bg-dark text-white" id="editAfp">
+                    <option value="No cotizo / No sé" ${p.afp==='No cotizo / No sé'?'selected':''}>No cotizo / No sé</option>
+                    <option value="CAPITAL" ${p.afp==='CAPITAL'?'selected':''}>Capital</option>
+                    <option value="CUPRUM" ${p.afp==='CUPRUM'?'selected':''}>Cuprum</option>
+                    <option value="HABITAT" ${p.afp==='HABITAT'?'selected':''}>Habitat</option>
+                    <option value="MODELO" ${p.afp==='MODELO'?'selected':''}>Modelo</option>
+                    <option value="PLANVITAL" ${p.afp==='PLANVITAL'?'selected':''}>PlanVital</option>
+                    <option value="PROVIDA" ${p.afp==='PROVIDA'?'selected':''}>ProVida</option>
+                    <option value="UNO" ${p.afp==='UNO'?'selected':''}>Uno</option>
+                </select>
+            </div>
+            <div class="col-6 mb-2"><label class="text-muted small">Salud</label>
+                <select class="form-select bg-dark text-white" id="editSalud">
+                    <option value="FONASA" ${p.salud==='FONASA'?'selected':''}>Fonasa</option>
+                    <option value="BANMEDICA" ${p.salud==='BANMEDICA'?'selected':''}>Banmédica</option>
+                    <option value="COLMENA" ${p.salud==='COLMENA'?'selected':''}>Colmena</option>
+                    <option value="CONSALUD" ${p.salud==='CONSALUD'?'selected':''}>Consalud</option>
+                    <option value="CRUZBLANCA" ${p.salud==='CRUZBLANCA'?'selected':''}>Cruz Blanca</option>
+                    <option value="NUEVAMASVIDA" ${p.salud==='NUEVAMASVIDA'?'selected':''}>Nueva Masvida</option>
+                    <option value="VIDATRES" ${p.salud==='VIDATRES'?'selected':''}>Vida Tres</option>
+                </select>
+            </div>
+            <div class="col-6 mb-2"><label class="text-muted small">Banco</label>
+                <select class="form-select bg-dark text-white" id="editBanco">
+                    <option value="ESTADO" ${p.banco==='ESTADO'?'selected':''}>Banco Estado</option>
+                    <option value="CHILE" ${p.banco==='CHILE'?'selected':''}>Banco de Chile</option>
+                    <option value="BCI" ${p.banco==='BCI'?'selected':''}>BCI</option>
+                    <option value="SANTANDER" ${p.banco==='SANTANDER'?'selected':''}>Santander</option>
+                    <option value="ITAU" ${p.banco==='ITAU'?'selected':''}>Itaú</option>
+                    <option value="SCOTIABANK" ${p.banco==='SCOTIABANK'?'selected':''}>Scotiabank</option>
+                    <option value="BICE" ${p.banco==='BICE'?'selected':''}>BICE</option>
+                    <option value="SECURITY" ${p.banco==='SECURITY'?'selected':''}>Security</option>
+                    <option value="CONSORCIO" ${p.banco==='CONSORCIO'?'selected':''}>Consorcio</option>
+                    <option value="RIPLEY" ${p.banco==='RIPLEY'?'selected':''}>Ripley</option>
+                </select>
+            </div>
+            <div class="col-6 mb-2"><label class="text-muted small">Tipo de Cuenta</label>
+                <select class="form-select bg-dark text-white" id="editTipoCuenta">
+                    <option value="CUENTA_RUT" ${p.tipoCuenta==='CUENTA_RUT'?'selected':''}>Cuenta RUT</option>
+                    <option value="CUENTA_CORRIENTE" ${p.tipoCuenta==='CUENTA_CORRIENTE'?'selected':''}>Cuenta Corriente</option>
+                    <option value="CUENTA_VISTA" ${p.tipoCuenta==='CUENTA_VISTA'?'selected':''}>Cuenta Vista / Ahorro</option>
+                </select>
+            </div>
             <div class="col-6 mb-2"><label class="text-muted small">N° Cuenta</label><input type="text" class="form-control bg-dark text-white" id="editCuenta" value="${p.numeroCuenta || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">AFP</label><input type="text" class="form-control bg-dark text-white" id="editAfp" value="${p.afp || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">Salud</label><input type="text" class="form-control bg-dark text-white" id="editSalud" value="${p.salud || ''}"></div>
         </div>`;
     
     if (blacklistGlobal[rut]) {
@@ -1022,10 +1090,12 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
             telefono: document.getElementById('editTel').value, 
             email: document.getElementById('editEmail').value,
             direccion: document.getElementById('editDir').value,
-            banco: document.getElementById('editBanco').value, 
-            numeroCuenta: document.getElementById('editCuenta').value,
+            sexo: document.getElementById('editSexo').value,
             afp: document.getElementById('editAfp').value, 
-            salud: document.getElementById('editSalud').value
+            salud: document.getElementById('editSalud').value,
+            banco: document.getElementById('editBanco').value, 
+            tipoCuenta: document.getElementById('editTipoCuenta').value,
+            numeroCuenta: document.getElementById('editCuenta').value
         });
         
         alert("Datos actualizados correctamente."); 
@@ -1298,221 +1368,6 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
     }
 });
 
-
-// ==========================================
-// PANEL INTELIGENTE DEL CONTADOR
-// ==========================================
-document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => {
-        const tabList = document.querySelector('.nav-tabs');
-        const tabContent = document.querySelector('.tab-content');
-        
-        if (tabList && tabContent && !document.getElementById('contador-tab')) {
-            const li = document.createElement('li');
-            li.className = 'nav-item';
-            li.role = 'presentation';
-            li.innerHTML = '<button class="nav-link fw-bold" id="contador-tab" data-bs-toggle="tab" data-bs-target="#tab-contador" type="button" role="tab" style="color: #00d26a;">📊 Contador</button>';
-            tabList.appendChild(li);
-            
-            const divPane = document.createElement('div');
-            divPane.className = 'tab-pane fade';
-            divPane.id = 'tab-contador';
-            divPane.role = 'tabpanel';
-            divPane.innerHTML = `
-                <div class="card bg-dark text-white border-success mt-3 shadow-lg">
-                    <div class="card-header border-success" style="background: #111;">
-                        <h4 class="mb-0 text-success fw-bold">📊 Cierre Contable Mensual (I.M.T)</h4>
-                    </div>
-                    <div class="card-body" style="background: #1a1a1a;">
-                        <p class="text-muted">Selecciona un mes histórico para analizar los datos financieros y generar el reporte exacto. El sistema agrupará la información excluyendo automáticamente a los invitados de cortesía.</p>
-                        
-                        <div class="row align-items-center mb-4">
-                            <div class="col-md-6">
-                                <label class="form-label text-warning fw-bold">1. Selecciona el Mes:</label>
-                                <select id="selectMesContador" class="form-select bg-secondary text-white fw-bold"></select>
-                            </div>
-                            <div class="col-md-6 text-end mt-4 mt-md-0">
-                                <button type="button" class="btn btn-success fw-bold py-2 px-4 shadow" id="btnDescargarMesElegido" disabled>
-                                    📥 Descargar Excel del Mes
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div id="resumenMesContador" class="alert d-none shadow-sm" style="background: #0a0a0a; border: 1px solid #00d26a; border-left: 5px solid #00d26a;"></div>
-                    </div>
-                </div>
-            `;
-            tabContent.appendChild(divPane);
-            
-            const btnViejoContador = document.getElementById('btnExcelContador');
-            if (btnViejoContador) {
-                btnViejoContador.innerText = "👉 Ir al Nuevo Panel de Contador";
-                btnViejoContador.classList.replace("btn-outline-warning", "btn-success");
-                btnViejoContador.style.fontWeight = "bold";
-                
-                const viejoPadre = btnViejoContador.closest('.card-panel');
-                if(viejoPadre) {
-                    const pDesc = viejoPadre.querySelector('p');
-                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña dedicada en el panel superior para mayor precisión.";
-                }
-
-                btnViejoContador.replaceWith(btnViejoContador.cloneNode(true));
-                document.getElementById('btnExcelContador').addEventListener('click', () => {
-                    document.getElementById('contador-tab').click();
-                });
-            }
-            
-            document.getElementById('contador-tab').addEventListener('click', async () => {
-                const selectMes = document.getElementById('selectMesContador');
-                if(selectMes.options.length > 1) return; 
-                
-                selectMes.innerHTML = '<option value="">⏳ Cargando meses desde el servidor...</option>';
-                
-                try {
-                    const snap = await get(ref(db, '2_asistencias'));
-                    if (!snap.exists()) {
-                        selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
-                        return;
-                    }
-                    const todas = snap.val();
-                    let infoMeses = {};
-
-                    for (const fecha in todas) {
-                        const mes = fecha.substring(0, 7); 
-                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0, rutsUnicos: new Set() };
-                        infoMeses[mes].fechas.push(fecha);
-                        
-                        for (const prog in todas[fecha]) {
-                            infoMeses[mes].programas.add(`${fecha}|${prog}`);
-                            for (const rut in todas[fecha][prog]) {
-                                const asis = todas[fecha][prog][rut];
-                                if(asis.tipo_ingreso !== "Cortesía") {
-                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                                    infoMeses[mes].totalPago += montoLimpio;
-                                    infoMeses[mes].rutsUnicos.add(rut);
-                                }
-                            }
-                        }
-                    }
-                    
-                    window.infoMesesGlobal = infoMeses;
-                    window.todasAsistenciasGlobal = todas;
-                    
-                    selectMes.innerHTML = '<option value="">-- Selecciona un mes para analizar --</option>';
-                    const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
-                    mesesOrdenados.forEach(m => {
-                        const [yyyy, mm] = m.split('-');
-                        selectMes.innerHTML += `<option value="${m}">Reporte Mensual: ${mm}-${yyyy}</option>`;
-                    });
-                    
-                } catch (e) {
-                    selectMes.innerHTML = '<option value="">Error al cargar los datos</option>';
-                }
-            });
-            
-            document.getElementById('selectMesContador').addEventListener('change', (e) => {
-                const m = e.target.value;
-                const resumenMes = document.getElementById('resumenMesContador');
-                const btnDescargar = document.getElementById('btnDescargarMesElegido');
-                
-                if (!m) {
-                    resumenMes.classList.add('d-none');
-                    btnDescargar.disabled = true;
-                    return;
-                }
-                
-                const data = window.infoMesesGlobal[m];
-                const fechasOrd = data.fechas.sort();
-                const primera = fechasOrd[0].split('-').reverse().join('-');
-                const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
-                
-                resumenMes.classList.remove('d-none');
-                resumenMes.innerHTML = `
-                    <div class="row text-center py-2">
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Primera Fecha</h6>
-                            <span class="text-info fw-bold fs-5">${primera}</span>
-                        </div>
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Última Fecha</h6>
-                            <span class="text-info fw-bold fs-5">${ultima}</span>
-                        </div>
-                        <div class="col-md-3 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Programas Grabados</h6>
-                            <span class="text-warning fw-bold fs-5">${data.programas.size}</span>
-                        </div>
-                        <div class="col-md-3">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Total Pagos del Mes</h6>
-                            <span class="text-success fw-bold fs-5">$${data.totalPago.toLocaleString('es-CL')}</span>
-                        </div>
-                    </div>
-                `;
-                btnDescargar.disabled = false;
-            });
-            
-            document.getElementById('btnDescargarMesElegido').addEventListener('click', async () => {
-                const mesElegido = document.getElementById('selectMesContador').value;
-                if (!mesElegido) return;
-                
-                const btn = document.getElementById('btnDescargarMesElegido');
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando...'; 
-                btn.disabled = true;
-                
-                try {
-                    let tot = {};
-                    const todas = window.todasAsistenciasGlobal;
-                    for (const f in todas) { 
-                        if (f.startsWith(mesElegido)) { 
-                            for (const prog in todas[f]) { 
-                                for (const r in todas[f][prog]) {
-                                    const asis = todas[f][prog][r];
-                                    if(asis.tipo_ingreso === "Cortesía") continue;
-                                    
-                                    if (!tot[r]) tot[r] = { monto: 0, fechas: new Set() }; 
-                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                                    tot[r].monto += montoLimpio;
-                                    tot[r].fechas.add(f);
-                                }
-                            }
-                        }
-                    }
-                    
-                    let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
-                    
-                    const trabSnap = await get(ref(db, '1_trabajadores'));
-                    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-                    
-                    for (const r in tot) {
-                        const tr = trabajadores[r] || { nombres: "Desconocido", apellidos: "" };
-                        const parts = r.split('-'); 
-                        const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
-                        const [y, m, d] = (tr.fechaNacimiento||"").split('-');
-                        
-                        const fechasOrdenadas = Array.from(tot[r].fechas).sort();
-                        const [yP, mP, dP] = fechasOrdenadas[0].split('-');
-                        
-                        const fIng = new Date(yP, mP - 1, dP);
-                        const fSal = new Date(yP, mP - 1, dP);
-                        
-                        fSal.setDate(fSal.getDate() + fechasOrdenadas.length);
-                        
-                        const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
-                        const strSal = `${String(fSal.getDate()).padStart(2,'0')}-${String(fSal.getMonth()+1).padStart(2,'0')}-${fSal.getFullYear()}`;
-                        
-                        csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
-                    }
-                    
-                    descargarCSV(csv, `Reporte_Contable_${mesElegido}_NAT.csv`);
-                } catch (e) {
-                    alert("Error generando el archivo contable.");
-                }
-                btn.innerText = "📥 Descargar Excel del Mes"; 
-                btn.disabled = false;
-            });
-        }
-    }, 1500); 
-});
-
 function descargarCSV(c, n) { 
     const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); 
     const a = document.createElement("a"); 
@@ -1702,10 +1557,13 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                             let objRut = window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut];
                             if (!objRut) {
                                 const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", email: "-", telefono: "-", direccion: "-" };
+                                
+                                const telefonoLimpio = (tr.telefono || "-").replace(/^\+56\s*9/, '9').replace(/^\+56/, '9');
+                                
                                 objRut = {
                                     nombres: `${tr.nombres} ${tr.apellidos}`,
                                     email: tr.email || "-",
-                                    telefono: tr.telefono || "-",
+                                    telefono: telefonoLimpio,
                                     direccion: tr.direccion || "-",
                                     fechas: [],
                                     tickets: [],
@@ -1820,9 +1678,14 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                                                 <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
                                                 <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
                                                 <td>
-                                                    <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana(event, '${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
-                                                        ${btnText}
-                                                    </button>
+                                                    <div class="d-flex justify-content-center gap-1">
+                                                        <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana(event, '${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
+                                                            ${btnText}
+                                                        </button>
+                                                        <button class="btn btn-outline-danger btn-sm fw-bold" onclick="window.eliminarContratoDT(event, '${rut}', '${prog}', '${wk}')">
+                                                            🗑️ Se retiró
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>`;
                     }
@@ -1889,6 +1752,26 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
     }
 }
 
+window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
+    event.preventDefault(); event.stopPropagation();
+    if(!confirm("¿Estás seguro de que esta persona se retiró?\nEsto eliminará permanentemente su contrato DT de esta lista.")) return;
+    
+    const asisData = window.agrupacionDTGlobal[prog][wkSortKey].ruts[rut];
+    let updates = {};
+    asisData.rutasFirebase.forEach(ruta => {
+        updates[`${ruta}/aplica_contrato`] = false;
+        updates[`${ruta}/tipo_ingreso`] = "Se retiró";
+    });
+    
+    try {
+        await update(ref(db), updates);
+        alert("Contrato anulado correctamente por retiro.");
+        document.getElementById('btnCargarContratosDT').click(); 
+    } catch(e) {
+        alert("Error al anular contrato.");
+    }
+}
+
 document.getElementById('btnArchivarContratosDT').addEventListener('click', async () => {
     if (!window.agrupacionDTGlobal || Object.keys(window.agrupacionDTGlobal).length === 0) return;
     
@@ -1936,16 +1819,12 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
 
 
 // ==========================================
-// PESTAÑA 4: SEGURIDAD 
+// PESTAÑA 4: SEGURIDAD (ACORDEÓN MES -> PROGRAMA)
 // ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarSeguridad');
     
-    let idAbierto = null; 
-    const acordeonAbierto = document.querySelector('#acordeonDT .accordion-collapse.show');
-    if (acordeonAbierto) idAbierto = acordeonAbierto.id;
-
     btnRefresh.innerText = "⏳ Cargando..."; 
     btnRefresh.disabled = true;
     
@@ -1965,83 +1844,141 @@ async function cargarReportesDT() {
     const todasLasAsistencias = asisSnap.val(); 
     const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
     
-    let htmlAcordeon = ""; 
-    let index = 0; 
-    const fechasOrdenadas = Object.keys(todasLasAsistencias).sort().reverse();
+    let agrupacionSeguridad = {};
+    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const nombresDias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-    for (const fecha of fechasOrdenadas) {
+    for (const fecha in todasLasAsistencias) {
+        const mesLlave = fecha.substring(0, 7); 
+        const [y, m, d] = fecha.split('-');
+        const dateObj = new Date(y, parseInt(m)-1, d);
+        const diaNombre = nombresDias[dateObj.getDay()];
+        const nombreMes = nombresMeses[parseInt(m)-1];
+        const etiquetaMes = `${nombreMes} ${y}`;
+        
+        if (!agrupacionSeguridad[mesLlave]) agrupacionSeguridad[mesLlave] = { etiqueta: etiquetaMes, programas: {} };
+        
         for (const prog in todasLasAsistencias[fecha]) {
-            index++; 
-            const asistentesDeEseDia = todasLasAsistencias[fecha][prog]; 
-            const cantidad = Object.keys(asistentesDeEseDia).length;
-            const isOpen = (idAbierto === `collapseDT_${index}`) ? 'show' : '';
-            const isCollapsed = (idAbierto === `collapseDT_${index}`) ? '' : 'collapsed';
-
-            htmlAcordeon += `
-            <div class="accordion-item">
-                <h2 class="accordion-header">
-                    <button class="accordion-button ${isCollapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDT_${index}">
-                        📅 ${fecha} | 🎬 ${prog.replace(" - ", " / ")} &nbsp; <span class="badge bg-success ms-2">${cantidad} personas</span>
-                    </button>
-                </h2>
-                <div id="collapseDT_${index}" class="accordion-collapse collapse ${isOpen}" data-bs-parent="#acordeonDT">
-                    <div class="accordion-body">
-                        <button class="btn btn-outline-info btn-sm mb-3 fw-bold" onclick="window.descargarListaSeguridad('${fecha}', '${prog}')">
-                            🛡️ Descargar Excel para Seguridad
-                        </button>
-                        <div class="table-responsive">
-                            <table class="table table-dark table-hover table-sm text-center align-middle" style="font-size: 0.85em;">
-                                <thead style="color: #b066ff;">
-                                    <tr>
-                                        <th>N° Ticket</th>
-                                        <th>RUT</th>
-                                        <th>Nombre Completo</th>
-                                        <th>Condición / Invitado Por</th>
-                                        <th>Teléfono</th>
-                                        <th>Dirección</th>
-                                        <th>AFP</th>
-                                        <th>Salud</th>
-                                        <th>Banco</th>
-                                        <th>Cuenta</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
-                                
-            for (const rut in asistentesDeEseDia) {
-                const asis = asistentesDeEseDia[rut];
-                const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
-                
-                let badgeCondicion = "";
-                if (asis.tipo_ingreso === "Cortesía") {
-                    badgeCondicion = `<span class="badge bg-warning text-dark fw-bold">Cortesía (${asis.invitado_por || '-'})</span>`;
-                } else {
-                    badgeCondicion = `<span class="badge bg-secondary">Trabajador</span>`;
-                }
-                
-                htmlAcordeon += `
-                                    <tr>
-                                        <td><span class="badge bg-secondary fs-6">${asis.numero_asignado || '-'}</span></td>
-                                        <td>${rut}</td>
-                                        <td>${tr.nombres} ${tr.apellidos}</td>
-                                        <td>${badgeCondicion}</td>
-                                        <td>${tr.telefono || '-'}</td>
-                                        <td>${tr.direccion || '-'}</td>
-                                        <td>${tr.afp || '-'}</td>
-                                        <td>${tr.salud || '-'}</td>
-                                        <td>${tr.banco || '-'}</td>
-                                        <td>${tr.numeroCuenta || '-'}</td>
-                                    </tr>`;
+            if (!agrupacionSeguridad[mesLlave].programas[prog]) {
+                agrupacionSeguridad[mesLlave].programas[prog] = {};
             }
-            htmlAcordeon += `
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
+            agrupacionSeguridad[mesLlave].programas[prog][fecha] = {
+                diaNombre: diaNombre,
+                asistentes: todasLasAsistencias[fecha][prog]
+            };
         }
     }
+
+    let htmlAcordeon = '<div class="accordion" id="accSeguridadMeses">'; 
+    let mesIdx = 0;
     
+    const mesesOrdenados = Object.keys(agrupacionSeguridad).sort().reverse();
+
+    for (const mes of mesesOrdenados) {
+        mesIdx++;
+        const dataMes = agrupacionSeguridad[mes];
+        
+        htmlAcordeon += `
+        <div class="accordion-item" style="border: 1px solid #00d26a; margin-bottom: 15px; background: #0a0a0a;">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#segMes_${mesIdx}" style="background: #0a1a0a; color: #00d26a; font-size: 1.2em;">
+                    📅 Mes: ${dataMes.etiqueta.toUpperCase()}
+                </button>
+            </h2>
+            <div id="segMes_${mesIdx}" class="accordion-collapse collapse" data-bs-parent="#accSeguridadMeses">
+                <div class="accordion-body" style="background: #141414;">
+                    <div class="accordion" id="accSegProgs_${mesIdx}">`;
+        
+        let progIdx = 0;
+        const progsOrdenados = Object.keys(dataMes.programas).sort();
+        
+        for (const prog of progsOrdenados) {
+            progIdx++;
+            const fechasData = dataMes.programas[prog];
+            
+            htmlAcordeon += `
+                        <div class="accordion-item" style="border: 1px solid #b066ff; margin-bottom: 10px; background: #1a1a1a;">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#segProg_${mesIdx}_${progIdx}" style="background: #2d1b4e; color: white;">
+                                    🎬 ${prog.replace(" - ", " / ")}
+                                </button>
+                            </h2>
+                            <div id="segProg_${mesIdx}_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accSegProgs_${mesIdx}">
+                                <div class="accordion-body p-0">`;
+            
+            const fechasOrdenadas = Object.keys(fechasData).sort().reverse();
+            for (const fecha of fechasOrdenadas) {
+                const asisDia = fechasData[fecha].asistentes;
+                const diaNombre = fechasData[fecha].diaNombre;
+                const cantidad = Object.keys(asisDia).length;
+                
+                const partesF = fecha.split('-');
+                const fechaBonita = `${partesF[2]}-${partesF[1]}-${partesF[0]}`;
+                
+                htmlAcordeon += `
+                                    <div class="p-3 border-bottom border-secondary">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6 class="text-warning fw-bold mb-0">📌 ${diaNombre} ${fechaBonita} <span class="badge bg-success ms-2">${cantidad} personas</span></h6>
+                                            <button class="btn btn-outline-info btn-sm fw-bold" onclick="window.descargarListaSeguridad('${fecha}', '${prog}')">
+                                                🛡️ Descargar Excel
+                                            </button>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-dark table-hover table-sm text-center align-middle" style="font-size: 0.85em;">
+                                                <thead style="color: #b066ff;">
+                                                    <tr>
+                                                        <th>N° Ticket</th>
+                                                        <th>RUT</th>
+                                                        <th>Nombre Completo</th>
+                                                        <th>Condición / Invitado Por</th>
+                                                        <th>Teléfono</th>
+                                                        <th>Dirección</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>`;
+                                                
+                for (const rut in asisDia) {
+                    const asis = asisDia[rut];
+                    const tr = trabajadores[rut] || { nombres: "No registrado", apellidos: "" };
+                    
+                    let badgeCondicion = "";
+                    if (asis.tipo_ingreso === "Cortesía") {
+                        badgeCondicion = `<span class="badge bg-warning text-dark fw-bold">Cortesía (${asis.invitado_por || '-'})</span>`;
+                    } else {
+                        badgeCondicion = `<span class="badge bg-secondary">Trabajador</span>`;
+                    }
+                    
+                    htmlAcordeon += `
+                                                    <tr>
+                                                        <td><span class="badge bg-secondary fs-6">${asis.numero_asignado || '-'}</span></td>
+                                                        <td>${rut}</td>
+                                                        <td>${tr.nombres} ${tr.apellidos}</td>
+                                                        <td>${badgeCondicion}</td>
+                                                        <td>${tr.telefono || '-'}</td>
+                                                        <td>${tr.direccion || '-'}</td>
+                                                    </tr>`;
+                }
+                htmlAcordeon += `
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>`;
+            }
+            
+            htmlAcordeon += `
+                                </div>
+                            </div>
+                        </div>`;
+        }
+        
+        htmlAcordeon += `
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    }
+    
+    htmlAcordeon += '</div>';
     contenedor.innerHTML = htmlAcordeon;
 }
 
@@ -2160,12 +2097,13 @@ document.getElementById('btnRespaldoPDFs').addEventListener('click', async () =>
                         dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog.replace(" - ", " / "));
                         
                         const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
+                        const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
                         
                         let nombreArchivo = "";
                         if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
-                            nombreArchivo = `Cesion_Imagen_${nombreCompletoLimpio}_${r}.pdf`;
+                            nombreArchivo = `Cesion_Imagen_${ticketStr}_${nombreCompletoLimpio}_${r}.pdf`;
                         } else {
-                            nombreArchivo = `Contrato_${nombreCompletoLimpio}_${r}.pdf`;
+                            nombreArchivo = `Contrato_${ticketStr}_${nombreCompletoLimpio}_${r}.pdf`;
                         }
                         
                         const pdfBlob = doc.output('blob'); 
