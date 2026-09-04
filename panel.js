@@ -18,7 +18,8 @@ const db = getDatabase(app);
 const CORREOS_ADMINISTRADORES = [
     "nat.producciones2020@gmail.com",
     "pinoelgueta@gmail.com", 
-    "correo_jefa_1@gmail.com"
+    "javier.rojas.fer@gmail.com",
+    "luisemilio.jorquera.avaria@gmail.com"
 ];
 
 onAuthStateChanged(auth, (user) => { 
