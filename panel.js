@@ -641,13 +641,15 @@ function actualizarTablero() {
         let faltanIP = 0;
         let faltanCortesia = 0;
         let htmlFaltantes = "";
+        let esDalePlay = nombrePrograma.includes("Dale Play");
 
         // Cruzamos los datos: Quien está en reservas pero NO en asistencias, es porque falta.
         for (const rut in reservasGlobales) {
             if (!asistenciasGlobales[rut]) {
                 const res = reservasGlobales[rut];
                 const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
-                const badge = res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`;
+                
+                const badge = esDalePlay ? '' : (res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`);
 
                 htmlFaltantes += `
                 <li class="list-group-item bg-dark text-white border-danger d-flex justify-content-between align-items-center" style="font-size: 0.9em; border-bottom: 1px solid #333;">
@@ -667,16 +669,22 @@ function actualizarTablero() {
             htmlFaltantes = "<p class='text-success p-3 fw-bold mb-0 text-center'>✅ ¡Todos los inscritos ya están adentro!</p>";
         }
 
-        document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.4em; color:#d6b3ff; font-weight:normal; display:block; margin-top:3px;">I/P: ${totalIP} | CORTESÍA: ${totalCortesia}</span>`;
-        document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
+        // CONTADORES PRINCIPALES (Ocultando I/P y Cort si es Dale Play)
+        if (esDalePlay) {
+            document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
+            document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
+        } else {
+            document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
+            document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
+        }
         
         let faltan = totalEsperados - totalFirmados; 
         let textoFaltan = faltan < 0 ? 0 : faltan;
         
         if (faltan > 0) {
-            // Desglose de los que vienen en camino
-            textoFaltan += ` <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px;">Faltan: ${faltanIP} I/P | ${faltanCortesia} CORT</span>`;
-            // Monito animado
+            if (!esDalePlay) {
+                textoFaltan += ` <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px;">Faltan: ${faltanIP} I/P | ${faltanCortesia} CORT</span>`;
+            }
             textoFaltan += `<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:2px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:1px;">¡EN CAMINO!</span>`;
         }
         
@@ -688,39 +696,56 @@ function actualizarTablero() {
             divFaltantes = document.createElement('div');
             divFaltantes.id = 'listaFaltantesPanel';
             divFaltantes.className = 'mt-3 mb-4';
+            
+            // Inserción 100% segura en el DOM
             const seccionLista = document.getElementById('seccionLista');
-            const btnEsUnDia = document.getElementById('btnEsUnDia');
-            if(btnEsUnDia) {
-                seccionLista.insertBefore(divFaltantes, btnEsUnDia);
+            const tableResp = seccionLista.querySelector('.table-responsive');
+            if(tableResp) {
+                seccionLista.insertBefore(divFaltantes, tableResp);
             } else {
-                seccionLista.appendChild(divFaltantes);
+                seccionLista.prepend(divFaltantes);
             }
         }
 
-        divFaltantes.innerHTML = `
-            <div class="accordion shadow-sm" id="accFaltantes">
-              <div class="accordion-item" style="background: #1a0a0a; border: 1px solid #ff3333;">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colFaltantes" style="background: #330000; color: #ff9999; font-weight: bold;">
-                    🚨 Ver Lista y Descargar para el Canal
-                  </button>
-                </h2>
-                <div id="colFaltantes" class="accordion-collapse collapse" data-bs-parent="#accFaltantes">
-                  <div class="accordion-body p-0">
-                    <div class="p-3 bg-dark border-bottom border-danger">
-                        <button class="btn btn-primary w-100 fw-bold shadow-sm" onclick="window.descargarListaCanal()" style="font-size: 0.95em;">
-                            📥 DESCARGAR EXCEL CANAL (Salud y Emergencia)
-                        </button>
+        // EVITAR RE-RENDER DEL ACORDEÓN: Solo inyectar la estructura si no existe
+        // Así evitamos que la lista "desaparezca" o se cierre al ingresar un nuevo registro
+        if (!divFaltantes.innerHTML.includes('accFaltantes')) {
+            divFaltantes.innerHTML = `
+                <div class="accordion shadow-sm" id="accFaltantes">
+                  <div class="accordion-item" style="background: #1a0a0a; border: 1px solid #ff3333;">
+                    <h2 class="accordion-header">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colFaltantes" style="background: #330000; color: #ff9999; font-weight: bold;" id="btnAccFaltantes">
+                        🚨 Ver Lista y Descargar para el Canal (<span id="countFaltantesHeader">${faltan}</span>)
+                      </button>
+                    </h2>
+                    <div id="colFaltantes" class="accordion-collapse collapse" data-bs-parent="#accFaltantes">
+                      <div class="accordion-body p-0">
+                        <div class="p-3 bg-dark border-bottom border-danger">
+                            <button class="btn btn-primary w-100 fw-bold shadow-sm" onclick="window.descargarListaCanal()" style="font-size: 0.95em;">
+                                📥 DESCARGAR EXCEL CANAL (Salud y Emergencia)
+                            </button>
+                        </div>
+                        <ul class="list-group list-group-flush" id="ulFaltantes" style="max-height: 280px; overflow-y: auto;">
+                        </ul>
+                      </div>
                     </div>
-                    <ul class="list-group list-group-flush" style="max-height: 280px; overflow-y: auto;">
-                      <li class="list-group-item bg-dark text-white fw-bold text-center" style="font-size: 0.85em; background:#222;">👇 AÚN FALTAN POR LLEGAR (${faltan}) 👇</li>
-                      ${htmlFaltantes}
-                    </ul>
                   </div>
                 </div>
-              </div>
-            </div>
-        `;
+            `;
+        }
+        
+        // Actualización dinámica del contenido interno sin romper el HTML principal
+        const countHeader = document.getElementById('countFaltantesHeader');
+        if(countHeader) countHeader.innerText = faltan;
+        
+        const ulFaltantes = document.getElementById('ulFaltantes');
+        if(ulFaltantes) {
+            ulFaltantes.innerHTML = `
+                <li class="list-group-item bg-dark text-white fw-bold text-center" style="font-size: 0.85em; background:#222;">👇 AÚN FALTAN POR LLEGAR (${faltan}) 👇</li>
+                ${htmlFaltantes}
+            `;
+        }
+
     } catch(e) {
         console.error("Error crítico evitado:", e);
     }
