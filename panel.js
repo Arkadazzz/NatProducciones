@@ -188,6 +188,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     let infoMeses = {};
 
                     for (const fecha in todas) {
+                        // VALIDACIÓN: Solo procesar llaves que sean fechas válidas (YYYY-MM-DD)
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) continue;
+
                         const mes = fecha.substring(0, 7); 
                         if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
                         infoMeses[mes].fechas.push(fecha);
@@ -207,19 +210,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     window.infoMesesGlobal = infoMeses;
                     window.todasAsistenciasGlobal = todas;
                     
-                    selectMes.innerHTML = '<option value="">-- Selecciona el mes a analizar --</option>';
+                    let htmlOptions = '<option value="">-- Selecciona el mes a analizar --</option>';
                     const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
-                    
                     const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
                     mesesOrdenados.forEach(m => {
-                        const [yyyy, mm] = m.split('-');
-                        const mesNombre = nombresMeses[parseInt(mm) - 1];
-                        selectMes.innerHTML += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
+                        const partes = m.split('-');
+                        if(partes.length === 2) {
+                            const yyyy = partes[0];
+                            const mm = parseInt(partes[1]) - 1;
+                            const mesNombre = nombresMeses[mm] || "Mes";
+                            htmlOptions += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
+                        }
                     });
                     
+                    // Asignación segura en bloque para Safari
+                    selectMes.innerHTML = htmlOptions;
+                    
                 } catch (e) {
-                    selectMes.innerHTML = '<option value="">Error al cargar los datos</option>';
+                    console.error("Error crítico en Contador:", e);
+                    selectMes.innerHTML = '<option value="">❌ Error al cargar los datos</option>';
                 }
             });
             
