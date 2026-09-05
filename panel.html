@@ -49,6 +49,7 @@
 </nav>
 
 <div class="container">
+    <!-- PESTAÑAS -->
     <ul class="nav nav-tabs" id="myTab" role="tablist">
         <li class="nav-item" role="presentation"><button class="nav-link active" id="puerta-tab" data-bs-toggle="tab" data-bs-target="#puerta" type="button">📍 Puerta</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="crm-tab" data-bs-toggle="tab" data-bs-target="#crm" type="button">👥 BD & Edición</button></li>
@@ -58,6 +59,8 @@
         <li class="nav-item" role="presentation"><button class="nav-link" id="seguridad-tab" data-bs-toggle="tab" data-bs-target="#seguridad" type="button">🛡️ Seguridad</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="mantenimiento-tab" data-bs-toggle="tab" data-bs-target="#mantenimiento" type="button">⚙️ Mant.</button></li>
         <li class="nav-item" role="presentation"><button class="nav-link" id="sorteo-tab" data-bs-toggle="tab" data-bs-target="#sorteo" type="button">🏆 Sorteos</button></li>
+        <!-- NUEVA PESTAÑA NATIVA DE CONTADOR -->
+        <li class="nav-item" role="presentation"><button class="nav-link" id="contador-tab" data-bs-toggle="tab" data-bs-target="#contador" type="button" style="color: #00d26a; font-weight: bold;">📊 Contador</button></li>
     </ul>
 
     <div class="tab-content" id="myTabContent">
@@ -175,18 +178,11 @@
                 <b>Nota:</b> El sistema unificará automáticamente los montos de una persona si asistió a varios programas seleccionados.
             </div>
             <div class="row mb-4">
-                <div class="col-md-6">
+                <div class="col-md-12">
                     <div class="card-panel text-center h-100" style="border-color: #00d26a;">
                         <h4 style="color: #00d26a;">🏦 Pagos Diarios y Atrasados</h4>
                         <p style="color: #aaaaaa;">Genera la nómina del banco seleccionando los programas pendientes.</p>
                         <button class="btn btn-outline-success w-100 fw-bold py-3 mt-2 fs-5" id="btnExcelBanco">Generar Nómina de Pago</button>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="card-panel text-center h-100" style="border-color: #ffcc00;">
-                        <h4 style="color: #ffcc00;">📊 Cierre Contable Mensual</h4>
-                        <p style="color: #aaaaaa;">Genera el archivo I.M.T. con la suma de TODOS los programas del mes.</p>
-                        <button class="btn btn-outline-warning text-white w-100 fw-bold py-3 mt-2 fs-5" id="btnExcelContador">Descargar Reporte del Mes</button>
                     </div>
                 </div>
             </div>
@@ -205,6 +201,30 @@
                         <tbody id="tablaDeudas"></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+        
+        <!-- PESTAÑA NUEVA: CONTADOR -->
+        <div class="tab-pane fade" id="contador" role="tabpanel">
+            <div class="card-panel" style="border: 1px solid #00d26a; background: rgba(0, 210, 106, 0.05);">
+                <h4 style="color: #00d26a; font-weight: bold;">📊 Cierre Contable Mensual (I.M.T)</h4>
+                <p class="text-muted">Selecciona un mes histórico para analizar los datos financieros y generar el reporte exacto. El sistema agrupará la información excluyendo automáticamente a los invitados de cortesía.</p>
+                
+                <div class="row align-items-center mb-4 mt-4">
+                    <div class="col-md-6">
+                        <label class="form-label text-warning fw-bold">1. Selecciona el Mes:</label>
+                        <select id="selectMesContador" class="form-select bg-secondary text-white fw-bold">
+                            <option value="">⏳ Cargando meses...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 text-end mt-4 mt-md-0">
+                        <button type="button" class="btn btn-success fw-bold py-2 px-4 shadow" id="btnDescargarMesElegido" disabled>
+                            📥 Descargar Excel del Mes
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="resumenMesContador" class="alert d-none shadow-sm" style="background: #0a0a0a; border: 1px solid #00d26a; border-left: 5px solid #00d26a;"></div>
             </div>
         </div>
 
@@ -329,6 +349,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-<script type="module" src="panel.js?v=11.0"></script>
+<script type="module" src="panel.js?v=25.0"></script>
 </body>
 </html>
