@@ -16,11 +16,9 @@ const auth = getAuth(app);
 const db = getDatabase(app);
 
 const CORREOS_ADMINISTRADORES = [
-    "cami.fevreseguel@gmail.com",
+    "nat.producciones2020@gmail.com",
     "pinoelgueta@gmail.com", 
-    "natalyseguel.va@gmail.com",
-    "javier.rojas.fer@gmail.com",
-    "luisemilio.jorquera.avaria@gmail.com",
+    "correo_jefa_1@gmail.com"
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -68,6 +66,8 @@ let modalFichaInstance;
 
 let totalEsperados = 0; 
 let totalFirmados = 0; 
+let totalIP = 0;
+let totalCortesia = 0;
 window.siguienteTicketAutomatico = 1;
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; 
@@ -550,7 +550,62 @@ function activarRadares() {
     if (unsubscribeAsistencias) unsubscribeAsistencias();
     
     unsubscribeReservas = onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
-        totalEsperados = snapshot.exists() ? Object.keys(snapshot.val()).length : 0; 
+        let htmlReservasGlobal = "";
+        if (snapshot.exists()) {
+            const reservas = snapshot.val();
+            totalEsperados = Object.keys(reservas).length; 
+            totalIP = 0;
+            totalCortesia = 0;
+            
+            for (const r in reservas) {
+                const res = reservas[r];
+                if (res.tipo === "Cortesía") totalCortesia++;
+                else totalIP++;
+                
+                const tr = listaGlobalCRM[r] || {nombres: "No registrado", apellidos: ""};
+                const badge = res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`;
+                
+                htmlReservasGlobal += `
+                <li class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center" style="font-size: 0.9em;">
+                    <div><span class="text-muted" style="font-size: 0.8em;">${r}</span><br><strong>${tr.nombres} ${tr.apellidos}</strong></div>
+                    ${badge}
+                </li>`;
+            }
+        } else {
+            totalEsperados = 0;
+            totalIP = 0;
+            totalCortesia = 0;
+            htmlReservasGlobal = "<p class='text-muted p-3'>Nadie se ha inscrito aún.</p>";
+        }
+        
+        let divReservas = document.getElementById('listaReservasPanel');
+        if(!divReservas) {
+            const seccionLista = document.getElementById('seccionConteoInvitados'); 
+            divReservas = document.createElement('div');
+            divReservas.id = 'listaReservasPanel';
+            divReservas.className = 'mt-3 mb-4';
+            seccionLista.parentNode.insertBefore(divReservas, seccionLista);
+        }
+        
+        divReservas.innerHTML = `
+            <div class="accordion shadow-sm" id="accReservas">
+              <div class="accordion-item" style="background: #1a1a1a; border: 1px solid #444;">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colReservas" style="background: #1c103f; color: #d6b3ff; font-weight: bold;">
+                    📋 Ver Personas Inscritas en el Formulario
+                  </button>
+                </h2>
+                <div id="colReservas" class="accordion-collapse collapse" data-bs-parent="#accReservas">
+                  <div class="accordion-body p-0">
+                    <ul class="list-group list-group-flush" style="max-height: 280px; overflow-y: auto;">
+                      ${htmlReservasGlobal}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+        `;
+        
         actualizarTablero();
     });
     
@@ -755,6 +810,7 @@ async function onScanSuccess(decodedText) {
                         <option value="Mario Orbenes" ${nombreActual==="Mario Orbenes"?'selected':''}>Mario Orbenes</option>
                         <option value="Hana Lizama" ${nombreActual==="Hana Lizama"?'selected':''}>Hana Lizama</option>
                         <option value="Fakundo" ${nombreActual==="Fakundo"?'selected':''}>Fakundo</option>
+                        <option value="Karina Abstangen" ${nombreActual==="Karina Abstangen"?'selected':''}>Karina Abstangen</option>
                     </select>
                 `;
             } else {
