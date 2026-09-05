@@ -550,73 +550,24 @@ function activarRadares() {
     if (unsubscribeAsistencias) unsubscribeAsistencias();
     
     unsubscribeReservas = onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
-        let htmlReservasGlobal = "";
         reservasGlobales = snapshot.exists() ? snapshot.val() : {};
         totalEsperados = Object.keys(reservasGlobales).length; 
         
-        if (snapshot.exists()) {
-            for (const r in reservasGlobales) {
-                const res = reservasGlobales[r];
-                const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
-                const badge = res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`;
-                
-                htmlReservasGlobal += `
-                <li class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center" style="font-size: 0.9em;">
-                    <div><span class="text-muted" style="font-size: 0.8em;">${r}</span><br><strong>${tr.nombres} ${tr.apellidos}</strong></div>
-                    ${badge}
-                </li>`;
-            }
-        } else {
-            htmlReservasGlobal = "<p class='text-muted p-3'>Nadie se ha inscrito aún.</p>";
+        totalIP = 0;
+        totalCortesia = 0;
+        for (const r in reservasGlobales) {
+            if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
+            else totalIP++;
         }
-        
-        let divReservas = document.getElementById('listaReservasPanel');
-        if(!divReservas) {
-            divReservas = document.createElement('div');
-            divReservas.id = 'listaReservasPanel';
-            divReservas.className = 'mt-3 mb-4';
-            const tableResp = document.querySelector('#seccionLista .table-responsive');
-            if(tableResp) {
-                tableResp.parentNode.insertBefore(divReservas, tableResp);
-            }
-        }
-        
-        divReservas.innerHTML = `
-            <div class="accordion shadow-sm" id="accReservas">
-              <div class="accordion-item" style="background: #1a1a1a; border: 1px solid #444;">
-                <h2 class="accordion-header">
-                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colReservas" style="background: #1c103f; color: #d6b3ff; font-weight: bold;">
-                    📋 Ver Personas Inscritas en el Formulario
-                  </button>
-                </h2>
-                <div id="colReservas" class="accordion-collapse collapse" data-bs-parent="#accReservas">
-                  <div class="accordion-body p-0">
-                    <ul class="list-group list-group-flush" style="max-height: 280px; overflow-y: auto;">
-                      ${htmlReservasGlobal}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-        `;
-        
         actualizarTablero();
     });
+
+
     
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
         const asistencias = asistenciasGlobales;
         totalFirmados = Object.keys(asistencias).length; 
-        
-        let inIP = 0;
-        let inCortesia = 0;
-        for(const r in asistencias) {
-            if(asistencias[r].tipo_ingreso === "Cortesía") inCortesia++;
-            else inIP++;
-        }
-        window.adentroIP = inIP;
-        window.adentroCortesia = inCortesia;
-        
         actualizarTablero();
         
         let maxNumero = 0; 
@@ -686,16 +637,110 @@ function activarRadares() {
 }
 
 function actualizarTablero() {
-    document.getElementById('contEsperados').innerText = totalEsperados;
-    document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
-    let faltan = totalEsperados - totalFirmados; 
-    let textoFaltan = faltan < 0 ? 0 : faltan;
-    
-    if (faltan > 0) {
-        textoFaltan += ` <br><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:5px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:2px;">¡EN CAMINO!</span>`;
+    try {
+        let faltanIP = 0;
+        let faltanCortesia = 0;
+        let htmlFaltantes = "";
+
+        // Cruzamos los datos: Quien está en reservas pero NO en asistencias, es porque falta.
+        for (const rut in reservasGlobales) {
+            if (!asistenciasGlobales[rut]) {
+                const res = reservasGlobales[rut];
+                const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
+                const badge = res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`;
+
+                htmlFaltantes += `
+                <li class="list-group-item bg-dark text-white border-danger d-flex justify-content-between align-items-center" style="font-size: 0.9em; border-bottom: 1px solid #333;">
+                    <div><span class="text-muted" style="font-size: 0.8em;">${rut}</span><br><strong class="text-danger">${tr.nombres} ${tr.apellidos}</strong></div>
+                    ${badge}
+                </li>`;
+
+                if (res.tipo === "Cortesía") {
+                    faltanCortesia++;
+                } else {
+                    faltanIP++;
+                }
+            }
+        }
+
+        if (htmlFaltantes === "") {
+            htmlFaltantes = "<p class='text-success p-3 fw-bold mb-0 text-center'>✅ ¡Todos los inscritos ya están adentro!</p>";
+        }
+
+        document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.4em; color:#d6b3ff; font-weight:normal; display:block; margin-top:3px;">I/P: ${totalIP} | CORTESÍA: ${totalCortesia}</span>`;
+        document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
+        
+        let faltan = totalEsperados - totalFirmados; 
+        let textoFaltan = faltan < 0 ? 0 : faltan;
+        
+        if (faltan > 0) {
+            // Desglose de los que vienen en camino
+            textoFaltan += ` <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px;">Faltan: ${faltanIP} I/P | ${faltanCortesia} CORT</span>`;
+            // Monito animado
+            textoFaltan += `<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:2px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:1px;">¡EN CAMINO!</span>`;
+        }
+        
+        document.getElementById('contFaltan').innerHTML = textoFaltan;
+
+        // ACORDEÓN DE FALTANTES Y DESCARGA PARA EL CANAL
+        let divFaltantes = document.getElementById('listaFaltantesPanel');
+        if(!divFaltantes) {
+            divFaltantes = document.createElement('div');
+            divFaltantes.id = 'listaFaltantesPanel';
+            divFaltantes.className = 'mt-3 mb-4';
+            const seccionLista = document.getElementById('seccionLista');
+            const btnEsUnDia = document.getElementById('btnEsUnDia');
+            if(btnEsUnDia) {
+                seccionLista.insertBefore(divFaltantes, btnEsUnDia);
+            } else {
+                seccionLista.appendChild(divFaltantes);
+            }
+        }
+
+        divFaltantes.innerHTML = `
+            <div class="accordion shadow-sm" id="accFaltantes">
+              <div class="accordion-item" style="background: #1a0a0a; border: 1px solid #ff3333;">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colFaltantes" style="background: #330000; color: #ff9999; font-weight: bold;">
+                    🚨 Ver Lista y Descargar para el Canal
+                  </button>
+                </h2>
+                <div id="colFaltantes" class="accordion-collapse collapse" data-bs-parent="#accFaltantes">
+                  <div class="accordion-body p-0">
+                    <div class="p-3 bg-dark border-bottom border-danger">
+                        <button class="btn btn-primary w-100 fw-bold shadow-sm" onclick="window.descargarListaCanal()" style="font-size: 0.95em;">
+                            📥 DESCARGAR EXCEL CANAL (Salud y Emergencia)
+                        </button>
+                    </div>
+                    <ul class="list-group list-group-flush" style="max-height: 280px; overflow-y: auto;">
+                      <li class="list-group-item bg-dark text-white fw-bold text-center" style="font-size: 0.85em; background:#222;">👇 AÚN FALTAN POR LLEGAR (${faltan}) 👇</li>
+                      ${htmlFaltantes}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+        `;
+    } catch(e) {
+        console.error("Error crítico evitado:", e);
     }
+}
+
+window.descargarListaCanal = function() {
+    if (!reservasGlobales || Object.keys(reservasGlobales).length === 0) {
+        return alert("No hay personas inscritas en el formulario todavía.");
+    }
+    let csv = "\uFEFFESTADO;RUT;NOMBRES;APELLIDOS;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n";
     
-    document.getElementById('contFaltan').innerHTML = textoFaltan;
+    for (const rut in reservasGlobales) {
+        const res = reservasGlobales[rut];
+        const tr = listaGlobalCRM[rut] || { nombres: "No registrado", apellidos: "" };
+        const cond = res.tipo === "Cortesía" ? `Cortesía (${res.invitado_por || ''})` : "I/P";
+        const estado = asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
+        
+        csv += `${estado};${rut};${tr.nombres || ''};${tr.apellidos || ''};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${tr.enfermedades || 'No indica'}\n`;
+    }
+    descargarCSV(csv, `Lista_Canal_${nombrePrograma.replace(/[ \/]/g, "_")}_${fechaPrograma}.csv`);
 }
 
 window.toggleDT = async function(rut, nuevoEstado) {
@@ -1075,6 +1120,9 @@ window.verPerfil = function(rut) {
             <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
             <div class="col-12 mb-2"><label class="text-muted small">Dirección</label><input type="text" class="form-control bg-dark text-white" id="editDir" value="${p.direccion || ''}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small text-warning">Contacto Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaNombre" value="${p.emergenciaNombre || ''}" placeholder="Nombre del contacto"></div>
+            <div class="col-6 mb-2"><label class="text-muted small text-warning">Tel. de Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaTelefono" value="${p.emergenciaTelefono || ''}" placeholder="Número"></div>
+            <div class="col-12 mb-3"><label class="text-muted small text-danger">Enfermedades Base / Alergias</label><input type="text" class="form-control bg-dark text-white border-danger" id="editEnfermedades" value="${p.enfermedades || ''}" placeholder="Indicar patologías o 'Ninguna'"></div>
             
             <div class="col-6 mb-2"><label class="text-muted small">Sexo</label>
                 <select class="form-select bg-dark text-white" id="editSexo">
@@ -1157,6 +1205,9 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
             telefono: document.getElementById('editTel').value, 
             email: document.getElementById('editEmail').value,
             direccion: document.getElementById('editDir').value,
+            emergenciaNombre: document.getElementById('editEmergenciaNombre').value,
+            emergenciaTelefono: document.getElementById('editEmergenciaTelefono').value,
+            enfermedades: document.getElementById('editEnfermedades').value,
             sexo: document.getElementById('editSexo').value,
             afp: document.getElementById('editAfp').value, 
             salud: document.getElementById('editSalud').value,
