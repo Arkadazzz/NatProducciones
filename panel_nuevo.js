@@ -176,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const selectMes = document.getElementById('selectMesContador');
     
     // Mostramos estado de carga claro
-    selectMes.innerHTML = '<option value="">⏳ CONECTANDO A BASE DE DATOS...</option>';
+    selectMes.innerHTML = '<option value="">⏳ Cargando historial (Versión Corregida)...</option>';
     document.getElementById('btnDescargarMesElegido').disabled = true;
     document.getElementById('resumenMesContador').classList.add('d-none');
     
