@@ -173,67 +173,78 @@ document.addEventListener("DOMContentLoaded", () => {
             
             // Lógica al presionar la Pestaña Contador
             document.getElementById('contador-tab').addEventListener('click', async () => {
-                const selectMes = document.getElementById('selectMesContador');
-                if(selectMes.options.length > 1) return; 
-                
-                selectMes.innerHTML = '<option value="">⏳ Cargando meses desde el servidor...</option>';
-                
-                try {
-                    const snap = await get(ref(db, '2_asistencias'));
-                    if (!snap.exists()) {
-                        selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
-                        return;
-                    }
-                    const todas = snap.val();
-                    let infoMeses = {};
+    const selectMes = document.getElementById('selectMesContador');
+    
+    // Mostramos estado de carga claro
+    selectMes.innerHTML = '<option value="">⏳ Cargando...</option>';
+    document.getElementById('btnDescargarMesElegido').disabled = true;
+    document.getElementById('resumenMesContador').classList.add('d-none');
+    
+    try {
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) {
+            selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
+            return;
+        }
+        const todas = snap.val();
+        let infoMeses = {};
 
-                    for (const fecha in todas) {
-                        // VALIDACIÓN: Solo procesar llaves que sean fechas válidas (YYYY-MM-DD)
-                        if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) continue;
+        for (const fecha in todas) {
+            // Validación estricta para evitar que una llave malformada rompa el ciclo
+            if (!fecha || !fecha.includes('-') || fecha.length < 7) continue;
 
-                        const mes = fecha.substring(0, 7); 
-                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
-                        infoMeses[mes].fechas.push(fecha);
-                        
-                        for (const prog in todas[fecha]) {
-                            infoMeses[mes].programas.add(`${fecha}|${prog}`);
-                            for (const rut in todas[fecha][prog]) {
-                                const asis = todas[fecha][prog][rut];
-                                if(asis.tipo_ingreso !== "Cortesía") {
-                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                                    infoMeses[mes].totalPago += montoLimpio;
-                                }
-                            }
-                        }
-                    }
-                    
-                    window.infoMesesGlobal = infoMeses;
-                    window.todasAsistenciasGlobal = todas;
-                    
-                    let htmlOptions = '<option value="">-- Selecciona el mes a analizar --</option>';
-                    const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
-                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-                    mesesOrdenados.forEach(m => {
-                        const partes = m.split('-');
-                        if(partes.length === 2) {
-                            const yyyy = partes[0];
-                            const mm = parseInt(partes[1]) - 1;
-                            const mesNombre = nombresMeses[mm] || "Mes";
-                            htmlOptions += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
-                        }
-                    });
-                    
-                    // Asignación segura en bloque para Safari
-                    selectMes.innerHTML = htmlOptions;
-                    
-                } catch (e) {
-                    console.error("Error crítico en Contador:", e);
-                    selectMes.innerHTML = '<option value="">❌ Error al cargar los datos</option>';
-                }
-            });
+            const mes = fecha.substring(0, 7); 
+            if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
             
-            document.getElementById('selectMesContador').addEventListener('change', (e) => {
+            if (!infoMeses[mes].fechas.includes(fecha)) {
+                infoMeses[mes].fechas.push(fecha);
+            }
+            
+            for (const prog in todas[fecha]) {
+                infoMeses[mes].programas.add(`${fecha}|${prog}`);
+                const asistentes = todas[fecha][prog];
+                for (const rut in asistentes) {
+                    const asis = asistentes[rut];
+                    if(asis && asis.tipo_ingreso !== "Cortesía" && asis.monto) {
+                        const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                        infoMeses[mes].totalPago += montoLimpio;
+                    }
+                }
+            }
+        }
+        
+        window.infoMesesGlobal = infoMeses;
+        window.todasAsistenciasGlobal = todas;
+        
+        let htmlOptions = '<option value="">-- Selecciona el mes a analizar --</option>';
+        const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+        const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        if (mesesOrdenados.length === 0) {
+            selectMes.innerHTML = '<option value="">No hay datos válidos</option>';
+            return;
+        }
+
+        mesesOrdenados.forEach(m => {
+            const partes = m.split('-');
+            if(partes.length >= 2) {
+                const yyyy = partes[0];
+                const mm = parseInt(partes[1]) - 1;
+                const mesNombre = nombresMeses[mm] || "Mes";
+                htmlOptions += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
+            }
+        });
+        
+        selectMes.innerHTML = htmlOptions;
+        
+    } catch (e) {
+        console.error("Error crítico procesando los meses:", e);
+        selectMes.innerHTML = '<option value="">❌ Error al cargar los datos</option>';
+        alert("Ocurrió un error leyendo la base de datos de meses. Revisa la consola.");
+    }
+});
+
+document.getElementById('selectMesContador').addEventListener('change', (e) => {
                 const m = e.target.value;
                 const resumenMes = document.getElementById('resumenMesContador');
                 const btnDescargar = document.getElementById('btnDescargarMesElegido');
