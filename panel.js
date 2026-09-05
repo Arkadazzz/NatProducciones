@@ -12,6 +12,991 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// FIRMA DE LA REPRESENTANTE LEGAL (Base64)
+// Aquí pondremos el código de la imagen de la firma
+const firmaCamilaBase64 = ""; // <-- Reemplazar por Base64 de la imagen
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+const CORREOS_ADMINISTRADORES = [
+    "nat.producciones2020@gmail.com",
+    "pinoelgueta@gmail.com", 
+    "correo_jefa_1@gmail.com"
+];
+
+onAuthStateChanged(auth, (user) => { 
+    if (!user) {
+        window.location.href = "login.html"; 
+    } else {
+        const correoLimpio = user.email.trim().toLowerCase();
+        const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
+        window.localStorage.setItem('correoStaffNat', correoLimpio); // Guardamos para uso en tabs dinámicos
+        
+        if (!esAdmin) {
+            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab', 'contador-tab'];
+            pestanasBloqueadas.forEach(id => {
+                const tab = document.getElementById(id);
+                if (tab && tab.parentElement) tab.parentElement.classList.add('d-none');
+            });
+        }
+    }
+});
+
+document.getElementById('btnCerrarSesion').addEventListener('click', () => { 
+    signOut(auth).then(() => { 
+        window.localStorage.removeItem('correoStaffNat');
+        window.location.href = "login.html"; 
+    }); 
+});
+
+const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
+
+let nombrePrograma = ""; 
+let fechaPrograma = ""; 
+let montoPago = 0; 
+let horaTerminoGeneral = ""; 
+let horaCitacionGeneral = ""; 
+let pinActivo = "";
+let valorHoraExtraGlobal = 0;
+
+let html5QrcodeScanner = null; 
+let signaturePad; 
+let rutActual = ""; 
+let claveActual = "";
+let listaGlobalCRM = {}; 
+let blacklistGlobal = {}; 
+let modalFichaInstance;
+
+let totalEsperados = 0; 
+let totalFirmados = 0; 
+let totalIP = 0;
+let totalCortesia = 0;
+window.siguienteTicketAutomatico = 1;
+window.asistentesSinSalida = 0; 
+let unsubscribeReservas = null; 
+let unsubscribeAsistencias = null;
+
+function poblarSelectoresHora() {
+    let opcionesHTML = '<option value="">-- Selecciona --</option>';
+    const horas = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1];
+    
+    for (let h of horas) {
+        for (let m of [0, 30]) {
+            let hh24 = h.toString().padStart(2, '0');
+            let mm = m.toString().padStart(2, '0');
+            let ampm = (h >= 12 && h < 24) ? 'PM' : 'AM';
+            let h12 = h % 12; 
+            if (h12 === 0) h12 = 12;
+            let hh12 = h12.toString().padStart(2, '0');
+            opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm}${ampm}</option>`;
+        }
+    }
+    const selectCitacion = document.getElementById('horaCitacion');
+    const selectTermino = document.getElementById('horaTermino');
+    
+    if (selectCitacion) selectCitacion.innerHTML = opcionesHTML;
+    if (selectTermino) selectTermino.innerHTML = opcionesHTML;
+}
+poblarSelectoresHora();
+
+get(ref(db, '1_trabajadores')).then(snap => { 
+    if (snap.exists()) {
+        listaGlobalCRM = snap.val(); 
+    }
+});
+
+// ==========================================
+// INYECCIÓN DINÁMICA DEL PANEL CONTADOR
+// ==========================================
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(() => {
+        const tabList = document.querySelector('.nav-tabs');
+        const tabContent = document.querySelector('.tab-content');
+        
+        if (tabList && tabContent && !document.getElementById('contador-tab')) {
+            const li = document.createElement('li');
+            li.className = 'nav-item';
+            li.role = 'presentation';
+            li.innerHTML = '<button class="nav-link fw-bold" id="contador-tab" data-bs-toggle="tab" data-bs-target="#tab-contador" type="button" role="tab" style="color: #00d26a;">📊 Contador</button>';
+            tabList.appendChild(li);
+            
+            // Si la persona NO es VIP, ocultar la pestaña
+            const authMail = window.localStorage.getItem('correoStaffNat') || "";
+            const esAdminLocal = CORREOS_ADMINISTRADORES.includes(authMail);
+            if(!esAdminLocal) li.classList.add('d-none');
+
+            const divPane = document.createElement('div');
+            divPane.className = 'tab-pane fade';
+            divPane.id = 'tab-contador';
+            divPane.role = 'tabpanel';
+            divPane.innerHTML = `
+                <div class="card bg-dark text-white border-success mt-3 shadow-lg">
+                    <div class="card-header border-success" style="background: #111;">
+                        <h4 class="mb-0 text-success fw-bold">📊 Cierre Contable Mensual (I.M.T)</h4>
+                    </div>
+                    <div class="card-body" style="background: #1a1a1a;">
+                        <p class="text-muted">Selecciona un mes histórico para analizar los datos financieros y generar el reporte exacto. El sistema agrupará la información excluyendo automáticamente a los invitados de cortesía.</p>
+                        
+                        <div class="row align-items-center mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label text-warning fw-bold">1. Selecciona el Mes:</label>
+                                <select id="selectMesContador" class="form-select bg-secondary text-white fw-bold"></select>
+                            </div>
+                            <div class="col-md-6 text-end mt-4 mt-md-0">
+                                <button type="button" class="btn btn-success fw-bold py-2 px-4 shadow" id="btnDescargarMesElegido" disabled>
+                                    📥 Descargar Excel del Mes
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="resumenMesContador" class="alert d-none shadow-sm" style="background: #0a0a0a; border: 1px solid #00d26a; border-left: 5px solid #00d26a;"></div>
+                    </div>
+                </div>
+            `;
+            tabContent.appendChild(divPane);
+            
+            // Redirigir el botón viejo de Finanzas hacia la pestaña nueva
+            const btnViejoContador = document.getElementById('btnExcelContador');
+            if (btnViejoContador) {
+                btnViejoContador.innerText = "👉 Ir al Nuevo Panel de Contador";
+                btnViejoContador.classList.replace("btn-outline-warning", "btn-success");
+                btnViejoContador.style.fontWeight = "bold";
+                
+                const viejoPadre = btnViejoContador.closest('.card-panel');
+                if(viejoPadre) {
+                    const pDesc = viejoPadre.querySelector('p');
+                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña en el menú superior.";
+                }
+
+                btnViejoContador.replaceWith(btnViejoContador.cloneNode(true));
+                document.getElementById('btnExcelContador').addEventListener('click', () => {
+                    document.getElementById('contador-tab').click();
+                });
+            }
+            
+            // Lógica al presionar la Pestaña Contador
+            document.getElementById('contador-tab').addEventListener('click', async () => {
+                const selectMes = document.getElementById('selectMesContador');
+                if(selectMes.options.length > 1) return; 
+                
+                selectMes.innerHTML = '<option value="">⏳ Cargando meses desde el servidor...</option>';
+                
+                try {
+                    const snap = await get(ref(db, '2_asistencias'));
+                    if (!snap.exists()) {
+                        selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
+                        return;
+                    }
+                    const todas = snap.val();
+                    let infoMeses = {};
+
+                    for (const fecha in todas) {
+                        const mes = fecha.substring(0, 7); 
+                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
+                        infoMeses[mes].fechas.push(fecha);
+                        
+                        for (const prog in todas[fecha]) {
+                            infoMeses[mes].programas.add(`${fecha}\vert{}${prog}`);
+                            for (const rut in todas[fecha][prog]) {
+                                const asis = todas[fecha][prog][rut];
+                                if(asis.tipo_ingreso !== "Cortesía") {
+                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                                    infoMeses[mes].totalPago += montoLimpio;
+                                }
+                            }
+                        }
+                    }
+                    
+                    window.infoMesesGlobal = infoMeses;
+                    window.todasAsistenciasGlobal = todas;
+                    
+                    selectMes.innerHTML = '<option value="">-- Selecciona el mes a analizar --</option>';
+                    const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+                    
+                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+                    mesesOrdenados.forEach(m => {
+                        const [yyyy, mm] = m.split('-');
+                        const mesNombre = nombresMeses[parseInt(mm) - 1];
+                        selectMes.innerHTML += `<option value="${m}">📆 ${mesNombre.toUpperCase()}${yyyy}</option>`;
+                    });
+                    
+                } catch (e) {
+                    selectMes.innerHTML = '<option value="">Error al cargar los datos</option>';
+                }
+            });
+            
+            document.getElementById('selectMesContador').addEventListener('change', (e) => {
+                const m = e.target.value;
+                const resumenMes = document.getElementById('resumenMesContador');
+                const btnDescargar = document.getElementById('btnDescargarMesElegido');
+                
+                if (!m) {
+                    resumenMes.classList.add('d-none');
+                    btnDescargar.disabled = true;
+                    return;
+                }
+                
+                const data = window.infoMesesGlobal[m];
+                const fechasOrd = data.fechas.sort();
+                const primera = fechasOrd[0].split('-').reverse().join('-');
+                const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
+                
+                const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                const mesNombreVisual = nombresMeses[parseInt(m.split('-')[1]) - 1];
+                
+                resumenMes.classList.remove('d-none');
+                resumenMes.innerHTML = `
+                    <h5 class="text-success text-center mb-3 border-bottom border-success pb-2">Mes de ${mesNombreVisual}${m.split('-')[0]}</h5>
+                    <div class="row text-center py-2">
+                        <div class="col-md-4 border-end border-secondary">
+                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Rango de Fechas</h6>
+                            <span class="text-info fw-bold fs-6">Del ${primera} <br> al${ultima}</span>
+                        </div>
+                        <div class="col-md-4 border-end border-secondary">
+                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Programas Grabados</h6>
+                            <span class="text-warning fw-bold fs-3">${data.programas.size}</span>                         </div>                         <div class="col-md-4">                             <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Total Dinero del Mes</h6>                             <span class="text-success fw-bold fs-4">$${data.totalPago.toLocaleString('es-CL')}</span>
+                        </div>
+                    </div>
+                `;
+                btnDescargar.disabled = false;
+            });
+            
+            document.getElementById('btnDescargarMesElegido').addEventListener('click', async () => {
+                const mesElegido = document.getElementById('selectMesContador').value;
+                if (!mesElegido) return;
+                
+                const btn = document.getElementById('btnDescargarMesElegido');
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando Excel...'; 
+                btn.disabled = true;
+                
+                try {
+                    let tot = {};
+                    const todas = window.todasAsistenciasGlobal;
+                    
+                    for (const f in todas) { 
+                        if (f.startsWith(mesElegido)) { 
+                            for (const prog in todas[f]) { 
+                                for (const r in todas[f][prog]) {
+                                    const asis = todas[f][prog][r];
+                                    if(asis.tipo_ingreso === "Cortesía") continue;
+                                    
+                                    if (!tot[r]) tot[r] = { monto: 0, fechas: new Set() }; 
+                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                                    tot[r].monto += montoLimpio;
+                                    tot[r].fechas.add(f);
+                                }
+                            }
+                        }
+                    }
+                    
+                    let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+                    
+                    const trabSnap = await get(ref(db, '1_trabajadores'));
+                    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+                    
+                    for (const r in tot) {
+                        const tr = trabajadores[r] || { nombres: "Desconocido", apellidos: "" };
+                        const parts = r.split('-'); 
+                        const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
+                        const [y, m, d] = (tr.fechaNacimiento||"").split('-');
+                        
+                        const fechasOrdenadas = Array.from(tot[r].fechas).sort();
+                        const [yP, mP, dP] = fechasOrdenadas[0].split('-');
+                        
+                        // CÁLCULO DE FECHAS: Ingreso y Salida sumando dias
+                        const fIng = new Date(yP, mP - 1, dP);
+                        const fSal = new Date(yP, mP - 1, dP);
+                        fSal.setDate(fSal.getDate() + fechasOrdenadas.length);
+                        
+                        const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
+                        const strSal = `${String(fSal.getDate()).padStart(2,'0')}-${String(fSal.getMonth()+1).padStart(2,'0')}-${fSal.getFullYear()}`;
+                        
+                        csv += `${r};${parts[0]};${parts[1]\vert{}\vert{}''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion\vert{}\vert{}''};;Santiago;Pesos;${tot[r].monto};${tr.afp\vert{}\vert{}''};${tr.salud||''};${tr.telefono\vert{}\vert{}''};${tr.email||''}\n`;
+                    }
+                    
+                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                    const mesNombreDescarga = nombresMeses[parseInt(mesElegido.split('-')[1]) - 1];
+                    
+                    descargarCSV(csv, `Reporte_Contable_${mesNombreDescarga}_${mesElegido.split('-')[0]}_NAT.csv`);
+                } catch (e) {
+                    alert("Error generando el archivo contable.");
+                }
+                btn.innerText = "📥 Descargar Excel del Mes"; 
+                btn.disabled = false;
+            });
+        }
+    }, 1500); 
+});
+
+function descargarCSV(c, n) { 
+    const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); 
+    const a = document.createElement("a"); 
+    a.href = url; 
+    a.download = n; 
+    a.click(); 
+}
+
+// ==========================================
+// CONTROL DE PROGRAMAS
+// ==========================================
+onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
+    const container = document.getElementById('contenedorProgramasActivos'); 
+    container.innerHTML = "";
+    
+    if (snapshot.exists()) {
+        const programas = snapshot.val();
+        for (const clave in programas) {
+            const p = programas[clave];
+            let badgePin = p.pin ? `<span class="badge bg-warning text-dark ms-2 fw-bold fs-6">PIN I/P: ${p.pin}</span>` : "";
+            
+            container.innerHTML += `
+                <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
+                    <div>
+                        <strong class="text-white">${p.nombre.replace(" - ", " / ")}</strong> ${badgePin}<br>
+                        <small style="color: #d6b3ff;">${p.fecha} \vert{} Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino \vert{}\vert{} 'N/A'} \vert{} H.Extra:$${p.valor_hora_extra || 0}</small>
+                    </div>
+                    <div>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra \vert{}\vert{} 0}', '${p.hora_citacion || ''}')">🚪 Entrar</button>
+                        <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
+                    </div>
+                </div>`;
+        }
+    } else {
+        container.innerHTML = "<p class='text-muted' style='font-size: 0.9em;'>No hay programas corriendo.</p>";
+        salirDeSala();
+    }
+});
+
+document.getElementById('btnActivarWeb').addEventListener('click', async () => {
+    const nom = document.getElementById('nombrePrograma').value;
+    const fec = document.getElementById('fechaPrograma').value;
+    const mon = document.getElementById('montoPago').value;
+    const horaCitacion = document.getElementById('horaCitacion').value; 
+    const valorHE = document.getElementById('valorHoraExtra').value || 0;
+    const horaSal = document.getElementById('horaTermino').value;
+    
+    if (!nom || !fec || !mon || !horaSal || !horaCitacion) {
+        return alert("Completa todos los campos obligatorios.");
+    }
+
+    let pinGenerado = ""; 
+    if (nom.includes("Detrás del Muro")) {
+        pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
+    }
+    
+    const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
+    
+    await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
+        nombre: nom, 
+        fecha: fec, 
+        monto: mon, 
+        pin: pinGenerado, 
+        hora_termino: horaSal, 
+        valor_hora_extra: valorHE, 
+        hora_citacion: horaCitacion 
+    });
+    
+    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion);
+});
+
+window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaCit) {
+    claveActual = clave; 
+    nombrePrograma = nom; 
+    fechaPrograma = fec; 
+    montoPago = mon; 
+    pinActivo = pin || ""; 
+    horaTerminoGeneral = horaSal || ""; 
+    valorHoraExtraGlobal = parseInt(valorHE) || 0;
+    horaCitacionGeneral = horaCit || "";
+    
+    let titulo = `Sala: ${nom.replace(" - ", " / ")}`; 
+    if (pinActivo) {
+        titulo += ` <span class="badge bg-warning text-dark ms-2">PIN: ${pinActivo}</span>`;
+    }
+    
+    document.getElementById('tituloEscaner').innerHTML = titulo;
+    document.getElementById('seccionConfiguracion').classList.add('d-none');
+    document.getElementById('seccionEscaner').classList.remove('d-none');
+    document.getElementById('seccionLista').classList.remove('d-none');
+    
+    if (!html5QrcodeScanner) {
+        html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+        html5QrcodeScanner.render(onScanSuccess, () => {});
+    }
+    
+    activarRadares();
+}
+
+window.cerrarProgramaGlobal = async function(clave) {
+    if(confirm("¿TERMINAR programa para todos? Desaparecerá de la web pública.")) {
+        await remove(ref(db, `0_estado_sistema/programas_activos/${clave}`));
+    }
+}
+
+function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBaseOriginal, valorHE, fechaProg) {
+    let nuevoMontoBase = parseInt(montoBaseOriginal) || 0;
+    let bonoExtra = 0;
+
+    if (!horaCitacion || !horaTermino) return { montoBaseNuevo: nuevoMontoBase, bonoExtra: 0 };
+
+    let [y, m, d] = fechaProg.split('-').map(Number);
+    let [hcH, hcM] = horaCitacion.split(':').map(Number);
+    let [htH, htM] = horaTermino.split(':').map(Number);
+    let [hsH, hsM] = horaSalidaReal.split(':').map(Number);
+
+    let tCit = new Date(y, m - 1, d, hcH, hcM);
+    let tTer = new Date(y, m - 1, d, htH, htM);
+    if (htH === 0 || htH === 1) tTer.setDate(tTer.getDate() + 1);
+    
+    let tSal = new Date(y, m - 1, d, hsH, hsM);
+    if (hsH < 8 && hcH >= 8) tSal.setDate(tSal.getDate() + 1);
+
+    let expectedDuration = (tTer - tCit) / 60000; 
+    let actualDuration = (tSal - tCit) / 60000;
+
+    if (actualDuration < (expectedDuration / 2)) {
+        nuevoMontoBase = 0; 
+    } else if (actualDuration < expectedDuration) {
+        nuevoMontoBase = Math.round(nuevoMontoBase / 2); 
+    } else {
+        let diffMins = Math.floor((tSal - tTer) / 60000);
+        if (diffMins > 0 && valorHE > 0) {
+            let horasCompletas = Math.floor(diffMins / 60);
+            let minRestantes = diffMins % 60;
+            
+            // Más de 30 minutos = 1 hora extra
+            if (minRestantes >= 30) {
+                horasCompletas++;
+            }
+            
+            bonoExtra = horasCompletas * parseInt(valorHE);
+        }
+    }
+
+    return { montoBaseNuevo: nuevoMontoBase, bonoExtra: bonoExtra };
+}
+
+document.getElementById('btnEsUnDia').addEventListener('click', async () => {
+    if (!claveActual) return;
+    const now = new Date();
+    const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+
+    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
+
+    try {
+        const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
+        if (snap.exists()) {
+            const asistencias = snap.val();
+            let actualizacionesFirebase = {};
+            let procesados = 0;
+
+            for (const rut in asistencias) {
+                const asis = asistencias[rut];
+                if (!asis.hora_salida) {
+                    let pagoFinal = 0;
+                    let bonoFinal = 0;
+
+                    if (asis.tipo_ingreso === "Cortesía") {
+                        pagoFinal = 0;
+                        bonoFinal = 0;
+                    } else {
+                        let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalidaMasiva, asis.monto, valorHoraExtraGlobal, fechaPrograma);
+                        pagoFinal = calculo.montoBaseNuevo + calculo.bonoExtra;
+                        bonoFinal = calculo.bonoExtra;
+                    }
+                    
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoFinal;
+                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = pagoFinal;
+                    procesados++;
+                }
+            }
+
+            if (Object.keys(actualizacionesFirebase).length > 0) {
+                await update(ref(db), actualizacionesFirebase);
+                alert(`✅ Checkout Masivo Exitoso.\nSe calculó la salida y el pago a ${procesados} personas.`);
+            }
+        }
+        await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
+        alert("¡Jornada terminada con éxito!");
+        salirDeSala();
+    } catch (error) { 
+        alert("Error al intentar cerrar la jornada masivamente."); 
+    }
+});
+
+document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
+
+function salirDeSala() {
+    claveActual = ""; 
+    nombrePrograma = ""; 
+    fechaPrograma = ""; 
+    montoPago = 0; 
+    pinActivo = ""; 
+    horaTerminoGeneral = ""; 
+    horaCitacionGeneral = ""; 
+    valorHoraExtraGlobal = 0;
+    
+    document.getElementById('seccionConfiguracion').classList.remove('d-none');
+    document.getElementById('seccionEscaner').classList.add('d-none');
+    document.getElementById('seccionFirma').classList.add('d-none');
+    document.getElementById('seccionLista').classList.add('d-none');
+    document.getElementById('tablaAsistentes').innerHTML = "";
+    
+    if (unsubscribeReservas) unsubscribeReservas();
+    if (unsubscribeAsistencias) unsubscribeAsistencias();
+    if (html5QrcodeScanner) { 
+        try { html5QrcodeScanner.clear(); } catch(e) {} 
+        html5QrcodeScanner = null; 
+    }
+}
+
+function activarRadares() {
+    if (unsubscribeReservas) unsubscribeReservas(); 
+    if (unsubscribeAsistencias) unsubscribeAsistencias();
+    
+    unsubscribeReservas = onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
+        let htmlReservasGlobal = "";
+        if (snapshot.exists()) {
+            const reservas = snapshot.val();
+            totalEsperados = Object.keys(reservas).length; 
+            totalIP = 0;
+            totalCortesia = 0;
+            
+            for (const r in reservas) {
+                const res = reservas[r];
+                if (res.tipo === "Cortesía") totalCortesia++;
+                else totalIP++;
+                
+                const tr = listaGlobalCRM[r] || {nombres: "No registrado", apellidos: ""};
+                const badge = res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`;
+                
+                htmlReservasGlobal += `
+                <li class="list-group-item bg-dark text-white border-secondary d-flex justify-content-between align-items-center" style="font-size: 0.9em;">
+                    <div><span class="text-muted" style="font-size: 0.8em;">${r}</span><br><strong>${tr.nombres} ${tr.apellidos}</strong></div>${badge}
+                </li>`;
+            }
+        } else {
+            totalEsperados = 0;
+            totalIP = 0;
+            totalCortesia = 0;
+            htmlReservasGlobal = "<p class='text-muted p-3'>Nadie se ha inscrito aún.</p>";
+        }
+        
+        let divReservas = document.getElementById('listaReservasPanel');
+        if(!divReservas) {
+            const seccionLista = document.getElementById('seccionConteoInvitados'); 
+            divReservas = document.createElement('div');
+            divReservas.id = 'listaReservasPanel';
+            divReservas.className = 'mt-3 mb-4';
+            seccionLista.parentNode.insertBefore(divReservas, seccionLista);
+        }
+        
+        divReservas.innerHTML = `
+            <div class="accordion shadow-sm" id="accReservas">
+              <div class="accordion-item" style="background: #1a1a1a; border: 1px solid #444;">
+                <h2 class="accordion-header">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colReservas" style="background: #1c103f; color: #d6b3ff; font-weight: bold;">
+                    📋 Ver Personas Inscritas en el Formulario
+                  </button>
+                </h2>
+                <div id="colReservas" class="accordion-collapse collapse" data-bs-parent="#accReservas">
+                  <div class="accordion-body p-0">
+                    <ul class="list-group list-group-flush" style="max-height: 280px; overflow-y: auto;">
+                      ${htmlReservasGlobal}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+        `;
+        
+        actualizarTablero();
+    });
+    
+    unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
+        const asistencias = snapshot.exists() ? snapshot.val() : {};
+        totalFirmados = Object.keys(asistencias).length; 
+        actualizarTablero();
+        
+        let maxNumero = 0; 
+        const conteoStaff = {}; 
+        window.asistentesSinSalida = 0; 
+        
+        const tbody = document.getElementById('tablaAsistentes'); 
+        tbody.innerHTML = "";
+        
+        for (const rut in asistencias) {
+            const asis = asistencias[rut]; 
+            const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
+            const num = parseInt(asis.numero_asignado) || 0; 
+            
+            if (num > maxNumero) {
+                maxNumero = num;
+            }
+            
+            if (asis.tipo_ingreso === "Cortesía" && asis.invitado_por) {
+                conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
+            }
+            
+            let btnDT = "";
+            if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato) {
+                if (asis.estado_dt === "Subido") {
+                    btnDT = `<button class="btn btn-success btn-sm fw-bold" onclick="window.toggleDT('${rut}', 'Pendiente')">✅ DT Listo</button>`;
+                } else {
+                    btnDT = `<button class="btn btn-outline-warning btn-sm fw-bold" onclick="window.toggleDT('${rut}', 'Subido')">⏳ Subir DT</button>`;
+                }
+            } else {
+                btnDT = `<span class="badge bg-secondary">No aplica</span>`;
+            }
+
+            let btnSalidaContrato = "";
+            if (asis.hora_salida) {
+                btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
+            } else { 
+                window.asistentesSinSalida++; 
+                btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}',${asis.monto})">Marcar Salida</button>`; 
+            }
+            
+            const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}',${asis.monto}, '${trab.nombres}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td>
+                            <td>${trab.nombres} ${trab.apellidos}<br>${btnEditarPago}</td>
+                            <td>${asis.hora_ingreso}</td>
+                            <td>${btnDT}</td>
+                            <td>${btnSalidaContrato}</td>
+                            <td><button class="btn btn-danger btn-sm" onclick="window.anularAsistencia('${rut}')">X</button></td>`;
+            tbody.appendChild(tr);
+        }
+        
+        window.siguienteTicketAutomatico = maxNumero + 1;
+        
+        if (nombrePrograma.includes("Detrás del Muro")) {
+            document.getElementById('seccionConteoInvitados').classList.remove('d-none');
+            let htmlConteo = "";
+            for(const staff in conteoStaff) {
+                htmlConteo += `<span class="badge bg-dark border border-warning fs-6 text-white">${staff}: <b class="text-warning fs-5 ms-1">${conteoStaff[staff]}</b></span>`;
+            }
+            document.getElementById('listaConteoInvitados').innerHTML = htmlConteo || "<small style='color: #aaaaaa;'>Nadie ha llegado.</small>";
+        } else { 
+            document.getElementById('seccionConteoInvitados').classList.add('d-none'); 
+        }
+    });
+}
+
+function actualizarTablero() {
+    document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.4em; color:#d6b3ff; font-weight:normal; display:block; margin-top:3px;">I/P: ${totalIP} \vert{} CORTESÍA: ${totalCortesia}</span>`;
+    document.getElementById('contFirmados').innerText = totalFirmados;
+    let faltan = totalEsperados - totalFirmados; 
+    let textoFaltan = faltan < 0 ? 0 : faltan;
+    
+    if (faltan > 0) {
+        textoFaltan += ` <br><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:5px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:2px;">¡EN CAMINO!</span>`;
+    }
+    
+    document.getElementById('contFaltan').innerHTML = textoFaltan;
+}
+
+window.toggleDT = async function(rut, nuevoEstado) {
+    try { 
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { estado_dt: nuevoEstado }); 
+    } catch (e) { 
+        alert("Error al actualizar el estado DT."); 
+    }
+}
+
+window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
+    let nuevoMonto = prompt(`¿Cuánto será el NUEVO PAGO TOTAL de ${nombrePersona} para la jornada de hoy?\n(Monto actual:$${montoActual})`, montoActual);
+    if (nuevoMonto === null || nuevoMonto === "") return;
+    
+    nuevoMonto = parseInt(nuevoMonto);
+    if (isNaN(nuevoMonto)) return alert("Por favor ingresa solo números.");
+    
+    try { 
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { monto: nuevoMonto }); 
+    } catch (e) { 
+        alert("Error al actualizar el pago."); 
+    }
+}
+
+window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
+    const now = new Date();
+    const horaSalida = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    
+    if (tipoIngreso === "Cortesía") {
+        if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
+        try { 
+            await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: 0, monto: 0 }); 
+        } catch (e) {}
+        return;
+    } 
+    
+    let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalida, montoBaseActual, valorHoraExtraGlobal, fechaPrograma);
+    
+    let msj = `Hora de salida marcada: ${horaSalida}\n\n`;
+    if (calculo.montoBaseNuevo === 0) {
+        msj += `⚠️ ABANDONO ANTICIPADO ⚠️\nSe retiró antes de cumplir la mitad de la jornada. El sistema ajustará su pago base a $0.\n`;
+    } else if (calculo.montoBaseNuevo < parseInt(montoBaseActual)) {
+        msj += `⚠️ RETIRO ANTICIPADO ⚠️\nSe retiró pasada la media jornada, pero no la completó. El sistema ajustará su pago base a la mitad: $${calculo.montoBaseNuevo}.\n`;
+    } else if (calculo.bonoExtra > 0) {
+        msj += `✅ Completó Horas Extras.\nBono extra calculado automáticamente: $${calculo.bonoExtra}\n`;
+    } else {
+        msj += `Jornada regular completada. Sin horas extra.\n`;
+    }
+
+    msj += `\nConfirma el BONO EXTRA que recibirá (Su pago base será modificado a $${calculo.montoBaseNuevo}):`;
+    
+    let respuesta = prompt(msj, calculo.bonoExtra);
+    if (respuesta === null) return; 
+    let bonoExtraConfirmado = parseInt(respuesta) || 0;
+    
+    const nuevoMontoTotal = calculo.montoBaseNuevo + bonoExtraConfirmado;
+
+    try { 
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
+            hora_salida: horaSalida, 
+            bono_horas_extras: bonoExtraConfirmado, 
+            monto: nuevoMontoTotal 
+        }); 
+    } catch (error) { 
+        alert("Error al marcar salida."); 
+    }
+}
+
+document.getElementById('btnIngresoManual').addEventListener('click', () => {
+    const rutIngresado = document.getElementById('rutManual').value.trim();
+    if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
+    onScanSuccess(rutIngresado); 
+    document.getElementById('rutManual').value = "";
+});
+
+async function onScanSuccess(decodedText) {
+    try { if(html5QrcodeScanner) html5QrcodeScanner.pause(); } catch(e) {} 
+    
+    document.getElementById('mensajeEscaneo').classList.remove('d-none'); 
+    rutActual = decodedText; 
+    
+    try {
+        const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
+        if (blacklistSnap.exists()) { 
+            alert(`⛔ ACCESO DENEGADO ⛔\nLa persona no tiene permitido el ingreso.`); 
+            try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+            return; 
+        }
+        
+        const reservaSnap = await get(child(ref(db), `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`));
+        const snapshot = await get(child(ref(db), `1_trabajadores/${rutActual}`));
+        
+        if (snapshot.exists()) {
+            const datos = snapshot.val(); 
+            listaGlobalCRM[rutActual] = datos; 
+            document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
+            const infoInvitado = document.getElementById('infoInvitado');
+            
+            const esCortesia = reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía";
+            infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
+
+            const opcionesDiv = document.getElementById('opcionesFirmaAdmin');
+            opcionesDiv.classList.remove('d-none');
+            
+            if (esCortesia) {
+                const nombreActual = reservaSnap.exists() ? reservaSnap.val().invitado_por : "";
+                opcionesDiv.innerHTML = `
+                    <label class="form-label text-warning mb-1">Corregir "Invitado Por":</label>
+                    <select id="editInvitadoPor" class="form-select bg-dark text-white border-warning">
+                        <option value="Luis Jorquera" ${nombreActual==="Luis Jorquera"?'selected':''}>Luis Jorquera</option>
+                        <option value="Agustin Pino" ${nombreActual==="Agustin Pino"?'selected':''}>Agustin Pino</option>
+                        <option value="Martina Pino" ${nombreActual==="Martina Pino"?'selected':''}>Martina Pino</option>
+                        <option value="Ariela Rojas" ${nombreActual==="Ariela Rojas"?'selected':''}>Ariela Rojas</option>
+                        <option value="Javier Rojas" ${nombreActual==="Javier Rojas"?'selected':''}>Javier Rojas</option>
+                        <option value="Matias Puentes" ${nombreActual==="Matias Puentes"?'selected':''}>Matias Puentes</option>
+                        <option value="Mario Orbenes" ${nombreActual==="Mario Orbenes"?'selected':''}>Mario Orbenes</option>
+                        <option value="Hana Lizama" ${nombreActual==="Hana Lizama"?'selected':''}>Hana Lizama</option>
+                        <option value="Fakundo" ${nombreActual==="Fakundo"?'selected':''}>Fakundo</option>
+                        <option value="Karina Abstangen" ${nombreActual==="Karina Abstangen"?'selected':''}>Karina Abstangen</option>
+                    </select>
+                `;
+            } else {
+                opcionesDiv.innerHTML = `
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="checkAplicaContrato" checked style="transform: scale(1.3); margin-right: 10px;">
+                        <label class="form-check-label text-white fw-bold" for="checkAplicaContrato">Generar Contrato Laboral DT</label>
+                    </div>
+                    <small class="text-muted">Si lo apagas, solo firmará Cesión de Imagen.</small>
+                `;
+            }
+
+            document.getElementById('seccionFirma').classList.remove('d-none'); 
+            document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
+            
+            const canvas = document.getElementById('signature-pad');
+            
+            // FIX DEL OFFSET DEL LÁPIZ: Aumentamos el delay a 250ms para que el iPad pinte la caja y calcule bien el ancho antes de configurar el pad
+            setTimeout(() => {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+                
+                if(!signaturePad) {
+                    signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(255, 255, 255)' }); 
+                }
+                signaturePad.clear(); 
+            }, 250);
+
+            document.getElementById('mensajeEscaneo').classList.add('d-none');
+            
+        } else { 
+            alert("RUT no encontrado en la base de datos."); 
+            try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+        }
+    } catch (error) { 
+        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+    }
+}
+
+document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
+
+document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
+    if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
+    
+    const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
+    const now = new Date();
+    const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+    const numeroFinal = document.getElementById('numeroAsignado').value;
+    
+    const textoInfo = document.getElementById('infoInvitado').innerText; 
+    const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
+    
+    let invitadoPor = "";
+    let aplicaContrato = false;
+
+    if (tipo === "Cortesía") {
+        invitadoPor = document.getElementById('editInvitadoPor') ? document.getElementById('editInvitadoPor').value : "";
+        aplicaContrato = false; 
+    } else {
+        aplicaContrato = document.getElementById('checkAplicaContrato') ? document.getElementById('checkAplicaContrato').checked : true;
+    }
+
+    try {
+        await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
+            rut: rutActual, 
+            nombre_programa: nombrePrograma, 
+            monto: (tipo === "Pago" ? montoPago : 0), 
+            tipo_ingreso: tipo, 
+            hora_ingreso: horaActual, 
+            firma_digital: firmaBase64, 
+            estado_pago: "Pendiente", 
+            numero_asignado: numeroFinal, 
+            invitado_por: invitadoPor, 
+            aplica_contrato: aplicaContrato, 
+            estado_dt: "Pendiente" 
+        });
+        
+        document.getElementById('seccionFirma').classList.add('d-none'); 
+        signaturePad.clear(); 
+        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+        rutActual = "";
+    } catch (error) { 
+        alert("Error al guardar."); 
+    }
+});
+
+window.anularAsistencia = async function(rut) { 
+    if(confirm("¿Seguro que deseas anular esta asistencia?")) {
+        await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); 
+    }
+}
+
+// ==========================================
+// CONTRATOS PDF 
+// ==========================================
+window.generarContratoPDF = async function(rut) {
+    const trab = listaGlobalCRM[rut]; 
+    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
+    
+    if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
+    
+    const asis = asisSnap.val(); 
+    const { jsPDF } = window.jspdf; 
+    const doc = new jsPDF({ format: 'legal' });
+    
+    dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
+    
+    const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
+    const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
+    
+    let nombreArchivo = "";
+    if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
+        nombreArchivo = `Cesion_Imagen_${ticketStr}_${nombreCompletoLimpio}_${rut}.pdf`;
+    } else {
+        nombreArchivo = `Contrato_${ticketStr}_${nombreCompletoLimpio}_${rut}.pdf`;
+    }
+    
+    doc.save(nombreArchivo);
+}
+
+function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
+    let y = 15; 
+    doc.setFont("helvetica", "bold"); 
+    doc.setFontSize(11);
+    
+    const mesNombres = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const [yearF, monthF, dayF] = fechaProg.split('-'); 
+    const fechaTexto = `${dayF} de ${mesNombres[parseInt(monthF)-1]} de ${yearF}`;
+    const fechaNac = trab.fechaNacimiento ? trab.fechaNacimiento.split('-').reverse().join('-') : '___________';
+    const nombreCompleto = `${trab.nombres || ''} ${trab.apellidos || ''}`.toUpperCase();
+    const direccion = trab.direccion ? trab.direccion.toUpperCase() : '_______________________';
+
+    let titulo = ""; 
+    let textoContrato = "";
+
+    if (asis.aplica_contrato === false || asis.tipo_ingreso === "Cortesía") {
+        titulo = "Acuerdo de Cesión de Derechos de Imagen y Voz";
+        textoContrato = `En Santiago, a ${fechaTexto}, don/a ${nombreCompleto}, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, domiciliado/a en calle ${direccion}, ciudad de Santiago, en adelante “el/la Cedente”, declara y acepta lo siguiente:
+
+PRIMERO. El Cedente asiste a la producción "${nombreProg}" en calidad de invitado/a o extra sin relation de subordinación ni dependencia.
+
+SEGUNDO. Por el presente acto, el Cedente autoriza a Camila Alejandra Fevre Seguel Produccion E.I.R.L de forma gratuita, irrevocable y sin límite territorial, la fijación, fijación audiovisual, reproducción y difusión de su imagen y voz captadas durante su asistencia a la producción.
+
+TERCERO. Se deja expresa constancia de que la participación es voluntaria y no existe remuneración laboral asociada a este acuerdo.`;
+    } else {
+        titulo = "Contrato de Trabajo Extras Público (Televisión)";
+        textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por don/a Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${nombreCompleto}, de nacionalidad chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '___________________________'}, domiciliado/a en ${direccion}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
+
+PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, entre el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
+
+SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deb¡Claro que sí! Aquí tienes el archivo descargable `.txt` con el código exacto ya arreglado y listo para usar:
+
+Tu archivo TXT está listo
+👉 **[file-tag: code-generated-file-f83aebaf-f333-4538-b154-928a61387507]**
+
+Y de todas formas, por si vuelve a fallar la descarga, aquí tienes el bloque de texto con el código completo. Solo tienes que hacer clic en el botón de **"Copiar código"** (Copy code) en la esquina superior derecha y pegarlo en tu archivo `panel.js` de GitHub.
+
+```javascript
+import { initializeApp } from "[https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js](https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js)";
+import { getAuth, onAuthStateChanged, signOut } from "[https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js](https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js)";
+import { getDatabase, ref, get, set, remove, child, onValue, update } from "[https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js](https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js)";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
+    authDomain: "natproducciones.firebaseapp.com",
+    projectId: "natproducciones",
+    storageBucket: "natproducciones.firebasestorage.app",
+    messagingSenderId: "553451405946",
+    appId: "1:553451405946:web:3a9f5a4a1429466641f1c3"
+};
+
+const app = initializeApp(firebaseConfig);
+
+// FIRMA DE LA REPRESENTANTE LEGAL (Base64)
+// Aquí pondremos el código de la imagen de la firma
+const firmaCamilaBase64 = ""; // <-- Reemplazar por Base64 de la imagen
 const auth = getAuth(app);
 const db = getDatabase(app);
 
@@ -329,6 +1314,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }, 1500); 
 });
+
+function descargarCSV(c, n) { 
+    const url = URL.createObjectURL(new Blob([c], { type: 'text/csv;charset=utf-8;' })); 
+    const a = document.createElement("a"); 
+    a.href = url; 
+    a.download = n; 
+    a.click(); 
+}
 
 // ==========================================
 // CONTROL DE PROGRAMAS
@@ -681,13 +1674,14 @@ function activarRadares() {
 }
 
 function actualizarTablero() {
-    document.getElementById('contEsperados').innerText = totalEsperados;
+    document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.4em; color:#d6b3ff; font-weight:normal; display:block; margin-top:3px;">I/P: ${totalIP} | CORTESÍA: ${totalCortesia}</span>`;
     document.getElementById('contFirmados').innerText = totalFirmados;
     let faltan = totalEsperados - totalFirmados; 
     let textoFaltan = faltan < 0 ? 0 : faltan;
     
+    // Pixel Art Caminando
     if (faltan > 0) {
-        textoFaltan += ` <br><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:5px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:2px;">¡EN CAMINO!</span>`;
+        textoFaltan += ` <br><img src="[https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif](https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif)" style="height: 30px; margin-top:5px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:2px;">¡EN CAMINO!</span>`;
     }
     
     document.getElementById('contFaltan').innerHTML = textoFaltan;
@@ -826,8 +1820,21 @@ async function onScanSuccess(decodedText) {
             document.getElementById('seccionFirma').classList.remove('d-none'); 
             document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
             
-            if(!signaturePad) signaturePad = new SignaturePad(document.getElementById('signature-pad'), { backgroundColor: 'rgb(255, 255, 255)' }); 
-            signaturePad.clear(); 
+            const canvas = document.getElementById('signature-pad');
+            
+            // FIX DEL OFFSET DEL LÁPIZ: Aumentamos el delay a 250ms para que el iPad pinte la caja y calcule bien el ancho antes de configurar el pad
+            setTimeout(() => {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+                
+                if(!signaturePad) {
+                    signaturePad = new SignaturePad(canvas, { backgroundColor: 'rgb(255, 255, 255)' }); 
+                }
+                signaturePad.clear(); 
+            }, 250);
+
             document.getElementById('mensajeEscaneo').classList.add('d-none');
             
         } else { 
@@ -951,7 +1958,7 @@ TERCERO. Se deja expresa constancia de que la participación es voluntaria y no 
 
 PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, entre el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
-SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
+SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los services, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
 TERCERO. El trabajador/a cumplirá una jornada ordinaria de trabajo que estará establecida en la citación a la jornada, que será entregado al trabajador/a con un mínimo anticipación 24 horas. La jornada diaria no excederá de 10 horas. Lo anterior, sin perjuicio de lo establecido en el Párrafo 2°, del Capítulo IV, del Título I, del Libro I, del Código del Trabajo, relativo a horas extraordinarias.
 
@@ -983,6 +1990,9 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
     y += (lineas.length * 4.8) + 20; 
 
     doc.setFont("helvetica", "bold"); 
+    if (firmaCamilaBase64.length > 100) {
+        try { doc.addImage(firmaCamilaBase64, 'JPEG', 15, y - 22, 70, 20); } catch(e) { console.error("Error cargando firma Camila"); }
+    }
     doc.text("_________________________________", 50, y, null, null, "center"); 
     doc.text("Firma Producción", 50, y + 5, null, null, "center"); 
     doc.setFont("helvetica", "normal"); 
@@ -1480,10 +2490,20 @@ document.getElementById('btnBuscarEfectivo').addEventListener('click', async () 
     document.getElementById('detalleProgramasEfectivo').innerText = `Asistencias a pagar:\n${deuda.programas.join(' | ')}`;
     document.getElementById('panelPagoEfectivo').classList.remove('d-none');
     
-    if(!signaturePadEfectivo) {
-        signaturePadEfectivo = new SignaturePad(document.getElementById('signature-pad-efectivo'), { backgroundColor: 'rgb(255, 255, 255)' });
-    }
-    signaturePadEfectivo.clear();
+    const canvasEfectivo = document.getElementById('signature-pad-efectivo');
+    
+    // FIX DEL OFFSET DEL LÁPIZ EFECTIVO
+    setTimeout(() => {
+        const ratioEf = Math.max(window.devicePixelRatio || 1, 1);
+        canvasEfectivo.width = canvasEfectivo.offsetWidth * ratioEf;
+        canvasEfectivo.height = canvasEfectivo.offsetHeight * ratioEf;
+        canvasEfectivo.getContext("2d").scale(ratioEf, ratioEf);
+        
+        if(!signaturePadEfectivo) {
+            signaturePadEfectivo = new SignaturePad(canvasEfectivo, { backgroundColor: 'rgb(255, 255, 255)' });
+        }
+        signaturePadEfectivo.clear();
+    }, 250);
     
     rutEfectivoActual = rut;
     deudaEfectivoActual = deuda;
@@ -1530,13 +2550,24 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
         const lineas = doc.splitTextToSize(textoCentral, 170);
         doc.text(lineas, 20, 40);
         
-        doc.addImage(firmaBase64, 'JPEG', 65, 130, 80, 25);
+        // Firma Producción
+        if (firmaCamilaBase64.length > 100) {
+            try { doc.addImage(firmaCamilaBase64, 'JPEG', 20, 135, 70, 20); } catch(e) {}
+        }
         doc.setFont("helvetica", "bold");
-        doc.text("_________________________________", 105, 160, null, null, "center");
-        doc.text("Firma Recibi Conforme", 105, 165, null, null, "center");
+        doc.text("_________________________________", 55, 160, null, null, "center");
+        doc.text("Firma Producción", 55, 165, null, null, "center");
         doc.setFont("helvetica", "normal");
-        doc.text(document.getElementById('nombreEfectivo').innerText, 105, 170, null, null, "center");
-        doc.text(rutEfectivoActual, 105, 175, null, null, "center");
+        doc.text("CAMILA FEVRE SEGUEL", 55, 170, null, null, "center");
+
+        // Firma Trabajador
+        doc.addImage(firmaBase64, 'JPEG', 115, 130, 80, 25);
+        doc.setFont("helvetica", "bold");
+        doc.text("_________________________________", 155, 160, null, null, "center");
+        doc.text("Firma Recibí Conforme", 155, 165, null, null, "center");
+        doc.setFont("helvetica", "normal");
+        doc.text(document.getElementById('nombreEfectivo').innerText, 155, 170, null, null, "center");
+        doc.text(rutEfectivoActual, 155, 175, null, null, "center");
         
         const nombreCompletoLimpio = document.getElementById('nombreEfectivo').innerText.replace(/[^a-zA-Z0-9_]/g, "_");
         doc.save(`Recibo_Efectivo_${nombreCompletoLimpio}_${rutEfectivoActual}.pdf`);
@@ -1879,7 +2910,6 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
     }
 });
 
-
 // ==========================================
 // PESTAÑA 4: SEGURIDAD (ACORDEÓN MES -> PROGRAMA)
 // ==========================================
@@ -2060,6 +3090,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
             const asis = asistentes[rut];
             
             const cond = asis.tipo_ingreso === "Cortesía" ? `Cortesía (${asis.invitado_por})` : "Trabajador";
+            const telefonoLimpio = (tr.telefono || "-").replace(/^\+56\s*9/, '9').replace(/^\+56/, '9').replace(/\s+/g, '');
             
             csv += `${asis.numero_asignado || '-'};${programaElegido.replace(" - ", " / ")};${fechaElegida};${rut};${tr.nombres};${tr.apellidos};${cond};${tr.direccion || '-'}\n`;
         }
