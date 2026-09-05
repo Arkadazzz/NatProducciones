@@ -557,7 +557,7 @@ function activarRadares() {
         if (snapshot.exists()) {
             for (const r in reservasGlobales) {
                 const res = reservasGlobales[r];
-                const tr = listaGlobalCRM[r] || {nombres: "No registrado", apellidos: ""};
+                const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
                 const badge = res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`;
                 
                 htmlReservasGlobal += `
@@ -607,6 +607,16 @@ function activarRadares() {
         asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
         const asistencias = asistenciasGlobales;
         totalFirmados = Object.keys(asistencias).length; 
+        
+        let inIP = 0;
+        let inCortesia = 0;
+        for(const r in asistencias) {
+            if(asistencias[r].tipo_ingreso === "Cortesía") inCortesia++;
+            else inIP++;
+        }
+        window.adentroIP = inIP;
+        window.adentroCortesia = inCortesia;
+        
         actualizarTablero();
         
         let maxNumero = 0; 
@@ -677,7 +687,7 @@ function activarRadares() {
 
 function actualizarTablero() {
     document.getElementById('contEsperados').innerText = totalEsperados;
-    document.getElementById('contFirmados').innerText = totalFirmados;
+    document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
     let faltan = totalEsperados - totalFirmados; 
     let textoFaltan = faltan < 0 ? 0 : faltan;
     
@@ -1232,7 +1242,7 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
     tbody.innerHTML = "";
     
     for (const r in deudas) {
-        const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
+        const tr = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" }; 
         const fila = document.createElement('tr');
         fila.innerHTML = `
             <td>${r}</td>
@@ -1260,7 +1270,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
+        const tr = listaGlobalCRM[rut] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
