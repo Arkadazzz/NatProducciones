@@ -27,7 +27,6 @@ onAuthStateChanged(auth, (user) => {
     } else {
         const correoLimpio = user.email.trim().toLowerCase();
         const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
-        window.localStorage.setItem('correoStaffNat', correoLimpio); // Guardamos para uso en tabs dinámicos
         
         if (!esAdmin) {
             const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab', 'contador-tab'];
@@ -41,7 +40,6 @@ onAuthStateChanged(auth, (user) => {
 
 document.getElementById('btnCerrarSesion').addEventListener('click', () => { 
     signOut(auth).then(() => { 
-        window.localStorage.removeItem('correoStaffNat');
         window.location.href = "login.html"; 
     }); 
 });
@@ -101,235 +99,7 @@ get(ref(db, '1_trabajadores')).then(snap => {
 });
 
 // ==========================================
-// INYECCIÓN DINÁMICA DEL PANEL CONTADOR
-// ==========================================
-document.addEventListener("DOMContentLoaded", () => {
-    setTimeout(() => {
-        const tabList = document.querySelector('.nav-tabs');
-        const tabContent = document.querySelector('.tab-content');
-        
-        if (tabList && tabContent && !document.getElementById('contador-tab')) {
-            const li = document.createElement('li');
-            li.className = 'nav-item';
-            li.role = 'presentation';
-            li.innerHTML = '<button class="nav-link fw-bold" id="contador-tab" data-bs-toggle="tab" data-bs-target="#tab-contador" type="button" role="tab" style="color: #00d26a;">📊 Contador</button>';
-            tabList.appendChild(li);
-            
-            // Si la persona NO es VIP, ocultar la pestaña
-            const authMail = window.localStorage.getItem('correoStaffNat') || "";
-            const esAdminLocal = CORREOS_ADMINISTRADORES.includes(authMail);
-            if(!esAdminLocal) li.classList.add('d-none');
-
-            const divPane = document.createElement('div');
-            divPane.className = 'tab-pane fade';
-            divPane.id = 'tab-contador';
-            divPane.role = 'tabpanel';
-            divPane.innerHTML = `
-                <div class="card bg-dark text-white border-success mt-3 shadow-lg">
-                    <div class="card-header border-success" style="background: #111;">
-                        <h4 class="mb-0 text-success fw-bold">📊 Cierre Contable Mensual (I.M.T)</h4>
-                    </div>
-                    <div class="card-body" style="background: #1a1a1a;">
-                        <p class="text-muted">Selecciona un mes histórico para analizar los datos financieros y generar el reporte exacto. El sistema agrupará la información excluyendo automáticamente a los invitados de cortesía.</p>
-                        
-                        <div class="row align-items-center mb-4">
-                            <div class="col-md-6">
-                                <label class="form-label text-warning fw-bold">1. Selecciona el Mes:</label>
-                                <select id="selectMesContador" class="form-select bg-secondary text-white fw-bold"></select>
-                            </div>
-                            <div class="col-md-6 text-end mt-4 mt-md-0">
-                                <button type="button" class="btn btn-success fw-bold py-2 px-4 shadow" id="btnDescargarMesElegido" disabled>
-                                    📥 Descargar Excel del Mes
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div id="resumenMesContador" class="alert d-none shadow-sm" style="background: #0a0a0a; border: 1px solid #00d26a; border-left: 5px solid #00d26a;"></div>
-                    </div>
-                </div>
-            `;
-            tabContent.appendChild(divPane);
-            
-            // Redirigir el botón viejo de Finanzas hacia la pestaña nueva
-            const btnViejoContador = document.getElementById('btnExcelContador');
-            if (btnViejoContador) {
-                btnViejoContador.innerText = "👉 Ir al Nuevo Panel de Contador";
-                btnViejoContador.classList.replace("btn-outline-warning", "btn-success");
-                btnViejoContador.style.fontWeight = "bold";
-                
-                const viejoPadre = btnViejoContador.closest('.card-panel');
-                if(viejoPadre) {
-                    const pDesc = viejoPadre.querySelector('p');
-                    if(pDesc) pDesc.innerText = "El Cierre Contable Mensual ha sido movido a su propia pestaña en el menú superior.";
-                }
-
-                btnViejoContador.replaceWith(btnViejoContador.cloneNode(true));
-                document.getElementById('btnExcelContador').addEventListener('click', () => {
-                    document.getElementById('contador-tab').click();
-                });
-            }
-            
-            // Lógica al presionar la Pestaña Contador
-            document.getElementById('contador-tab').addEventListener('click', async () => {
-                const selectMes = document.getElementById('selectMesContador');
-                if(selectMes.options.length > 1) return; 
-                
-                selectMes.innerHTML = '<option value="">⏳ Cargando meses desde el servidor...</option>';
-                
-                try {
-                    const snap = await get(ref(db, '2_asistencias'));
-                    if (!snap.exists()) {
-                        selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
-                        return;
-                    }
-                    const todas = snap.val();
-                    let infoMeses = {};
-
-                    for (const fecha in todas) {
-                        const mes = fecha.substring(0, 7); 
-                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
-                        infoMeses[mes].fechas.push(fecha);
-                        
-                        for (const prog in todas[fecha]) {
-                            infoMeses[mes].programas.add(`${fecha}|${prog}`);
-                            for (const rut in todas[fecha][prog]) {
-                                const asis = todas[fecha][prog][rut];
-                                if(asis.tipo_ingreso !== "Cortesía") {
-                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                                    infoMeses[mes].totalPago += montoLimpio;
-                                }
-                            }
-                        }
-                    }
-                    
-                    window.infoMesesGlobal = infoMeses;
-                    window.todasAsistenciasGlobal = todas;
-                    
-                    selectMes.innerHTML = '<option value="">-- Selecciona el mes a analizar --</option>';
-                    const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
-                    
-                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-
-                    mesesOrdenados.forEach(m => {
-                        const [yyyy, mm] = m.split('-');
-                        const mesNombre = nombresMeses[parseInt(mm) - 1];
-                        selectMes.innerHTML += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
-                    });
-                    
-                } catch (e) {
-                    selectMes.innerHTML = '<option value="">Error al cargar los datos</option>';
-                }
-            });
-            
-            document.getElementById('selectMesContador').addEventListener('change', (e) => {
-                const m = e.target.value;
-                const resumenMes = document.getElementById('resumenMesContador');
-                const btnDescargar = document.getElementById('btnDescargarMesElegido');
-                
-                if (!m) {
-                    resumenMes.classList.add('d-none');
-                    btnDescargar.disabled = true;
-                    return;
-                }
-                
-                const data = window.infoMesesGlobal[m];
-                const fechasOrd = data.fechas.sort();
-                const primera = fechasOrd[0].split('-').reverse().join('-');
-                const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
-                
-                const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-                const mesNombreVisual = nombresMeses[parseInt(m.split('-')[1]) - 1];
-                
-                resumenMes.classList.remove('d-none');
-                resumenMes.innerHTML = `
-                    <h5 class="text-success text-center mb-3 border-bottom border-success pb-2">Mes de ${mesNombreVisual} ${m.split('-')[0]}</h5>
-                    <div class="row text-center py-2">
-                        <div class="col-md-4 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Rango de Fechas</h6>
-                            <span class="text-info fw-bold fs-6">Del ${primera} <br> al ${ultima}</span>
-                        </div>
-                        <div class="col-md-4 border-end border-secondary">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Programas Grabados</h6>
-                            <span class="text-warning fw-bold fs-3">${data.programas.size}</span>
-                        </div>
-                        <div class="col-md-4">
-                            <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Total Dinero del Mes</h6>
-                            <span class="text-success fw-bold fs-4">$${data.totalPago.toLocaleString('es-CL')}</span>
-                        </div>
-                    </div>
-                `;
-                btnDescargar.disabled = false;
-            });
-            
-            document.getElementById('btnDescargarMesElegido').addEventListener('click', async () => {
-                const mesElegido = document.getElementById('selectMesContador').value;
-                if (!mesElegido) return;
-                
-                const btn = document.getElementById('btnDescargarMesElegido');
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Procesando Excel...'; 
-                btn.disabled = true;
-                
-                try {
-                    let tot = {};
-                    const todas = window.todasAsistenciasGlobal;
-                    
-                    for (const f in todas) { 
-                        if (f.startsWith(mesElegido)) { 
-                            for (const prog in todas[f]) { 
-                                for (const r in todas[f][prog]) {
-                                    const asis = todas[f][prog][r];
-                                    if(asis.tipo_ingreso === "Cortesía") continue;
-                                    
-                                    if (!tot[r]) tot[r] = { monto: 0, fechas: new Set() }; 
-                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                                    tot[r].monto += montoLimpio;
-                                    tot[r].fechas.add(f);
-                                }
-                            }
-                        }
-                    }
-                    
-                    let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
-                    
-                    const trabSnap = await get(ref(db, '1_trabajadores'));
-                    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-                    
-                    for (const r in tot) {
-                        const tr = trabajadores[r] || { nombres: "Desconocido", apellidos: "" };
-                        const parts = r.split('-'); 
-                        const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
-                        const [y, m, d] = (tr.fechaNacimiento||"").split('-');
-                        
-                        const fechasOrdenadas = Array.from(tot[r].fechas).sort();
-                        const [yP, mP, dP] = fechasOrdenadas[0].split('-');
-                        
-                        // CÁLCULO DE FECHAS: Ingreso y Salida sumando dias
-                        const fIng = new Date(yP, mP - 1, dP);
-                        const fSal = new Date(yP, mP - 1, dP);
-                        fSal.setDate(fSal.getDate() + fechasOrdenadas.length);
-                        
-                        const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
-                        const strSal = `${String(fSal.getDate()).padStart(2,'0')}-${String(fSal.getMonth()+1).padStart(2,'0')}-${fSal.getFullYear()}`;
-                        
-                        csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
-                    }
-                    
-                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-                    const mesNombreDescarga = nombresMeses[parseInt(mesElegido.split('-')[1]) - 1];
-                    
-                    descargarCSV(csv, `Reporte_Contable_${mesNombreDescarga}_${mesElegido.split('-')[0]}_NAT.csv`);
-                } catch (e) {
-                    alert("Error generando el archivo contable.");
-                }
-                btn.innerText = "📥 Descargar Excel del Mes"; 
-                btn.disabled = false;
-            });
-        }
-    }, 1500); 
-});
-
-// ==========================================
-// CONTROL DE PROGRAMAS
+// CONTROL DE PROGRAMAS Y PUERTA
 // ==========================================
 onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     const container = document.getElementById('contenedorProgramasActivos'); 
@@ -456,7 +226,6 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
             let horasCompletas = Math.floor(diffMins / 60);
             let minRestantes = diffMins % 60;
             
-            // Más de 30 minutos = 1 hora extra
             if (minRestantes >= 30) {
                 horasCompletas++;
             }
@@ -629,6 +398,7 @@ function actualizarTablero() {
     let faltan = totalEsperados - totalFirmados; 
     let textoFaltan = faltan < 0 ? 0 : faltan;
     
+    // Pixel Art Caminando
     if (faltan > 0) {
         textoFaltan += ` <br><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:5px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:2px;">¡EN CAMINO!</span>`;
     }
@@ -943,10 +713,168 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
     doc.text("Firma Asistente", 155, y + 5, null, null, "center"); 
     doc.setFont("helvetica", "normal"); 
     doc.text(nombreCompleto, 155, y + 10, null, null, "center");
-    // RUT INCLUIDO BAJO LA FIRMA
+    // SE AGREGA EL RUT DEBAJO DEL NOMBRE EN EL PDF
     doc.text(`RUT: ${rut}`, 155, y + 15, null, null, "center"); 
 }
 
+// ==========================================
+// CONTADOR INTELIGENTE (PESTAÑA NATIVA)
+// ==========================================
+document.getElementById('contador-tab').addEventListener('click', async () => {
+    const selectMes = document.getElementById('selectMesContador');
+    if(selectMes.options.length > 1) return; 
+    
+    selectMes.innerHTML = '<option value="">⏳ Cargando meses desde el servidor...</option>';
+    
+    try {
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) {
+            selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
+            return;
+        }
+        const todas = snap.val();
+        let infoMeses = {};
+
+        for (const fecha in todas) {
+            const mes = fecha.substring(0, 7); 
+            if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
+            infoMeses[mes].fechas.push(fecha);
+            
+            for (const prog in todas[fecha]) {
+                infoMeses[mes].programas.add(`${fecha}|${prog}`);
+                for (const rut in todas[fecha][prog]) {
+                    const asis = todas[fecha][prog][rut];
+                    if(asis.tipo_ingreso !== "Cortesía") {
+                        const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                        infoMeses[mes].totalPago += montoLimpio;
+                    }
+                }
+            }
+        }
+        
+        window.infoMesesGlobal = infoMeses;
+        window.todasAsistenciasGlobal = todas;
+        
+        selectMes.innerHTML = '<option value="">-- Selecciona el mes a analizar --</option>';
+        const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+        
+        const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        mesesOrdenados.forEach(m => {
+            const [yyyy, mm] = m.split('-');
+            const mesNombre = nombresMeses[parseInt(mm) - 1];
+            selectMes.innerHTML += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
+        });
+        
+    } catch (e) {
+        selectMes.innerHTML = '<option value="">Error al cargar los datos</option>';
+    }
+});
+
+document.getElementById('selectMesContador').addEventListener('change', (e) => {
+    const m = e.target.value;
+    const resumenMes = document.getElementById('resumenMesContador');
+    const btnDescargar = document.getElementById('btnDescargarMesElegido');
+    
+    if (!m) {
+        resumenMes.classList.add('d-none');
+        btnDescargar.disabled = true;
+        return;
+    }
+    
+    const data = window.infoMesesGlobal[m];
+    const fechasOrd = data.fechas.sort();
+    const primera = fechasOrd[0].split('-').reverse().join('-');
+    const ultima = fechasOrd[fechasOrd.length - 1].split('-').reverse().join('-');
+    
+    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const mesNombreVisual = nombresMeses[parseInt(m.split('-')[1]) - 1];
+    
+    resumenMes.classList.remove('d-none');
+    resumenMes.innerHTML = `
+        <h5 class="text-success text-center mb-3 border-bottom border-success pb-2">Mes de ${mesNombreVisual} ${m.split('-')[0]}</h5>
+        <div class="row text-center py-2">
+            <div class="col-md-4 border-end border-secondary">
+                <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Rango de Fechas</h6>
+                <span class="text-info fw-bold fs-6">Del ${primera} <br> al ${ultima}</span>
+            </div>
+            <div class="col-md-4 border-end border-secondary">
+                <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Programas Grabados</h6>
+                <span class="text-warning fw-bold fs-3">${data.programas.size}</span>
+            </div>
+            <div class="col-md-4">
+                <h6 class="text-muted mb-1" style="font-size: 0.8em; text-transform: uppercase;">Total Dinero del Mes</h6>
+                <span class="text-success fw-bold fs-4">$${data.totalPago.toLocaleString('es-CL')}</span>
+            </div>
+        </div>
+    `;
+    btnDescargar.disabled = false;
+});
+
+document.getElementById('btnDescargarMesElegido').addEventListener('click', async () => {
+    const mesElegido = document.getElementById('selectMesContador').value;
+    if (!mesElegido) return;
+    
+    const btn = document.getElementById('btnDescargarMesElegido');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Procesando Excel...'; 
+    btn.disabled = true;
+    
+    try {
+        let tot = {};
+        const todas = window.todasAsistenciasGlobal;
+        
+        for (const f in todas) { 
+            if (f.startsWith(mesElegido)) { 
+                for (const prog in todas[f]) { 
+                    for (const r in todas[f][prog]) {
+                        const asis = todas[f][prog][r];
+                        if(asis.tipo_ingreso === "Cortesía") continue;
+                        
+                        if (!tot[r]) tot[r] = { monto: 0, fechas: new Set() }; 
+                        const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                        tot[r].monto += montoLimpio;
+                        tot[r].fechas.add(f);
+                    }
+                }
+            }
+        }
+        
+        let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+        
+        const trabSnap = await get(ref(db, '1_trabajadores'));
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        
+        for (const r in tot) {
+            const tr = trabajadores[r] || { nombres: "Desconocido", apellidos: "" };
+            const parts = r.split('-'); 
+            const aps = tr.apellidos ? tr.apellidos.trim().split(' ') : [""]; 
+            const [y, m, d] = (tr.fechaNacimiento||"").split('-');
+            
+            const fechasOrdenadas = Array.from(tot[r].fechas).sort();
+            const [yP, mP, dP] = fechasOrdenadas[0].split('-');
+            
+            const fIng = new Date(yP, mP - 1, dP);
+            const fSal = new Date(yP, mP - 1, dP);
+            // Salida + la cantidad de dias que asistió
+            fSal.setDate(fSal.getDate() + fechasOrdenadas.length);
+            
+            const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
+            const strSal = `${String(fSal.getDate()).padStart(2,'0')}-${String(fSal.getMonth()+1).padStart(2,'0')}-${fSal.getFullYear()}`;
+            
+            csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
+        }
+        
+        const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+        const mesNombreDescarga = nombresMeses[parseInt(mesElegido.split('-')[1]) - 1];
+        
+        descargarCSV(csv, `Reporte_Contable_${mesNombreDescarga}_${mesElegido.split('-')[0]}_NAT.csv`);
+    } catch (e) {
+        alert("Error generando el archivo contable.");
+    }
+    btn.innerHTML = originalText; 
+    btn.disabled = false;
+});
 
 // ==========================================
 // CRM Y EDICIÓN
@@ -1381,123 +1309,6 @@ function descargarCSV(c, n) {
 }
 
 // ==========================================
-// EFECTIVO
-// ==========================================
-let signaturePadEfectivo = null;
-let rutEfectivoActual = "";
-let deudaEfectivoActual = null;
-
-document.getElementById('btnBuscarEfectivo').addEventListener('click', async () => {
-    const rut = document.getElementById('rutEfectivo').value.trim();
-    if (!rut) return alert("Por favor ingresa un RUT válido.");
-    
-    const snap = await get(ref(db, '2_asistencias'));
-    if (!snap.exists()) return alert("No hay registros de asistencias en el sistema.");
-    
-    const todas = snap.val();
-    let deuda = { montoTotal: 0, programas: [], rutas: [] };
-    
-    for (const f in todas) {
-        for (const p in todas[f]) {
-            if (todas[f][p][rut]) {
-                const asis = todas[f][p][rut];
-                const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                
-                if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
-                    deuda.montoTotal += montoLimpio;
-                    deuda.programas.push(`${p.replace(" - ", " / ")} (${f})`);
-                    deuda.rutas.push(`2_asistencias/${f}/${p}/${rut}`);
-                }
-            }
-        }
-    }
-    
-    if (deuda.montoTotal === 0) return alert("✅ Esta persona NO tiene pagos de honorarios pendientes.");
-    
-    const trabSnap = await get(child(ref(db), `1_trabajadores/${rut}`));
-    const trab = trabSnap.exists() ? trabSnap.val() : {nombres: "Trabajador", apellidos: "No Registrado"};
-    
-    document.getElementById('nombreEfectivo').innerText = `${trab.nombres} ${trab.apellidos}`;
-    document.getElementById('montoEfectivo').innerText = `$${deuda.montoTotal}`;
-    document.getElementById('detalleProgramasEfectivo').innerText = `Asistencias a pagar:\n${deuda.programas.join(' | ')}`;
-    document.getElementById('panelPagoEfectivo').classList.remove('d-none');
-    
-    if(!signaturePadEfectivo) {
-        signaturePadEfectivo = new SignaturePad(document.getElementById('signature-pad-efectivo'), { backgroundColor: 'rgb(255, 255, 255)' });
-    }
-    signaturePadEfectivo.clear();
-    
-    rutEfectivoActual = rut;
-    deudaEfectivoActual = deuda;
-});
-
-document.getElementById('btnLimpiarFirmaEfectivo').addEventListener('click', () => { 
-    if(signaturePadEfectivo) signaturePadEfectivo.clear(); 
-});
-
-document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
-    if (signaturePadEfectivo.isEmpty()) return alert("El trabajador debe firmar el recibo para constancia legal.");
-    if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoTotal} en efectivo?`)) return;
-    
-    const btn = document.getElementById('btnConfirmarPagoEfectivo');
-    btn.disabled = true;
-    btn.innerText = "⏳ Procesando...";
-
-    try {
-        const firmaBase64 = signaturePadEfectivo.toDataURL('image/jpeg');
-        const nowIso = new Date().toISOString();
-        const idRecibo = Date.now().toString();
-        
-        await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
-            rut: rutEfectivoActual,
-            monto: deudaEfectivoActual.montoTotal,
-            fecha: nowIso,
-            firma: firmaBase64,
-            programas: deudaEfectivoActual.programas
-        });
-        
-        let updates = {};
-        deudaEfectivoActual.rutas.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
-        await update(ref(db), updates);
-
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        
-        doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-        doc.text("COMPROBANTE DE PAGO EN EFECTIVO", 105, 20, null, null, "center");
-        
-        doc.setFontSize(12); doc.setFont("helvetica", "normal");
-        const textoCentral = `En Santiago, con fecha ${new Date().toLocaleDateString()}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago integro en EFECTIVO por la suma de $${deudaEfectivoActual.montoTotal} pesos a don/na ${document.getElementById('nombreEfectivo').innerText}, Cedula de Identidad N° ${rutEfectivoActual}.\n\nEste pago corresponde a la liquidacion de honorarios por su participacion como publico / extra en los siguientes programas:\n\n${deudaEfectivoActual.programas.join('\n')}\n\nEl trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfaccion, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de indole civil ni laboral.`;
-        
-        const lineas = doc.splitTextToSize(textoCentral, 170);
-        doc.text(lineas, 20, 40);
-        
-        doc.addImage(firmaBase64, 'JPEG', 65, 130, 80, 25);
-        doc.setFont("helvetica", "bold");
-        doc.text("_________________________________", 105, 160, null, null, "center");
-        doc.text("Firma Recibi Conforme", 105, 165, null, null, "center");
-        doc.setFont("helvetica", "normal");
-        doc.text(document.getElementById('nombreEfectivo').innerText, 105, 170, null, null, "center");
-        doc.text(rutEfectivoActual, 105, 175, null, null, "center");
-        
-        const nombreCompletoLimpio = document.getElementById('nombreEfectivo').innerText.replace(/[^a-zA-Z0-9_]/g, "_");
-        doc.save(`Recibo_Efectivo_${nombreCompletoLimpio}_${rutEfectivoActual}.pdf`);
-        
-        alert("✅ Pago registrado exitosamente en la base de datos y PDF descargado.");
-        document.getElementById('panelPagoEfectivo').classList.add('d-none');
-        document.getElementById('rutEfectivo').value = "";
-        rutEfectivoActual = "";
-        
-    } catch (e) {
-        console.error(e);
-        alert("Error detallado: " + e.message + "\n\nSácale pantallazo a este mensaje si vuelve a fallar.");
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "💾 Procesar Pago y Generar PDF";
-    }
-});
-
-// ==========================================
 // CONTRATOS DT
 // ==========================================
 document.getElementById('contratos-dt-tab').addEventListener('click', () => {
@@ -1562,7 +1373,8 @@ document.getElementById('btnCargarContratosDT').addEventListener('click', async 
                             if (!objRut) {
                                 const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", email: "-", telefono: "-", direccion: "-" };
                                 
-                                const telefonoLimpio = (tr.telefono || "-").replace(/^\+56\s*9/, '9').replace(/^\+56/, '9');
+                                // LIMPIEZA DE +56 EN EL TELÉFONO
+                                const telefonoLimpio = (tr.telefono || "-").replace(/^\+56\s*9/, '9').replace(/^\+56/, '9').replace(/\s+/g, '');
                                 
                                 objRut = {
                                     nombres: `${tr.nombres} ${tr.apellidos}`,
@@ -1758,7 +1570,7 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
 
 window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
     event.preventDefault(); event.stopPropagation();
-    if(!confirm("¿Estás seguro de que esta persona se retiró?\nEsto eliminará permanentemente su contrato DT de esta lista.")) return;
+    if(!confirm("¿Estás seguro de que esta persona se retiró?\nEsto eliminará su contrato DT de esta lista y de los cobros.")) return;
     
     const asisData = window.agrupacionDTGlobal[prog][wkSortKey].ruts[rut];
     let updates = {};
@@ -1820,7 +1632,6 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
         alert("Error al archivar en Firebase.");
     }
 });
-
 
 // ==========================================
 // PESTAÑA 4: SEGURIDAD (ACORDEÓN MES -> PROGRAMA)
@@ -2002,6 +1813,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
             const asis = asistentes[rut];
             
             const cond = asis.tipo_ingreso === "Cortesía" ? `Cortesía (${asis.invitado_por})` : "Trabajador";
+            const telefonoLimpio = (tr.telefono || "-").replace(/^\+56\s*9/, '9').replace(/^\+56/, '9').replace(/\s+/g, '');
             
             csv += `${asis.numero_asignado || '-'};${programaElegido.replace(" - ", " / ")};${fechaElegida};${rut};${tr.nombres};${tr.apellidos};${cond};${tr.direccion || '-'}\n`;
         }
@@ -2011,10 +1823,6 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         alert("Error al descargar lista de seguridad.");
     }
 }
-
-document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
-document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
-
 
 // ==========================================
 // MANTENIMIENTO 
