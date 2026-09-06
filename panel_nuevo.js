@@ -103,14 +103,21 @@ get(ref(db, '1_trabajadores')).then(snap => {
 });
 
 // ==========================================
-// INYECCIÓN DINÁMICA DEL PANEL CONTADOR
+// INYECCIÓN DINÁMICA DEL PANEL CONTADOR (VERSIÓN DEFINITIVA ANTI-HTML ESTÁTICO)
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
         const tabList = document.querySelector('.nav-tabs');
         const tabContent = document.querySelector('.tab-content');
         
-        if (tabList && tabContent && !document.getElementById('contador-tab')) {
+        // 1. DESTRUCCIÓN DEL HTML ESTÁTICO (Aquí estaba el problema)
+        const tabViejo = document.getElementById('contador-tab');
+        if (tabViejo && tabViejo.parentElement) tabViejo.parentElement.remove();
+        const paneViejo = document.getElementById('tab-contador');
+        if (paneViejo) paneViejo.remove();
+        
+        // 2. INYECCIÓN DEL CÓDIGO LIMPIO DESDE CERO
+        if (tabList && tabContent) {
             const li = document.createElement('li');
             li.className = 'nav-item';
             li.role = 'presentation';
@@ -169,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
             
-            // Lógica al presionar la Pestaña Contador
+            // 3. CONEXIÓN DE LA LÓGICA (AHORA SÍ FUNCIONARÁ)
             document.getElementById('contador-tab').addEventListener('click', () => {
                 const selectMes = document.getElementById('selectMesContador');
                 const btnDescargar = document.getElementById('btnDescargarMesElegido');
@@ -191,7 +198,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     let infoMeses = {};
 
                     Object.keys(todas).forEach(fecha => {
-                        // BARRERA ANTI-LOOP
                         if (!fecha || typeof fecha !== 'string' || !fecha.includes('-')) return;
 
                         const mes = fecha.substring(0, 7); 
@@ -331,6 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         const fechasOrdenadas = Array.from(tot[r].fechas).sort();
                         const [yP, mP, dP] = fechasOrdenadas[0].split('-');
                         
+                        // CÁLCULO DE FECHAS: Ingreso y Salida sumando dias
                         const fIng = new Date(yP, mP - 1, dP);
                         const fSal = new Date(yP, mP - 1, dP);
                         fSal.setDate(fSal.getDate() + fechasOrdenadas.length);
