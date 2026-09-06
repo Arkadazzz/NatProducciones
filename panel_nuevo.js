@@ -171,80 +171,87 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
             
-            // Lógica al presionar la Pestaña Contador
-            document.getElementById('contador-tab').addEventListener('click', async () => {
-    const selectMes = document.getElementById('selectMesContador');
-    
-    // Mostramos estado de carga claro
-    selectMes.innerHTML = '<option value="">⏳ Cargando historial (Versión Corregida)...</option>';
-    document.getElementById('btnDescargarMesElegido').disabled = true;
-    document.getElementById('resumenMesContador').classList.add('d-none');
-    
-    try {
-        const snap = await get(ref(db, '2_asistencias'));
-        if (!snap.exists()) {
-            selectMes.innerHTML = '<option value="">No hay registros de asistencias</option>';
-            return;
-        }
-        const todas = snap.val();
-        let infoMeses = {};
+            // Lógica al presionar la Pestaña Contador (Corregida sin bloqueos ni loops infinitos)
+            document.getElementById('contador-tab').addEventListener('click', () => {
+                const selectMes = document.getElementById('selectMesContador');
+                const btnDescargar = document.getElementById('btnDescargarMesElegido');
+                const resumenMes = document.getElementById('resumenMesContador');
 
-        for (const fecha in todas) {
-            // Validación estricta para evitar que una llave malformada rompa el ciclo
-            if (!fecha || !fecha.includes('-') || fecha.length < 7) continue;
+                if (selectMes.options.length > 1 && window.infoMesesGlobal) return; 
 
-            const mes = fecha.substring(0, 7); 
-            if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
-            
-            if (!infoMeses[mes].fechas.includes(fecha)) {
-                infoMeses[mes].fechas.push(fecha);
-            }
-            
-            for (const prog in todas[fecha]) {
-                infoMeses[mes].programas.add(`${fecha}|${prog}`);
-                const asistentes = todas[fecha][prog];
-                for (const rut in asistentes) {
-                    const asis = asistentes[rut];
-                    if(asis && asis.tipo_ingreso !== "Cortesía" && asis.monto) {
-                        const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                        infoMeses[mes].totalPago += montoLimpio;
+                selectMes.innerHTML = '<option value="">⏳ Sincronizando Base de Datos...</option>';
+                btnDescargar.disabled = true;
+                resumenMes.classList.add('d-none');
+
+                get(ref(db, '2_asistencias')).then((snap) => {
+                    if (!snap.exists()) {
+                        selectMes.innerHTML = '<option value="">❌ No hay registros históricos</option>';
+                        return;
                     }
-                }
-            }
-        }
-        
-        window.infoMesesGlobal = infoMeses;
-        window.todasAsistenciasGlobal = todas;
-        
-        let htmlOptions = '<option value="">-- Selecciona el mes a analizar --</option>';
-        const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
-        const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-        if (mesesOrdenados.length === 0) {
-            selectMes.innerHTML = '<option value="">No hay datos válidos</option>';
-            return;
-        }
+                    const todas = snap.val();
+                    let infoMeses = {};
 
-        mesesOrdenados.forEach(m => {
-            const partes = m.split('-');
-            if(partes.length >= 2) {
-                const yyyy = partes[0];
-                const mm = parseInt(partes[1]) - 1;
-                const mesNombre = nombresMeses[mm] || "Mes";
-                htmlOptions += `<option value="${m}">📆 ${mesNombre.toUpperCase()} ${yyyy}</option>`;
-            }
-        });
-        
-        selectMes.innerHTML = htmlOptions;
-        
-    } catch (e) {
-        console.error("Error crítico procesando los meses:", e);
-        selectMes.innerHTML = '<option value="">❌ Error al cargar los datos</option>';
-        alert("Ocurrió un error leyendo la base de datos de meses. Revisa la consola.");
-    }
-});
+                    Object.keys(todas).forEach(fecha => {
+                        // BARRERA ANTI-LOOP: Si la fecha está mal escrita o vacía, la salta inmediatamente
+                        if (!fecha || typeof fecha !== 'string' || !fecha.includes('-')) return;
 
-document.getElementById('selectMesContador').addEventListener('change', (e) => {
+                        const mes = fecha.substring(0, 7); 
+                        if (!infoMeses[mes]) infoMeses[mes] = { fechas: [], programas: new Set(), totalPago: 0 };
+                        
+                        if (!infoMeses[mes].fechas.includes(fecha)) infoMeses[mes].fechas.push(fecha);
+                        
+                        const nodosProgramas = todas[fecha];
+                        if (typeof nodosProgramas !== 'object') return;
+
+                        Object.keys(nodosProgramas).forEach(prog => {
+                            infoMeses[mes].programas.add(`${fecha}|${prog}`);
+                            const asistentes = nodosProgramas[prog];
+                            
+                            if (typeof asistentes !== 'object') return;
+
+                            Object.keys(asistentes).forEach(rut => {
+                                const asis = asistentes[rut];
+                                if (asis && asis.tipo_ingreso !== "Cortesía" && asis.monto) {
+                                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                                    infoMeses[mes].totalPago += montoLimpio;
+                                }
+                            });
+                        });
+                    });
+
+                    window.infoMesesGlobal = infoMeses;
+                    window.todasAsistenciasGlobal = todas;
+
+                    const mesesOrdenados = Object.keys(infoMeses).sort().reverse();
+                    if (mesesOrdenados.length === 0) {
+                        selectMes.innerHTML = '<option value="">⚠️ No hay asistencias válidas</option>';
+                        return;
+                    }
+
+                    let htmlOptions = '<option value="">-- Selecciona el mes a analizar --</option>';
+                    const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+                    mesesOrdenados.forEach(m => {
+                        const partes = m.split('-');
+                        if (partes.length >= 2) {
+                            const yyyy = partes[0];
+                            const mm = parseInt(partes[1]) - 1;
+                            if (!isNaN(mm) && mm >= 0 && mm < 12) {
+                                htmlOptions += `<option value="${m}">📆 ${nombresMeses[mm].toUpperCase()} ${yyyy}</option>`;
+                            }
+                        }
+                    });
+
+                    selectMes.innerHTML = htmlOptions;
+
+                }).catch((error) => {
+                    console.error("Error al cargar contador:", error);
+                    selectMes.innerHTML = '<option value="">❌ Error de conexión con el servidor</option>';
+                });
+            });
+
+            document.getElementById('selectMesContador').addEventListener('change', (e) => {
                 const m = e.target.value;
                 const resumenMes = document.getElementById('resumenMesContador');
                 const btnDescargar = document.getElementById('btnDescargarMesElegido');
@@ -312,7 +319,8 @@ document.getElementById('selectMesContador').addEventListener('change', (e) => {
                         }
                     }
                     
-                    let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+                    let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico
+";
                     
                     const trabSnap = await get(ref(db, '1_trabajadores'));
                     const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
@@ -334,7 +342,8 @@ document.getElementById('selectMesContador').addEventListener('change', (e) => {
                         const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
                         const strSal = `${String(fSal.getDate()).padStart(2,'0')}-${String(fSal.getMonth()+1).padStart(2,'0')}-${fSal.getFullYear()}`;
                         
-                        csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
+                        csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}
+`;
                     }
                     
                     const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -496,7 +505,13 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     const now = new Date();
     const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
+    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬
+
+¿Cerrar la jornada y dar por terminado el evento?
+
+El sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.
+
+¿Proceder?`)) return;
 
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
@@ -529,7 +544,8 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
 
             if (Object.keys(actualizacionesFirebase).length > 0) {
                 await update(ref(db), actualizacionesFirebase);
-                alert(`✅ Checkout Masivo Exitoso.\nSe calculó la salida y el pago a ${procesados} personas.`);
+                alert(`✅ Checkout Masivo Exitoso.
+Se calculó la salida y el pago a ${procesados} personas.`);
             }
         }
         await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
@@ -583,8 +599,6 @@ function activarRadares() {
         actualizarTablero();
     });
 
-
-    
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
         const asistencias = asistenciasGlobales;
@@ -729,7 +743,6 @@ function actualizarTablero() {
         }
 
         // EVITAR RE-RENDER DEL ACORDEÓN: Solo inyectar la estructura si no existe
-        // Así evitamos que la lista "desaparezca" o se cierre al ingresar un nuevo registro
         if (!divFaltantes.innerHTML.includes('accFaltantes')) {
             divFaltantes.innerHTML = `
                 <div class="accordion shadow-sm" id="accFaltantes">
@@ -776,7 +789,8 @@ window.descargarListaCanal = function() {
     if (!reservasGlobales || Object.keys(reservasGlobales).length === 0) {
         return alert("No hay personas inscritas en el formulario todavía.");
     }
-    let csv = "\uFEFFESTADO;RUT;NOMBRES;APELLIDOS;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n";
+    let csv = "﻿ESTADO;RUT;NOMBRES;APELLIDOS;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS
+";
     
     for (const rut in reservasGlobales) {
         const res = reservasGlobales[rut];
@@ -784,7 +798,8 @@ window.descargarListaCanal = function() {
         const cond = res.tipo === "Cortesía" ? `Cortesía (${res.invitado_por || ''})` : "I/P";
         const estado = asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
         
-        csv += `${estado};${rut};${tr.nombres || ''};${tr.apellidos || ''};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${tr.enfermedades || 'No indica'}\n`;
+        csv += `${estado};${rut};${tr.nombres || ''};${tr.apellidos || ''};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${tr.enfermedades || 'No indica'}
+`;
     }
     descargarCSV(csv, `Lista_Canal_${nombrePrograma.replace(/[ \/]/g, "_")}_${fechaPrograma}.csv`);
 }
@@ -798,7 +813,8 @@ window.toggleDT = async function(rut, nuevoEstado) {
 }
 
 window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
-    let nuevoMonto = prompt(`¿Cuánto será el NUEVO PAGO TOTAL de ${nombrePersona} para la jornada de hoy?\n(Monto actual: $${montoActual})`, montoActual);
+    let nuevoMonto = prompt(`¿Cuánto será el NUEVO PAGO TOTAL de ${nombrePersona} para la jornada de hoy?
+(Monto actual: $${montoActual})`, montoActual);
     if (nuevoMonto === null || nuevoMonto === "") return;
     
     nuevoMonto = parseInt(nuevoMonto);
@@ -816,7 +832,8 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     const horaSalida = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     
     if (tipoIngreso === "Cortesía") {
-        if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
+        if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?
+(Se mantendrá su pago en $0).`)) return;
         try { 
             await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: 0, monto: 0 }); 
         } catch (e) {}
@@ -825,18 +842,28 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     
     let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalida, montoBaseActual, valorHoraExtraGlobal, fechaPrograma);
     
-    let msj = `Hora de salida marcada: ${horaSalida}\n\n`;
+    let msj = `Hora de salida marcada: ${horaSalida}
+
+`;
     if (calculo.montoBaseNuevo === 0) {
-        msj += `⚠️ ABANDONO ANTICIPADO ⚠️\nSe retiró antes de cumplir la mitad de la jornada. El sistema ajustará su pago base a $0.\n`;
+        msj += `⚠️ ABANDONO ANTICIPADO ⚠️
+Se retiró antes de cumplir la mitad de la jornada. El sistema ajustará su pago base a $0.
+`;
     } else if (calculo.montoBaseNuevo < parseInt(montoBaseActual)) {
-        msj += `⚠️ RETIRO ANTICIPADO ⚠️\nSe retiró pasada la media jornada, pero no la completó. El sistema ajustará su pago base a la mitad: $${calculo.montoBaseNuevo}.\n`;
+        msj += `⚠️ RETIRO ANTICIPADO ⚠️
+Se retiró pasada la media jornada, pero no la completó. El sistema ajustará su pago base a la mitad: $${calculo.montoBaseNuevo}.
+`;
     } else if (calculo.bonoExtra > 0) {
-        msj += `✅ Completó Horas Extras.\nBono extra calculado automáticamente: $${calculo.bonoExtra}\n`;
+        msj += `✅ Completó Horas Extras.
+Bono extra calculado automáticamente: $${calculo.bonoExtra}
+`;
     } else {
-        msj += `Jornada regular completada. Sin horas extra.\n`;
+        msj += `Jornada regular completada. Sin horas extra.
+`;
     }
 
-    msj += `\nConfirma el BONO EXTRA que recibirá (Su pago base será modificado a $${calculo.montoBaseNuevo}):`;
+    msj += `
+Confirma el BONO EXTRA que recibirá (Su pago base será modificado a $${calculo.montoBaseNuevo}):`;
     
     let respuesta = prompt(msj, calculo.bonoExtra);
     if (respuesta === null) return; 
@@ -871,7 +898,8 @@ async function onScanSuccess(decodedText) {
     try {
         const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
         if (blacklistSnap.exists()) { 
-            alert(`⛔ ACCESO DENEGADO ⛔\nLa persona no tiene permitido el ingreso.`); 
+            alert(`⛔ ACCESO DENEGADO ⛔
+La persona no tiene permitido el ingreso.`); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
             document.getElementById('mensajeEscaneo').classList.add('d-none'); 
             return; 
@@ -1272,7 +1300,8 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
 });
 
 document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
-    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
+    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨
+Esto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; 
         renderCRM(listaGlobalCRM); 
@@ -1356,10 +1385,13 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
         return alert("No hay plata retenida.");
     }
     
-    if (!confirm("🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?")) return;
+    if (!confirm("🚨 ATENCIÓN 🚨
+
+¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?")) return;
     
     const fechaHoy = new Date().toISOString().split('T')[0];
-    let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
+    let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario
+";
     let actualizacionesFirebase = {};
     
     const trabSnap = await get(ref(db, '1_trabajadores')); 
@@ -1371,7 +1403,8 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
-            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT\n`; 
+            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT
+`; 
         }
         for (const ruta of deuda.rutas_bd) { 
             actualizacionesFirebase[`${ruta}/estado_pago`] = "Pagado"; 
@@ -1505,7 +1538,8 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
             }
         });
 
-        let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
+        let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario
+";
 
         for (const rut in agrupacionPagos) {
             const datosPago = agrupacionPagos[rut]; 
@@ -1513,7 +1547,8 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
             const rutSin = rut.replace(/[^0-9kK]/g, ''); 
             const glosaProg = datosPago.programas.join(', ').substring(0, 40);
             
-            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${datosPago.montoTotal};;${tr.email || ''};;${glosaProg};PAGO NAT\n`;
+            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${datosPago.montoTotal};;${tr.email || ''};;${glosaProg};PAGO NAT
+`;
             
             datosPago.rutasFirebase.forEach(ruta => { 
                 actualizacionesFirebase[ruta] = "Pagado"; 
@@ -1579,7 +1614,8 @@ document.getElementById('btnBuscarEfectivo').addEventListener('click', async () 
     
     document.getElementById('nombreEfectivo').innerText = `${trab.nombres} ${trab.apellidos}`;
     document.getElementById('montoEfectivo').innerText = `$${deuda.montoTotal}`;
-    document.getElementById('detalleProgramasEfectivo').innerText = `Asistencias a pagar:\n${deuda.programas.join(' | ')}`;
+    document.getElementById('detalleProgramasEfectivo').innerText = `Asistencias a pagar:
+${deuda.programas.join(' | ')}`;
     document.getElementById('panelPagoEfectivo').classList.remove('d-none');
     
     if(!signaturePadEfectivo) {
@@ -1627,7 +1663,14 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
         doc.text("COMPROBANTE DE PAGO EN EFECTIVO", 105, 20, null, null, "center");
         
         doc.setFontSize(12); doc.setFont("helvetica", "normal");
-        const textoCentral = `En Santiago, con fecha ${new Date().toLocaleDateString()}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago integro en EFECTIVO por la suma de $${deudaEfectivoActual.montoTotal} pesos a don/na ${document.getElementById('nombreEfectivo').innerText}, Cedula de Identidad N° ${rutEfectivoActual}.\n\nEste pago corresponde a la liquidacion de honorarios por su participacion como publico / extra en los siguientes programas:\n\n${deudaEfectivoActual.programas.join('\n')}\n\nEl trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfaccion, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de indole civil ni laboral.`;
+        const textoCentral = `En Santiago, con fecha ${new Date().toLocaleDateString()}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago integro en EFECTIVO por la suma de $${deudaEfectivoActual.montoTotal} pesos a don/na ${document.getElementById('nombreEfectivo').innerText}, Cedula de Identidad N° ${rutEfectivoActual}.
+
+Este pago corresponde a la liquidacion de honorarios por su participacion como publico / extra en los siguientes programas:
+
+${deudaEfectivoActual.programas.join('
+')}
+
+El trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfaccion, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de indole civil ni laboral.`;
         
         const lineas = doc.splitTextToSize(textoCentral, 170);
         doc.text(lineas, 20, 40);
@@ -1650,7 +1693,9 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
         
     } catch (e) {
         console.error(e);
-        alert("Error detallado: " + e.message + "\n\nSácale pantallazo a este mensaje si vuelve a fallar.");
+        alert("Error detallado: " + e.message + "
+
+Sácale pantallazo a este mensaje si vuelve a fallar.");
     } finally {
         btn.disabled = false;
         btn.innerText = "💾 Procesar Pago y Generar PDF";
