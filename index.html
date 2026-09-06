@@ -116,13 +116,29 @@
                     <input type="text" id="comuna" class="form-control" required placeholder="Ej: Santiago">
                 </div>
 
-                <div class="col-12 mb-3">
+                <div class="col-6 mb-3">
                     <label class="form-label">Sexo</label>
                     <select id="sexo" class="form-select" required>
                         <option value="">-- Seleccionar --</option>
                         <option value="M">Masculino</option>
                         <option value="F">Femenino</option>
                         <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                
+                <div class="col-6 mb-3">
+                    <label class="form-label">Nacionalidad</label>
+                    <select id="nacionalidad" class="form-select" required>
+                        <option value="">-- Seleccionar --</option>
+                        <option value="Chilena">Chilena</option>
+                        <option value="Venezolana">Venezolana</option>
+                        <option value="Colombiana">Colombiana</option>
+                        <option value="Peruana">Peruana</option>
+                        <option value="Haitiana">Haitiana</option>
+                        <option value="Argentina">Argentina</option>
+                        <option value="Boliviana">Boliviana</option>
+                        <option value="Ecuatoriana">Ecuatoriana</option>
+                        <option value="Otra">Otra</option>
                     </select>
                 </div>
             </div>
@@ -209,6 +225,14 @@
                         <input type="text" id="numeroCuenta" class="form-control" required>
                     </div>
                 </div>
+            </div>
+
+            <!-- ESCUDO LEGAL LEY 19.628 -->
+            <div class="form-check mb-4" style="background: #1a0a0a; padding: 15px 15px 15px 40px; border-left: 3px solid #ff3333; border-radius: 5px;">
+                <input class="form-check-input" type="checkbox" id="consentimientoSalud" required style="transform: scale(1.3); margin-top: 5px; cursor: pointer;">
+                <label class="form-check-label text-muted" for="consentimientoSalud" style="font-size: 0.85em; cursor: pointer;">
+                    Declaro que la información médica entregada es verdadera. Autorizo expresamente a NAT Producciones a mantener y utilizar estos <strong>datos sensibles de salud</strong> (Ley 19.628) de forma estrictamente confidencial, con el único fin de aplicar protocolos de primeros auxilios o contactar a mi red de apoyo frente a una emergencia médica durante la jornada.
+                </label>
             </div>
 
             <button type="submit" class="btn btn-custom" id="btnEnviar">ENVIAR REGISTRO 🚀</button>
@@ -356,13 +380,14 @@
                         document.getElementById('numero_dir').value = d.numero_dir || '';
                         document.getElementById('comuna').value = d.comuna || '';
                     } else if (d.direccion) {
-                        document.getElementById('calle').value = d.direccion;
+                        document.getElementById('calle').value = d.direccion || '';
                     }
 
                     document.getElementById('emergenciaNombre').value = d.emergenciaNombre || '';
                     document.getElementById('emergenciaTelefono').value = d.emergenciaTelefono || '';
                     document.getElementById('enfermedades').value = d.enfermedades || '';
                     document.getElementById('sexo').value = d.sexo || '';
+                    document.getElementById('nacionalidad').value = d.nacionalidad || '';
 
                     if(d.afp) document.getElementById('afp').value = d.afp;
                     if(d.salud) document.getElementById('salud').value = d.salud;
@@ -437,6 +462,7 @@
                 comuna: comunaVal,
                 direccion: direccionCombinada,
                 sexo: document.getElementById('sexo').value,
+                nacionalidad: document.getElementById('nacionalidad').value,
                 emergenciaNombre: document.getElementById('emergenciaNombre').value,
                 emergenciaTelefono: document.getElementById('emergenciaTelefono').value,
                 enfermedades: document.getElementById('enfermedades').value
