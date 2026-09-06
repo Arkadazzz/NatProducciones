@@ -36,12 +36,12 @@
             <div class="row">
                 <div class="col-12 mb-3">
                     <label class="form-label text-warning fw-bold">Evento Activo</label>
-                    <select id="programaSelect" class="form-select border-warning" required>
-                        <option value="">⏳ Buscando eventos...</option>
-                    </select>
+                    <div id="programaSelectContainer">
+                        <p class="text-warning">⏳ Buscando eventos...</p>
+                    </div>
                 </div>
                 
-                <div class="col-12 mb-3">
+                <div class="col-12 mb-3 mt-2">
                     <label class="form-label text-white fw-bold">Tipo de Ingreso</label>
                     <select id="tipoIngreso" class="form-select" required>
                         <option value="Pago">🎟️ Público General (I/P)</option>
@@ -78,8 +78,8 @@
             <h5 class="section-title">👤 Datos Personales</h5>
             <div class="row">
                 <div class="col-12 mb-3">
-                    <label class="form-label">RUT <small class="text-muted">(Ej: 12345678-9)</small></label>
-                    <input type="text" id="rut" class="form-control" required placeholder="12345678-9">
+                    <label class="form-label text-success fw-bold">RUT <small class="text-muted">(Ingresa tu RUT para auto-completar)</small></label>
+                    <input type="text" id="rut" class="form-control border-success" required placeholder="12345678-9">
                 </div>
                 <div class="col-6 mb-3">
                     <label class="form-label">Nombres</label>
@@ -101,10 +101,21 @@
                     <label class="form-label">Correo Electrónico</label>
                     <input type="email" id="email" class="form-control" required>
                 </div>
+                
+                <!-- DIRECCIÓN SEPARADA -->
                 <div class="col-12 mb-3">
-                    <label class="form-label">Dirección (Calle, Número, Comuna)</label>
-                    <input type="text" id="direccion" class="form-control" required>
+                    <label class="form-label">Calle (Dirección)</label>
+                    <input type="text" id="calle" class="form-control" required placeholder="Ej: Av. Providencia">
                 </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Número (Casa/Depto)</label>
+                    <input type="text" id="numero_dir" class="form-control" required placeholder="Ej: 1234">
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Comuna</label>
+                    <input type="text" id="comuna" class="form-control" required placeholder="Ej: Santiago">
+                </div>
+
                 <div class="col-12 mb-3">
                     <label class="form-label">Sexo</label>
                     <select id="sexo" class="form-select" required>
@@ -139,7 +150,7 @@
 
             <!-- SECCIÓN 4: DATOS BANCARIOS -->
             <div id="seccionBancaria">
-                <h5 class="section-title text-success">💰 Datos para Pago de Honorarios</h5>
+                <h5 class="section-title text-success">💰 Datos Bancarios (Pago de Honorarios)</h5>
                 <div class="row">
                     <div class="col-6 mb-3">
                         <label class="form-label">AFP</label>
@@ -235,19 +246,33 @@
 
     let programasDisponibles = {};
 
-    // 1. CARGAR PROGRAMAS ACTIVOS
+    // 1. CARGAR PROGRAMAS ACTIVOS CON BOTONES (OPCIONES ABIERTAS)
     onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
-        const select = document.getElementById('programaSelect');
-        select.innerHTML = '<option value="">-- Selecciona el evento --</option>';
+        const container = document.getElementById('programaSelectContainer');
+        container.innerHTML = '';
         
         if (snapshot.exists()) {
             programasDisponibles = snapshot.val();
             for (const clave in programasDisponibles) {
                 const p = programasDisponibles[clave];
-                select.innerHTML += `<option value="${clave}">${p.nombre} (${p.fecha})</option>`;
+                container.innerHTML += `
+                    <div class="form-check mb-2" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #b066ff; border-radius: 8px;">
+                        <input class="form-check-input" type="radio" name="programaRadio" id="prog_${clave}" value="${clave}" required style="transform: scale(1.4); margin-top: 5px; cursor: pointer;">
+                        <label class="form-check-label text-white w-100" for="prog_${clave}" style="cursor: pointer;">
+                            <strong class="text-white">${p.nombre}</strong> <br>
+                            <small class="text-warning">${p.fecha}</small>
+                        </label>
+                    </div>
+                `;
             }
+            
+            // Re-vincular la lógica de bloqueo al cambiar de botón
+            document.querySelectorAll('input[name="programaRadio"]').forEach(radio => {
+                radio.addEventListener('change', actualizarFormulario);
+            });
+            
         } else {
-            select.innerHTML = '<option value="">No hay eventos activos en este momento</option>';
+            container.innerHTML = '<div class="alert alert-warning text-center">No hay eventos activos en este momento</div>';
         }
     });
 
@@ -255,16 +280,15 @@
     const tipoIngreso = document.getElementById('tipoIngreso');
     const divInvitadoPor = document.getElementById('divInvitadoPor');
     const divPin = document.getElementById('divPin');
-    const programaSelect = document.getElementById('programaSelect');
     const seccionBancaria = document.getElementById('seccionBancaria');
     const invitadoPorInput = document.getElementById('invitadoPor');
     const pinInput = document.getElementById('pinAcceso');
     
-    // Elementos Bancarios (para quitar/poner el required)
     const camposBancarios = ['afp', 'salud', 'banco', 'tipoCuenta', 'numeroCuenta'];
 
     function actualizarFormulario() {
-        const progClave = programaSelect.value;
+        const radioSeleccionado = document.querySelector('input[name="programaRadio"]:checked');
+        const progClave = radioSeleccionado ? radioSeleccionado.value : null;
         
         // Bloquear cortesía si es Dale Play
         if (progClave && programasDisponibles[progClave]) {
@@ -287,7 +311,6 @@
             divPin.classList.add('d-none');
             pinInput.required = false;
             
-            // Si es cortesía, no obligar a llenar banco
             seccionBancaria.classList.add('d-none');
             camposBancarios.forEach(id => document.getElementById(id).required = false);
         } else {
@@ -297,7 +320,6 @@
             seccionBancaria.classList.remove('d-none');
             camposBancarios.forEach(id => document.getElementById(id).required = true);
             
-            // Si es Pago y el programa tiene PIN, exigirlo
             if (progClave && programasDisponibles[progClave] && programasDisponibles[progClave].pin) {
                 divPin.classList.remove('d-none');
                 pinInput.required = true;
@@ -309,18 +331,63 @@
     }
 
     tipoIngreso.addEventListener('change', actualizarFormulario);
-    programaSelect.addEventListener('change', actualizarFormulario);
 
-    // FORMATEO DE RUT (Agregar guión automático si no tiene)
-    document.getElementById('rut').addEventListener('blur', function(e) {
+    // 3. AUTO RELLENAR DATOS
+    document.getElementById('rut').addEventListener('blur', async function(e) {
         let val = this.value.replace(/[^0-9kK]/g, '').toUpperCase();
         if(val.length > 1) {
             val = val.slice(0, -1) + '-' + val.slice(-1);
         }
         this.value = val;
+
+        if (val.length >= 8) {
+            try {
+                const snap = await get(child(ref(db), `1_trabajadores/${val}`));
+                if (snap.exists()) {
+                    const d = snap.val();
+                    document.getElementById('nombres').value = d.nombres || '';
+                    document.getElementById('apellidos').value = d.apellidos || '';
+                    document.getElementById('fechaNac').value = d.fechaNacimiento || '';
+                    document.getElementById('telefono').value = d.telefono || '';
+                    document.getElementById('email').value = d.email || '';
+                    
+                    if (d.calle) {
+                        document.getElementById('calle').value = d.calle || '';
+                        document.getElementById('numero_dir').value = d.numero_dir || '';
+                        document.getElementById('comuna').value = d.comuna || '';
+                    } else if (d.direccion) {
+                        document.getElementById('calle').value = d.direccion;
+                    }
+
+                    document.getElementById('emergenciaNombre').value = d.emergenciaNombre || '';
+                    document.getElementById('emergenciaTelefono').value = d.emergenciaTelefono || '';
+                    document.getElementById('enfermedades').value = d.enfermedades || '';
+                    document.getElementById('sexo').value = d.sexo || '';
+
+                    if(d.afp) document.getElementById('afp').value = d.afp;
+                    if(d.salud) document.getElementById('salud').value = d.salud;
+                    if(d.banco) document.getElementById('banco').value = d.banco;
+                    if(d.tipoCuenta) document.getElementById('tipoCuenta').value = d.tipoCuenta;
+                    if(d.numeroCuenta) document.getElementById('numeroCuenta').value = d.numeroCuenta;
+                    
+                    const btn = document.getElementById('btnEnviar');
+                    const oldText = btn.innerText;
+                    btn.innerText = "✨ ¡Datos cargados automáticamente!";
+                    btn.style.background = "#00d26a";
+                    btn.style.color = "#000";
+                    setTimeout(() => { 
+                        btn.innerText = oldText; 
+                        btn.style.background = ""; 
+                        btn.style.color = "white";
+                    }, 3000);
+                }
+            } catch(err) {
+                console.error("Error autofill", err);
+            }
+        }
     });
 
-    // 3. ENVIAR FORMULARIO
+    // 4. ENVIAR FORMULARIO
     document.getElementById('registroForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -329,14 +396,14 @@
         btn.innerText = "PROCESANDO... ⏳";
 
         try {
-            const progClave = programaSelect.value;
+            const radioSeleccionado = document.querySelector('input[name="programaRadio"]:checked');
+            const progClave = radioSeleccionado ? radioSeleccionado.value : null;
             if (!progClave) { alert("Selecciona un evento."); throw new Error(); }
             const prog = programasDisponibles[progClave];
 
             const rut = document.getElementById('rut').value.trim();
             const tipo = tipoIngreso.value;
 
-            // Validar PIN
             if (tipo === "Pago" && prog.pin) {
                 if (pinInput.value !== prog.pin) {
                     alert("❌ PIN INCORRECTO. Pídeselo a tu captador.");
@@ -345,17 +412,19 @@
                 }
             }
 
-            // Verificar Blacklist
             const blacklistSnap = await get(child(ref(db), `4_blacklist/${rut}`));
             if (blacklistSnap.exists()) {
                 alert("⛔ No puedes registrarte. Tu RUT está bloqueado en el sistema.");
                 throw new Error("Blacklist");
             }
 
-            // Limpiar teléfono (Quitar +56)
             let telefonoLimpio = document.getElementById('telefono').value.replace(/^\+56\s*9/, '9').replace(/^\+56/, '9').replace(/\s+/g, '');
+            
+            const calleVal = document.getElementById('calle').value;
+            const numVal = document.getElementById('numero_dir').value;
+            const comunaVal = document.getElementById('comuna').value;
+            const direccionCombinada = `${calleVal} ${numVal}, ${comunaVal}`;
 
-            // Guardar en BD (1_trabajadores)
             const datosTrabajador = {
                 rut: rut,
                 nombres: document.getElementById('nombres').value.toUpperCase(),
@@ -363,7 +432,10 @@
                 fechaNacimiento: document.getElementById('fechaNac').value,
                 telefono: telefonoLimpio,
                 email: document.getElementById('email').value.toLowerCase(),
-                direccion: document.getElementById('direccion').value,
+                calle: calleVal,
+                numero_dir: numVal,
+                comuna: comunaVal,
+                direccion: direccionCombinada,
                 sexo: document.getElementById('sexo').value,
                 emergenciaNombre: document.getElementById('emergenciaNombre').value,
                 emergenciaTelefono: document.getElementById('emergenciaTelefono').value,
@@ -378,21 +450,18 @@
                 datosTrabajador.numeroCuenta = document.getElementById('numeroCuenta').value;
             }
 
-            // Auto-fill account number if RUT account
             if (datosTrabajador.tipoCuenta === "CUENTA_RUT" && !datosTrabajador.numeroCuenta) {
                 datosTrabajador.numeroCuenta = rut.split('-')[0];
             }
 
             await set(ref(db, `1_trabajadores/${rut}`), datosTrabajador);
 
-            // Guardar Reserva
             await set(ref(db, `3_reservas/${prog.fecha}/${prog.nombre}/${rut}`), {
                 rut: rut,
                 tipo: tipo,
                 invitado_por: tipo === "Cortesía" ? invitadoPorInput.value : ""
             });
 
-            // ÉXITO -> Mostrar QR
             document.getElementById('form-container').classList.add('d-none');
             document.getElementById('success-container').classList.remove('d-none');
             document.getElementById('displayRut').innerText = rut;
@@ -406,7 +475,6 @@
                 correctLevel : QRCode.CorrectLevel.H
             });
 
-            // Scroll arriba para que vean el mensaje
             window.scrollTo(0,0);
 
         } catch (err) {
