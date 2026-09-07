@@ -55,7 +55,7 @@ document.getElementById('btnCerrarSesion').addEventListener('click', () => {
     }); 
 });
 
-const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28" };
+const mapaBancos = { "CHILE": "1", "ESTADO": "12", "SCOTIABANK": "14", "BCI": "16", "SANTANDER": "37", "ITAU": "39", "SECURITY": "49", "RIPLEY": "53", "CONSORCIO": "55", "BICE": "28", "MERCADOPAGO": "875" };
 
 let nombrePrograma = ""; 
 let fechaPrograma = ""; 
@@ -1170,6 +1170,7 @@ window.verPerfil = function(rut) {
                     <option value="SECURITY" ${p.banco==='SECURITY'?'selected':''}>Security</option>
                     <option value="CONSORCIO" ${p.banco==='CONSORCIO'?'selected':''}>Consorcio</option>
                     <option value="RIPLEY" ${p.banco==='RIPLEY'?'selected':''}>Ripley</option>
+                    <option value="MERCADOPAGO" ${p.banco==='MERCADOPAGO'?'selected':''}>Mercado Pago</option>
                 </select>
             </div>
             <div class="col-6 mb-2"><label class="text-muted small">Tipo de Cuenta</label>
