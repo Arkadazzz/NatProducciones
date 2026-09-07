@@ -2271,7 +2271,7 @@ const inputConfirmar = document.getElementById('inputConfirmarLimpieza');
 const btnEjecutar = document.getElementById('btnEjecutarLimpieza');
 
 inputConfirmar.addEventListener('input', (e) => { 
-    btnEjecutar.disabled = (e.target.value !== "LIMPIAR"); 
+    btnEjecutar.disabled = (e.target.value !== "1812"); 
 });
 
 btnEjecutar.addEventListener('click', async () => {
