@@ -1297,7 +1297,7 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
     tbody.innerHTML = "";
     
     for (const r in deudas) {
-        const tr = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" }; 
+        const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
         const fila = document.createElement('tr');
         fila.innerHTML = `
             <td>${r}</td>
