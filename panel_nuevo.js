@@ -1030,12 +1030,14 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
     doc.setFont("helvetica", "normal"); 
     doc.text("CAMILA FEVRE SEGUEL", 50, y + 10, null, null, "center"); 
 
+    
     // Dibujar firma de Camila
     if (FIRMA_CAMILA_BASE64 && FIRMA_CAMILA_BASE64 !== "PEGAR_AQUI_TU_BASE64_DE_LA_CAMI") {
         try {
-            doc.addImage(FIRMA_CAMILA_BASE64, 10, y - 25, 80, 25);
+            let formatoCami = FIRMA_CAMILA_BASE64.toUpperCase().includes("IMAGE/PNG") ? "PNG" : "JPEG";
+            doc.addImage(FIRMA_CAMILA_BASE64, formatoCami, 10, y - 25, 80, 25);
         } catch(e) {
-            console.error("Error al cargar firma de Producción");
+            console.error("Error al cargar firma de Producción", e);
         }
     } 
 
