@@ -16,7 +16,9 @@
         h4, h5 { color: #b066ff; font-weight: 600; }
         .section-title { margin-bottom: 20px; color: #d6b3ff; font-size: 1.3em; }
         .separator { border-top: 2px dashed #333; margin: 30px 0; }
-        #qr-container { background: white; padding: 20px; border-radius: 10px; display: inline-block; margin-top: 20px; }
+        #qr-container { background: white !important; padding: 20px; border-radius: 10px; display: inline-block; margin-top: 20px; }
+        /* Bloqueo estricto de Dark Mode forzado para el QR */
+        #qr-container img, #qr-container canvas { filter: invert(0) !important; mix-blend-mode: normal !important; background-color: white !important; }
     </style>
 </head>
 <body>
