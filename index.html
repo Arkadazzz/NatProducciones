@@ -209,6 +209,7 @@
                             <option value="SECURITY">Security</option>
                             <option value="CONSORCIO">Consorcio</option>
                             <option value="RIPLEY">Ripley</option>
+                            <option value="MERCADOPAGO">Mercado Pago</option>
                         </select>
                     </div>
                     <div class="col-6 mb-3">
@@ -244,9 +245,11 @@
         <h2 class="text-success fw-bold mb-3">¡Registro Exitoso!</h2>
         <p class="fs-5">Muestra este Código QR en la puerta para ingresar.</p>
         <div id="qr-container"></div>
+        <br>
+        <button type="button" class="btn btn-info fw-bold px-4 py-2 mt-2 shadow" onclick="window.descargarQR()" style="border-radius: 8px; font-size: 1.1em; color: black;">💾 Descargar mi QR</button>
         <h3 class="mt-4 text-warning fw-bold" id="displayRut"></h3>
-        <p class="text-muted mt-4">Toma una captura de pantalla por precaución.</p>
-        <button class="btn btn-outline-light mt-3" onclick="window.location.reload()">Registrar a otra persona</button>
+        <p class="text-muted mt-2">O tómale una captura de pantalla por precaución.</p>
+        <button type="button" class="btn btn-outline-light mt-3 w-100" onclick="window.location.reload()">Registrar a otra persona</button>
     </div>
 
 </div>
@@ -269,6 +272,30 @@
     const db = getDatabase(app);
 
     let programasDisponibles = {};
+
+    // DESCARGAR QR
+    window.descargarQR = function() {
+        const qrImg = document.querySelector('#qr-container img');
+        const rut = document.getElementById('displayRut').innerText;
+        if (qrImg && qrImg.src) {
+            const a = document.createElement('a');
+            a.href = qrImg.src;
+            a.download = `QR_Acceso_NAT_${rut}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } else {
+            const qrCanvas = document.querySelector('#qr-container canvas');
+            if (qrCanvas) {
+                const a = document.createElement('a');
+                a.href = qrCanvas.toDataURL("image/png");
+                a.download = `QR_Acceso_NAT_${rut}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+    };
 
     // 1. CARGAR PROGRAMAS ACTIVOS CON BOTONES (OPCIONES ABIERTAS)
     onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
