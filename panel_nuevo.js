@@ -1265,68 +1265,49 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 // ==========================================
 // FINANZAS Y BÓVEDA
 // ==========================================
-async function cargarBoveda() {
-    const tbody = document.getElementById('tablaDeudas'); 
-    if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-warning fw-bold py-3">⏳ Calculando pagos pendientes...</td></tr>';
+document.getElementById('finanzas-tab').addEventListener('click', async () => {
+    const snap = await get(ref(db, '2_asistencias')); 
+    if (!snap.exists()) return;
     
-    try {
-        const snap = await get(ref(db, '2_asistencias')); 
-        if (!snap.exists()) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-success fw-bold py-3">✅ La bóveda está vacía. No hay pagos pendientes.</td></tr>';
-            return;
-        }
-        
-        const trabSnap = await get(ref(db, '1_trabajadores')); 
-        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
-        
-        let deudas = {}; 
-        const todas = snap.val();
-        
-        for (const fecha in todas) { 
-            for (const prog in todas[fecha]) { 
-                for (const r in todas[fecha][prog]) {
-                    const asis = todas[fecha][prog][r];
-                    
-                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                    
-                    if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
-                        if (!deudas[r]) deudas[r] = { monto: 0, dias: 0, rutas_bd: [] };
-                        deudas[r].monto += montoLimpio; 
-                        deudas[r].dias += 1; 
-                        deudas[r].rutas_bd.push(`2_asistencias/${fecha}/${prog}/${r}`);
-                    }
+    const trabSnap = await get(ref(db, '1_trabajadores')); 
+    if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
+    
+    let deudas = {}; 
+    const todas = snap.val();
+    
+    for (const fecha in todas) { 
+        for (const prog in todas[fecha]) { 
+            for (const r in todas[fecha][prog]) {
+                const asis = todas[fecha][prog][r];
+                
+                const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                
+                if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
+                    if (!deudas[r]) deudas[r] = { monto: 0, dias: 0, rutas_bd: [] };
+                    deudas[r].monto += montoLimpio; 
+                    deudas[r].dias += 1; 
+                    deudas[r].rutas_bd.push(`2_asistencias/${fecha}/${prog}/${r}`);
                 }
             }
         }
-        
-        window.deudasGlobales = deudas; 
-        tbody.innerHTML = "";
-        
-        if (Object.keys(deudas).length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-success fw-bold py-3">✅ La bóveda está vacía. No hay pagos pendientes.</td></tr>';
-            return;
-        }
-        
-        for (const r in deudas) {
-            const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
-            const fila = document.createElement('tr');
-            fila.innerHTML = `
-                <td class="fw-bold">${r}</td>
-                <td>${tr.nombres} ${tr.apellidos}</td>
-                <td><span class="badge bg-secondary">${deudas[r].dias} programa(s)</span></td>
-                <td class="text-success fw-bold fs-5">$${deudas[r].monto.toLocaleString('es-CL')}</td>
-            `; 
-            tbody.appendChild(fila);
-        }
-    } catch (e) {
-        console.error(e);
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger fw-bold py-3">❌ Error de conexión al cargar la bóveda.</td></tr>';
     }
-}
-
-document.getElementById('finanzas-tab').addEventListener('click', cargarBoveda);
-setTimeout(cargarBoveda, 1500); // Carga automática de seguridad
+    
+    window.deudasGlobales = deudas; 
+    const tbody = document.getElementById('tablaDeudas'); 
+    tbody.innerHTML = "";
+    
+    for (const r in deudas) {
+        const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${r}</td>
+            <td>${tr.nombres} ${tr.apellidos}</td>
+            <td><span class="badge bg-secondary">${deudas[r].dias} días</span></td>
+            <td class="text-success fw-bold fs-5">$${deudas[r].monto}</td>
+        `; 
+        tbody.appendChild(fila);
+    }
+});
 
 document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) {
@@ -1524,26 +1505,69 @@ let signaturePadEfectivo = null;
 let rutEfectivoActual = "";
 let deudaEfectivoActual = null;
 
+// Cambiar placeholder dinámicamente para indicar que se puede buscar por nombre
+setTimeout(() => {
+    const inputEfe = document.getElementById('rutEfectivo');
+    if(inputEfe) inputEfe.placeholder = "Ingresa Nombres, Apellidos o RUT...";
+}, 500);
+
 document.getElementById('btnBuscarEfectivo').addEventListener('click', async () => {
-    const rut = document.getElementById('rutEfectivo').value.trim();
-    if (!rut) return alert("Por favor ingresa un RUT válido.");
+    const inputVal = document.getElementById('rutEfectivo').value.trim().toLowerCase();
+    if (!inputVal) return alert("Por favor ingresa un RUT o Nombre válido.");
     
-    const snap = await get(ref(db, '2_asistencias'));
-    if (!snap.exists()) return alert("No hay registros de asistencias en el sistema.");
+    const [asisSnap, trabSnap] = await Promise.all([
+        get(ref(db, '2_asistencias')),
+        get(ref(db, '1_trabajadores'))
+    ]);
     
-    const todas = snap.val();
-    let deuda = { montoTotal: 0, programas: [], rutas: [] };
+    if (!asisSnap.exists()) return alert("No hay registros de asistencias en el sistema.");
+    
+    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+    let targetRut = null;
+    let encontrados = [];
+
+    // Buscar por RUT exacto, o coincidencias en nombres/apellidos
+    for (const r in trabajadores) {
+        const t = trabajadores[r];
+        const nombreCompleto = `${t.nombres} ${t.apellidos}`.toLowerCase();
+        const rutLimpio = r.replace(/[^0-9kK]/g, '').toLowerCase();
+        const inputLimpio = inputVal.replace(/[^0-9kK]/g, '');
+
+        if (r.toLowerCase() === inputVal || rutLimpio === inputLimpio || nombreCompleto.includes(inputVal)) {
+            encontrados.push(r);
+        }
+    }
+
+    if (encontrados.length === 0) {
+        targetRut = inputVal; // Intento directo
+    } else if (encontrados.length > 1) {
+        let msg = "Se encontraron varias personas. Por favor, sé más específico o usa el RUT exacto:\n\n";
+        encontrados.slice(0, 5).forEach((rut, i) => {
+            msg += `${i+1}. ${trabajadores[rut].nombres} ${trabajadores[rut].apellidos} (${rut})\n`;
+        });
+        return alert(msg);
+    } else {
+        targetRut = encontrados[0];
+    }
+    
+    const todas = asisSnap.val();
+    let deuda = { montoTotal: 0, programasDetalle: [] };
     
     for (const f in todas) {
         for (const p in todas[f]) {
-            if (todas[f][p][rut]) {
-                const asis = todas[f][p][rut];
+            if (todas[f][p][targetRut]) {
+                const asis = todas[f][p][targetRut];
                 const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                 
                 if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
+                    deuda.programasDetalle.push({
+                        fecha: f,
+                        prog: p,
+                        nombreStr: `${p.replace(" - ", " / ")} (${f})`,
+                        monto: montoLimpio,
+                        ruta: `2_asistencias/${f}/${p}/${targetRut}`
+                    });
                     deuda.montoTotal += montoLimpio;
-                    deuda.programas.push(`${p.replace(" - ", " / ")} (${f})`);
-                    deuda.rutas.push(`2_asistencias/${f}/${p}/${rut}`);
                 }
             }
         }
@@ -1551,12 +1575,38 @@ document.getElementById('btnBuscarEfectivo').addEventListener('click', async () 
     
     if (deuda.montoTotal === 0) return alert("✅ Esta persona NO tiene pagos de honorarios pendientes.");
     
-    const trabSnap = await get(child(ref(db), `1_trabajadores/${rut}`));
-    const trab = trabSnap.exists() ? trabSnap.val() : {nombres: "Trabajador", apellidos: "No Registrado"};
+    const trab = trabajadores[targetRut] || {nombres: "Trabajador", apellidos: "No Registrado"};
     
     document.getElementById('nombreEfectivo').innerText = `${trab.nombres} ${trab.apellidos}`;
-    document.getElementById('montoEfectivo').innerText = `$${deuda.montoTotal}`;
-    document.getElementById('detalleProgramasEfectivo').innerText = `Asistencias a pagar:\n${deuda.programas.join(' | ')}`;
+    
+    // Inyectar checkboxes
+    let htmlCheckboxes = '<p class="text-warning mt-3 mb-2 fw-bold" style="font-size: 0.9em;">Selecciona qué programas liquidarás en efectivo ahora:</p>';
+    deuda.programasDetalle.forEach((item, idx) => {
+        htmlCheckboxes += `
+        <div class="form-check text-start ms-2 mb-2 p-2 rounded" style="background: #222; border: 1px solid #444;">
+            <input class="form-check-input check-pago-parcial" type="checkbox" value="${idx}" id="chk_efe_${idx}" checked style="transform: scale(1.3); margin-top:5px; cursor: pointer; margin-left: -15px;">
+            <label class="form-check-label ms-2 text-white w-100 d-flex justify-content-between" for="chk_efe_${idx}" style="cursor: pointer; font-size: 0.95em;">
+                <span>${item.nombreStr}</span>
+                <span class="text-success fw-bold">$${item.monto.toLocaleString('es-CL')}</span>
+            </label>
+        </div>`;
+    });
+    
+    document.getElementById('detalleProgramasEfectivo').innerHTML = htmlCheckboxes;
+    
+    // Función para recalcular el monto dinámicamente
+    const recalcularTotal = () => {
+        let suma = 0;
+        document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
+            suma += deuda.programasDetalle[chk.value].monto;
+        });
+        document.getElementById('montoEfectivo').innerText = `$${suma.toLocaleString('es-CL')}`;
+        deudaEfectivoActual.montoCalculado = suma;
+    };
+
+    document.querySelectorAll('.check-pago-parcial').forEach(chk => chk.addEventListener('change', recalcularTotal));
+    recalcularTotal();
+    
     document.getElementById('panelPagoEfectivo').classList.remove('d-none');
     
     const canvasEfe = document.getElementById('signature-pad-efectivo');
@@ -1570,7 +1620,7 @@ document.getElementById('btnBuscarEfectivo').addEventListener('click', async () 
     }
     signaturePadEfectivo.clear();
     
-    rutEfectivoActual = rut;
+    rutEfectivoActual = targetRut;
     deudaEfectivoActual = deuda;
 });
 
@@ -1580,65 +1630,175 @@ document.getElementById('btnLimpiarFirmaEfectivo').addEventListener('click', () 
 
 document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
     if (signaturePadEfectivo.isEmpty()) return alert("El trabajador debe firmar el recibo para constancia legal.");
-    if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoTotal} en efectivo?`)) return;
+    
+    let seleccionados = [];
+    document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
+        seleccionados.push(deudaEfectivoActual.programasDetalle[chk.value]);
+    });
+
+    if(seleccionados.length === 0) return alert("Debes seleccionar al menos un programa para pagar.");
+
+    if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO por los ${seleccionados.length} programa(s) seleccionado(s)?`)) return;
     
     const btn = document.getElementById('btnConfirmarPagoEfectivo');
+    const textOrg = btn.innerText;
     btn.disabled = true;
-    btn.innerText = "⏳ Procesando...";
+    btn.innerText = "⏳ Guardando Recibo en la Nube...";
 
     try {
         const firmaBase64 = signaturePadEfectivo.toDataURL('image/jpeg');
         const nowIso = new Date().toISOString();
         const idRecibo = Date.now().toString();
         
+        const nombresProgramas = seleccionados.map(s => s.nombreStr);
+        const rutasActualizar = seleccionados.map(s => s.ruta);
+        
         await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
             rut: rutEfectivoActual,
-            monto: deudaEfectivoActual.montoTotal,
+            monto: deudaEfectivoActual.montoCalculado,
             fecha: nowIso,
             firma: firmaBase64,
-            programas: deudaEfectivoActual.programas
+            programas: nombresProgramas
         });
         
         let updates = {};
-        deudaEfectivoActual.rutas.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
+        rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
         await update(ref(db), updates);
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+        alert("✅ Pago registrado con éxito y comprobante asegurado en la Bóveda de Recibos.\n\nNota: El PDF NO se descarga ahora. Podrás descargarlos todos juntos en un archivo ZIP desde la pestaña 'Efectivo'.");
         
-        doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-        doc.text("COMPROBANTE DE PAGO EN EFECTIVO", 105, 20, null, null, "center");
-        
-        doc.setFontSize(12); doc.setFont("helvetica", "normal");
-        const textoCentral = `En Santiago, con fecha ${new Date().toLocaleDateString()}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago integro en EFECTIVO por la suma de $${deudaEfectivoActual.montoTotal} pesos a don/na ${document.getElementById('nombreEfectivo').innerText}, Cedula de Identidad N° ${rutEfectivoActual}.\n\nEste pago corresponde a la liquidacion de honorarios por su participacion como publico / extra en los siguientes programas:\n\n${deudaEfectivoActual.programas.join('\n')}\n\nEl trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfaccion, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de indole civil ni laboral.`;
-        
-        const lineas = doc.splitTextToSize(textoCentral, 170);
-        doc.text(lineas, 20, 40);
-        
-        doc.addImage(firmaBase64, 'JPEG', 65, 130, 80, 25);
-        doc.setFont("helvetica", "bold");
-        doc.text("_________________________________", 105, 160, null, null, "center");
-        doc.text("Firma Recibi Conforme", 105, 165, null, null, "center");
-        doc.setFont("helvetica", "normal");
-        doc.text(document.getElementById('nombreEfectivo').innerText, 105, 170, null, null, "center");
-        doc.text(rutEfectivoActual, 105, 175, null, null, "center");
-        
-        const nombreCompletoLimpio = document.getElementById('nombreEfectivo').innerText.replace(/[^a-zA-Z0-9_]/g, "_");
-        doc.save(`Recibo_Efectivo_${nombreCompletoLimpio}_${rutEfectivoActual}.pdf`);
-        
-        alert("✅ Pago registrado exitosamente en la base de datos y PDF descargado.");
         document.getElementById('panelPagoEfectivo').classList.add('d-none');
         document.getElementById('rutEfectivo').value = "";
         rutEfectivoActual = "";
         
+        renderPanelRecibosBatch();
+        
     } catch (e) {
         console.error(e);
-        alert("Error detallado: " + e.message + "\n\nSácale pantallazo a este mensaje si vuelve a fallar.");
+        alert("Error detallado: " + e.message);
     } finally {
         btn.disabled = false;
-        btn.innerText = "💾 Procesar Pago y Generar PDF";
+        btn.innerText = "💾 Confirmar y Guardar Recibo";
     }
 });
+
+// --- PESTAÑA EFECTIVO: GESTIÓN DE RECIBOS EN LOTE ---
+document.getElementById('efectivo-tab')?.addEventListener('click', renderPanelRecibosBatch);
+
+async function renderPanelRecibosBatch() {
+    let container = document.getElementById('panelRecibosBatch');
+    if (!container) {
+        const paneEl = document.getElementById('tab-efectivo');
+        if(!paneEl) return;
+        container = document.createElement('div');
+        container.id = 'panelRecibosBatch';
+        container.className = 'card bg-dark border-info mt-5 p-4 shadow-lg';
+        paneEl.appendChild(container);
+    }
+    
+    container.innerHTML = '<div class="text-info fs-5 text-center">⏳ Revisando Bóveda de Recibos...</div>';
+    try {
+        const snap = await get(ref(db, '7_pagos_efectivo'));
+        const recibos = snap.exists() ? snap.val() : {};
+        const count = Object.keys(recibos).length;
+        
+        if (count === 0) {
+            container.innerHTML = '<div class="text-success text-center fw-bold fs-5 p-2">✅ Bóveda Vacía. No hay recibos de efectivo por archivar.</div>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-info pb-2">
+                <h4 class="text-info mb-0">🗂️ Recibos Guardados (${count})</h4>
+            </div>
+            <p class="text-muted" style="font-size: 0.95em;">Los comprobantes de los pagos en efectivo están almacenados. Descárgalos todos juntos ahora.</p>
+            
+            <button class="btn btn-info fw-bold py-3 shadow w-100 fs-5 text-dark" id="btnDescargarZipEfectivo" style="border-radius: 10px;">
+                📥 Descargar ZIP con los ${count} Recibos
+            </button>
+            
+            <div id="zonaEliminarRecibos" class="d-none mt-4 p-3" style="background: rgba(255, 0, 0, 0.1); border: 2px dashed #ff3333; border-radius: 8px;">
+                <h5 class="text-danger fw-bold text-center mb-3">⚠️ Zona de Limpieza Segura</h5>
+                <p class="text-white text-center mb-3" style="font-size: 0.9em;">¿Ya descargaste el ZIP, lo abriste y confirmaste que los PDFs están adentro?<br>Si es así, borra los registros para no volver a descargar los mismos mañana.</p>
+                <button class="btn btn-danger fw-bold w-100 py-2 fs-5" id="btnVaciarRecibos" style="border-radius: 8px;">
+                    🗑️ Sí, Eliminar los ${count} recibos de la Nube
+                </button>
+            </div>
+        `;
+        
+        document.getElementById('btnDescargarZipEfectivo').addEventListener('click', async () => {
+            const btn = document.getElementById('btnDescargarZipEfectivo');
+            btn.innerText = "⏳ Empaquetando ZIP... (Puede tomar unos segundos)";
+            btn.disabled = true;
+            
+            try {
+                const zip = new JSZip();
+                const { jsPDF } = window.jspdf;
+                const trabSnap = await get(ref(db, '1_trabajadores'));
+                const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+                
+                for (const id in recibos) {
+                    const rec = recibos[id];
+                    const tr = trabajadores[rec.rut] || { nombres: "Desconocido", apellidos: "" };
+                    
+                    const doc = new jsPDF();
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+                    doc.text("COMPROBANTE DE PAGO EN EFECTIVO", 105, 20, null, null, "center");
+                    
+                    doc.setFontSize(12); doc.setFont("helvetica", "normal");
+                    const dateObj = new Date(rec.fecha);
+                    const dateStr = `${dateObj.getDate().toString().padStart(2,'0')}-${(dateObj.getMonth()+1).toString().padStart(2,'0')}-${dateObj.getFullYear()}`;
+                    const nombreCompleto = `${tr.nombres} ${tr.apellidos}`;
+                    
+                    const textoCentral = `En Santiago, con fecha ${dateStr}, NAT PRODUCCIONES (Camila Alejandra Fevre Seguel Produccion E.I.R.L) realiza el pago integro en EFECTIVO por la suma de $${rec.monto.toLocaleString('es-CL')} pesos a don/na ${nombreCompleto}, Cedula de Identidad N° ${rec.rut}.\n\nEste pago corresponde a la liquidacion de honorarios por su participacion como publico / extra en los siguientes programas:\n\n${rec.programas.join('\n')}\n\nEl trabajador declara mediante su firma recibir el dinero conforme y a su entera satisfaccion, liberando a la productora de cualquier deuda asociada a estas jornadas, no teniendo reclamos posteriores que realizar de indole civil ni laboral.`;
+                    
+                    const lineas = doc.splitTextToSize(textoCentral, 170);
+                    doc.text(lineas, 20, 40);
+                    
+                    if (rec.firma) {
+                        try { doc.addImage(rec.firma, 'JPEG', 65, 130, 80, 25); } catch(e) {}
+                    }
+                    
+                    doc.setFont("helvetica", "bold");
+                    doc.text("_________________________________", 105, 160, null, null, "center");
+                    doc.text("Firma Recibí Conforme", 105, 165, null, null, "center");
+                    doc.setFont("helvetica", "normal");
+                    doc.text(nombreCompleto, 105, 170, null, null, "center");
+                    doc.text(rec.rut, 105, 175, null, null, "center");
+                    
+                    const pdfBlob = doc.output('blob');
+                    const safeName = nombreCompleto.replace(/[^a-zA-Z0-9]/g, "_");
+                    zip.file(`Recibo_Efectivo_${safeName}_${rec.rut}_${id}.pdf`, pdfBlob);
+                }
+                
+                const zipContent = await zip.generateAsync({type:"blob"});
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(zipContent);
+                a.download = `Recibos_Efectivo_NAT_${new Date().toISOString().split('T')[0]}.zip`;
+                a.click();
+                
+                btn.innerText = "✅ ZIP Descargado Exitosamente";
+                document.getElementById('zonaEliminarRecibos').classList.remove('d-none');
+                
+            } catch(e) {
+                alert("Error armando el ZIP: " + e.message);
+                btn.innerText = "📥 Intentar de nuevo";
+                btn.disabled = false;
+            }
+        });
+        
+        document.getElementById('btnVaciarRecibos').addEventListener('click', async () => {
+            if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los recibos están guardados en tu dispositivo?\n\nSi aceptas, todos estos registros se esfumarán de la base de datos para no repetirse el próximo mes.`)) {
+                await remove(ref(db, '7_pagos_efectivo'));
+                alert("✅ La Bóveda de Recibos de Efectivo ha sido vaciada.");
+                renderPanelRecibosBatch();
+            }
+        });
+    } catch(e) {
+        console.error("Error", e);
+    }
+}
+setTimeout(renderPanelRecibosBatch, 2500);
 
 // ==========================================
 // CONTRATOS DT
