@@ -79,6 +79,10 @@ let reservasGlobales = {};
 let asistenciasGlobales = {};
 window.siguienteTicketAutomatico = 1;
 window.asistentesSinSalida = 0; 
+window.totalIP = 0;
+window.totalCortesia = 0;
+window.adentroIP = 0;
+window.adentroCortesia = 0; 
 let unsubscribeReservas = null; 
 let unsubscribeAsistencias = null;
 
@@ -531,11 +535,11 @@ function activarRadares() {
         reservasGlobales = snapshot.exists() ? snapshot.val() : {};
         totalEsperados = Object.keys(reservasGlobales).length; 
         
-        totalIP = 0;
-        totalCortesia = 0;
+        window.totalIP = 0;
+        window.totalCortesia = 0;
         for (const r in reservasGlobales) {
-            if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
-            else totalIP++;
+            if (reservasGlobales[r].tipo === "Cortesía") window.totalCortesia++;
+            else window.totalIP++;
         }
         actualizarTablero();
     });
@@ -682,6 +686,13 @@ function actualizarTablero() {
         let htmlFaltantes = "";
         let esDalePlay = nombrePrograma.includes("Dale Play");
 
+        window.adentroIP = 0;
+        window.adentroCortesia = 0;
+        for (const r in asistenciasGlobales) {
+            if (asistenciasGlobales[r].tipo_ingreso === "Cortesía") window.adentroCortesia++;
+            else window.adentroIP++;
+        }
+
         for (const rut in reservasGlobales) {
             if (!asistenciasGlobales[rut]) {
                 const res = reservasGlobales[rut];
@@ -711,7 +722,7 @@ function actualizarTablero() {
             document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
             document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
         } else {
-            document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
+            document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.totalIP || 0} | CORT: ${window.totalCortesia || 0}</span>`;
             document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
         }
         
@@ -957,7 +968,14 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
     const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
     const now = new Date();
     const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    const numeroFinal = document.getElementById('numeroAsignado').value;
+    
+    // Cálculo Dinámico en Tiempo Real para evitar choque de números entre iPads
+    let numReal = 0;
+    for (const r in asistenciasGlobales) {
+        let n = parseInt(asistenciasGlobales[r].numero_asignado) || 0;
+        if (n > numReal) numReal = n;
+    }
+    const numeroFinal = numReal + 1;
     
     const textoInfo = document.getElementById('infoInvitado').innerText; 
     const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
