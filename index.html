@@ -275,27 +275,39 @@
 
     let programasDisponibles = {};
 
-    // DESCARGAR QR
+    // DESCARGAR QR CON FONDO BLANCO GARANTIZADO
     window.descargarQR = function() {
-        const qrImg = document.querySelector('#qr-container img');
         const rut = document.getElementById('displayRut').innerText;
-        if (qrImg && qrImg.src) {
+        const qrCanvas = document.querySelector('#qr-container canvas');
+        const qrImg = document.querySelector('#qr-container img');
+
+        let source = qrCanvas;
+        if (!source || (source.style.display === 'none' && qrImg && qrImg.src)) {
+            source = qrImg;
+        }
+
+        if (source) {
+            const margin = 20; // Margen blanco para que el escáner lea rápido
+            const size = 200; // Tamaño del QR
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = size + (margin * 2);
+            tempCanvas.height = size + (margin * 2);
+            const ctx = tempCanvas.getContext('2d');
+
+            // 1. Forzar un fondo 100% blanco puro
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // 2. Dibujar el QR encima del fondo blanco
+            ctx.drawImage(source, margin, margin, size, size);
+
+            // 3. Descargar como JPG (El formato JPG no soporta transparencia, matando el bug del fondo negro)
             const a = document.createElement('a');
-            a.href = qrImg.src;
-            a.download = `QR_Acceso_NAT_${rut}.png`;
+            a.href = tempCanvas.toDataURL("image/jpeg", 1.0);
+            a.download = `QR_Acceso_NAT_${rut}.jpg`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-        } else {
-            const qrCanvas = document.querySelector('#qr-container canvas');
-            if (qrCanvas) {
-                const a = document.createElement('a');
-                a.href = qrCanvas.toDataURL("image/png");
-                a.download = `QR_Acceso_NAT_${rut}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
         }
     };
 
