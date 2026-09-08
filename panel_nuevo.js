@@ -436,11 +436,7 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
     } else {
         let diffMins = Math.floor((tSal - tTer) / 60000);
         if (diffMins > 0 && valorHE > 0) {
-            let horasCompletas = Math.floor(diffMins / 60);
-            let minRestantes = diffMins % 60;
-            if (minRestantes >= 30) {
-                horasCompletas++;
-            }
+            let horasCompletas = Math.floor(diffMins / 60); // Ahora requiere 60 mins exactos para sumar 1
             bonoExtra = horasCompletas * parseInt(valorHE);
         }
     }
