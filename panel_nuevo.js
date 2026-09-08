@@ -542,29 +542,94 @@ function activarRadares() {
 
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
-        const asistencias = asistenciasGlobales;
-        totalFirmados = Object.keys(asistencias).length; 
+        totalFirmados = Object.keys(asistenciasGlobales).length; 
         actualizarTablero();
         
+        // Inyectar barra de búsqueda y orden
+        let seccionLista = document.getElementById('seccionLista');
+        if(seccionLista && !document.getElementById('controlesPuerta')) {
+            let div = document.createElement('div');
+            div.id = 'controlesPuerta';
+            div.className = 'row mb-3 align-items-center bg-dark p-2 rounded border border-info';
+            div.innerHTML = `
+                <div class="col-md-6 mb-2 mb-md-0">
+                    <input type="text" id="buscadorPuerta" class="form-control bg-dark text-white border-info" placeholder="🔍 Buscar por Nombre, RUT o Ticket...">
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <label class="text-info me-2 small fw-bold">Ordenar por:</label>
+                    <select id="ordenPuerta" class="form-select bg-dark text-white border-info d-inline-block w-auto">
+                        <option value="ticket_desc">Últimos en entrar</option>
+                        <option value="ticket_asc">Ticket (Menor a Mayor)</option>
+                        <option value="nombre_asc">Nombre (A-Z)</option>
+                        <option value="rut_asc">RUT</option>
+                    </select>
+                </div>
+            `;
+            const tableResp = seccionLista.querySelector('.table-responsive');
+            if(tableResp) {
+                seccionLista.insertBefore(div, tableResp);
+            } else {
+                seccionLista.prepend(div);
+            }
+
+            document.getElementById('buscadorPuerta').addEventListener('input', (e) => {
+                window.termBusquedaPuerta = e.target.value.toLowerCase();
+                window.renderTablaPuerta();
+            });
+            document.getElementById('ordenPuerta').addEventListener('change', (e) => {
+                window.criterioOrdenPuerta = e.target.value;
+                window.renderTablaPuerta();
+            });
+        }
+        
+        window.renderTablaPuerta();
+    });
+
+    window.renderTablaPuerta = function() {
         let maxNumero = 0; 
         const conteoStaff = {}; 
         window.asistentesSinSalida = 0; 
         
         const tbody = document.getElementById('tablaAsistentes'); 
+        if(!tbody) return;
         tbody.innerHTML = "";
         
-        for (const rut in asistencias) {
-            const asis = asistencias[rut]; 
+        let arrAsistentes = [];
+        
+        for (const rut in asistenciasGlobales) {
+            const asis = asistenciasGlobales[rut]; 
             const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
             const num = parseInt(asis.numero_asignado) || 0; 
             
-            if (num > maxNumero) {
-                maxNumero = num;
-            }
+            if (num > maxNumero) { maxNumero = num; }
             
             if (asis.tipo_ingreso === "Cortesía" && asis.invitado_por) {
                 conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
             }
+            
+            const nombreCompleto = `${trab.nombres} ${trab.apellidos}`.toLowerCase();
+            const ticketStr = String(num);
+            const rutStr = rut.toLowerCase();
+            const term = window.termBusquedaPuerta || "";
+
+            if (term && !nombreCompleto.includes(term) && !rutStr.includes(term) && !ticketStr.includes(term)) {
+                continue; 
+            }
+
+            arrAsistentes.push({ rut, asis, trab, num, nombreOriginal: `${trab.nombres} ${trab.apellidos}` });
+        }
+        
+        const sortVal = window.criterioOrdenPuerta || "ticket_desc";
+        arrAsistentes.sort((a, b) => {
+            if (sortVal === "ticket_asc") return a.num - b.num;
+            if (sortVal === "ticket_desc") return b.num - a.num;
+            if (sortVal === "nombre_asc") return a.nombreOriginal.localeCompare(b.nombreOriginal);
+            if (sortVal === "rut_asc") return a.rut.localeCompare(b.rut);
+            return 0;
+        });
+        
+        arrAsistentes.forEach(item => {
+            const { rut, asis, trab, num } = item;
             
             let badgeDT = "";
             if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato) {
@@ -572,10 +637,12 @@ function activarRadares() {
             } else {
                 badgeDT = `<span class="text-muted" style="font-size: 0.8em;">N/A</span>`;
             }
+            
+            const btnPDFInstante = `<button class="btn btn-outline-info btn-sm fw-bold ms-1" onclick="window.generarContratoPDF('${rut}')" title="Descargar PDF ahora">📄 PDF</button>`;
 
             let btnSalidaContrato = "";
             if (asis.hora_salida) {
-                btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span> <button class="btn btn-outline-info btn-sm ms-1" onclick="window.generarContratoPDF('${rut}')">📄 PDF</button>`;
+                btnSalidaContrato = `<span class="badge bg-secondary">Salió: ${asis.hora_salida}</span>`;
             } else { 
                 window.asistentesSinSalida++; 
                 btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
@@ -587,11 +654,11 @@ function activarRadares() {
             tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td>
                             <td>${trab.nombres} ${trab.apellidos}<br>${btnEditarPago}</td>
                             <td>${asis.hora_ingreso}</td>
-                            <td>${badgeDT}</td>
+                            <td>${badgeDT} ${btnPDFInstante}</td>
                             <td>${btnSalidaContrato}</td>
                             <td><button class="btn btn-danger btn-sm" onclick="window.anularAsistencia('${rut}')">X</button></td>`;
             tbody.appendChild(tr);
-        }
+        });
         
         window.siguienteTicketAutomatico = maxNumero + 1;
         
@@ -605,7 +672,7 @@ function activarRadares() {
         } else { 
             document.getElementById('seccionConteoInvitados').classList.add('d-none'); 
         }
-    });
+    };
 }
 
 function actualizarTablero() {
