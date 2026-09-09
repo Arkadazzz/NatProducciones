@@ -2538,6 +2538,7 @@ btnEjecutar.addEventListener('click', async () => {
     try {
         await remove(ref(db, '2_asistencias')); 
         await remove(ref(db, '3_reservas'));
+        await remove(ref(db, '8_autorizaciones_menores')); // Limpieza de permisos de menores
         alert("✅ Nube limpiada con éxito."); 
         
         const modal = bootstrap.Modal.getInstance(document.getElementById('modalLimpieza'));
@@ -2681,3 +2682,169 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         btnSorteo.disabled = false;
     }
 });
+
+// ==========================================
+// MANTENIMIENTO - AUTORIZACIONES MENORES
+// ==========================================
+async function renderPanelMenoresBatch() {
+    let mantTab = document.getElementById('mantenimiento-tab');
+    if(!mantTab) return;
+    
+    let container = document.getElementById('panelMenoresBatch');
+    if (!container) {
+        let baseEl = document.getElementById('btnRespaldoMaestro');
+        if (baseEl) {
+            let parentCard = baseEl.parentElement.parentElement;
+            container = document.createElement('div');
+            container.id = 'panelMenoresBatch';
+            container.className = 'card bg-dark border-warning mt-5 p-4 shadow-lg w-100';
+            parentCard.appendChild(container);
+        } else {
+            return;
+        }
+    }
+    
+    container.innerHTML = '<div class="text-warning fs-5 text-center">⏳ Revisando Permisos de Menores...</div>';
+    try {
+        const snap = await get(ref(db, '8_autorizaciones_menores'));
+        if (!snap.exists()) {
+            container.innerHTML = '<div class="text-success text-center fw-bold fs-5 p-2">✅ No hay permisos notariales de menores pendientes.</div>';
+            return;
+        }
+        
+        const datosMenores = snap.val();
+        let totalPermisos = 0;
+        let flatPermisos = [];
+        
+        for (const fecha in datosMenores) {
+            for (const prog in datosMenores[fecha]) {
+                for (const rut in datosMenores[fecha][prog]) {
+                    totalPermisos++;
+                    flatPermisos.push({
+                        ...datosMenores[fecha][prog][rut],
+                        rutaDB: `8_autorizaciones_menores/${fecha}/${prog}/${rut}`
+                    });
+                }
+            }
+        }
+        
+        if (totalPermisos === 0) {
+            container.innerHTML = '<div class="text-success text-center fw-bold fs-5 p-2">✅ No hay permisos notariales de menores pendientes.</div>';
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2">
+                <h4 class="text-warning mb-0">🚸 Permisos Notariales Menores (${totalPermisos})</h4>
+            </div>
+            <p class="text-muted" style="font-size: 0.95em;">Descarga el ZIP con las autorizaciones firmadas por los apoderados, organizadas por carpetas de eventos.</p>
+            
+            <button class="btn btn-warning fw-bold py-3 shadow w-100 fs-5 text-dark" id="btnDescargarZipMenores" style="border-radius: 10px;">
+                📥 Descargar ZIP con los ${totalPermisos} Permisos
+            </button>
+            
+            <div id="zonaEliminarMenores" class="d-none mt-4 p-3" style="background: rgba(255, 0, 0, 0.1); border: 2px dashed #ff3333; border-radius: 8px;">
+                <h5 class="text-danger fw-bold text-center mb-3">⚠️ Zona de Limpieza Segura</h5>
+                <p class="text-white text-center mb-3" style="font-size: 0.9em;">¿Ya descargaste el ZIP y confirmaste que los permisos están adentro?<br>Si es así, borra los registros de la nube.</p>
+                <button class="btn btn-danger fw-bold w-100 py-2 fs-5" id="btnVaciarMenores" style="border-radius: 8px;">
+                    🗑️ Sí, Eliminar los ${totalPermisos} permisos de la Nube
+                </button>
+            </div>
+        `;
+        
+        document.getElementById('btnDescargarZipMenores').addEventListener('click', async () => {
+            const btn = document.getElementById('btnDescargarZipMenores');
+            btn.innerText = "⏳ Empaquetando ZIP de Menores...";
+            btn.disabled = true;
+            
+            try {
+                const zip = new JSZip();
+                const { jsPDF } = window.jspdf;
+                
+                flatPermisos.forEach(auto => {
+                    const doc = new jsPDF();
+                    doc.setFont("helvetica", "bold"); doc.setFontSize(14);
+                    doc.text("AUTORIZACIÓN PARA TRABAJO DE MENOR DE EDAD", 105, 20, null, null, "center");
+                    
+                    doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+                    
+                    const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+                    const partesFecha = auto.fecha_programa.split('-');
+                    const dia = partesFecha[2];
+                    const mes = meses[parseInt(partesFecha[1]) - 1];
+                    const anio = partesFecha[0];
+
+                    const texto = `En Santiago de Chile a ${dia} de ${mes} de ${anio}, yo ${auto.nombre_apoderado}, nacionalidad ${auto.nacionalidad_apoderado}, profesión/oficio ${auto.profesion_apoderado}, Cédula de Identidad N° ${auto.rut_apoderado}, con domicilio en ${auto.domicilio_apoderado}, en mi calidad de ${auto.relacion_apoderado} del menor ${auto.nombre_menor}, Cédula de Identidad N° ${auto.rut_menor}, de ${auto.edad_menor} años de edad, vengo en otorgar mi autorización expresa para que mi hijo(a)/pupilo(a) pueda desempeñarse laboralmente con la empresa:
+
+RAZÓN SOCIAL: Camila Alejandra Fevre Seguel E.I.R.L. Producción. NOMBRE DE FANTASÍA: Nat Producciones
+
+1. Objeto de la Prestación de Servicios
+El menor queda autorizado para participar en las siguientes actividades:
+• Desempeñarse como extra en series y películas.
+• Participar como público en programas de televisión del canal Mega. (Dale Play)
+
+2. Condiciones de Seguridad y Bienestar
+Declaro haber sido informado(a) de que la productora garantiza las condiciones de seguridad y dignidad para el menor durante la ejecución de sus labores, contando con:
+• Presencia de un Prevencionista de Riesgos en terreno.
+• Acceso a servicio de Enfermería y primeros auxilios.
+• Suministro de agua potable, servicios higiénicos y cobertura de necesidades básicas.
+
+3. Declaración de Cumplimiento Legal
+Esta autorización se otorga conforme a lo establecido en el Código del Trabajo de Chile, asegurando que las labores no interrumpirán los estudios del menor ni perjudicarán su salud o desarrollo físico y moral.
+
+La presente autorización es válida para el período en curso.`;
+                    
+                    const lineas = doc.splitTextToSize(texto, 170);
+                    doc.text(lineas, 20, 40);
+                    
+                    if (auto.firma_apoderado) {
+                        try { doc.addImage(auto.firma_apoderado, 'JPEG', 65, 150, 80, 25); } catch(e) {}
+                    }
+                    
+                    doc.setFont("helvetica", "bold");
+                    doc.text("_________________________________", 105, 180, null, null, "center");
+                    doc.text("Firma Apoderado / Tutor Legal", 105, 185, null, null, "center");
+                    doc.setFont("helvetica", "normal");
+                    doc.text(auto.nombre_apoderado, 105, 190, null, null, "center");
+                    doc.text(auto.rut_apoderado, 105, 195, null, null, "center");
+                    
+                    const pdfBlob = doc.output('blob');
+                    const safeMenor = auto.nombre_menor.replace(/[^a-zA-Z0-9]/g, "_");
+                    const nombreCarpeta = `${auto.fecha_programa}_${auto.nombre_programa.replace(/[^a-zA-Z0-9\-]/g, "_")}`;
+                    
+                    zip.folder(nombreCarpeta).file(`Permiso_Menor_${safeMenor}_${auto.rut_menor}.pdf`, pdfBlob);
+                });
+                
+                const zipContent = await zip.generateAsync({type:"blob"});
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(zipContent);
+                a.download = `Permisos_Notariales_Menores_${new Date().toISOString().split('T')[0]}.zip`;
+                a.click();
+                
+                btn.innerText = "✅ ZIP Descargado Exitosamente";
+                document.getElementById('zonaEliminarMenores').classList.remove('d-none');
+                
+            } catch(e) {
+                alert("Error armando el ZIP: " + e.message);
+                btn.innerText = "📥 Intentar de nuevo";
+                btn.disabled = false;
+            }
+        });
+        
+        document.getElementById('btnVaciarMenores').addEventListener('click', async () => {
+            if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los permisos están guardados?\n\nSi aceptas, estos registros se eliminarán de la base de datos para no mezclarse con los de mañana.`)) {
+                await remove(ref(db, '8_autorizaciones_menores'));
+                alert("✅ Carpeta de permisos de menores ha sido vaciada.");
+                renderPanelMenoresBatch();
+            }
+        });
+        
+    } catch(e) {
+        console.error(e);
+        container.innerHTML = '<div class="text-danger text-center">Error al cargar permisos.</div>';
+    }
+}
+
+// Inicializar
+document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
+setTimeout(renderPanelMenoresBatch, 3000);
