@@ -1838,7 +1838,17 @@ async function renderPanelRecibosBatch() {
                     
                     const pdfBlob = doc.output('blob');
                     const safeName = nombreCompleto.replace(/[^a-zA-Z0-9]/g, "_");
-                    zip.file(`Recibo_Efectivo_${safeName}_${rec.rut}_${id}.pdf`, pdfBlob);
+                    
+                    // Crear carpeta dinámica usando el nombre y fecha del programa
+                    const primerPrograma = (rec.programas && rec.programas.length > 0) ? rec.programas[0] : "Pagos_Varios";
+                    let nombreCarpeta = primerPrograma.replace(/[^a-zA-Z0-9\-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, '');
+                    
+                    // Si se le pagaron varios programas a la vez, lo indicamos en la carpeta
+                    if (rec.programas && rec.programas.length > 1) {
+                        nombreCarpeta += "_Y_OTROS";
+                    }
+                    
+                    zip.folder(nombreCarpeta).file(`Recibo_Efectivo_${safeName}_${rec.rut}_${id}.pdf`, pdfBlob);
                 }
                 
                 const zipContent = await zip.generateAsync({type:"blob"});
