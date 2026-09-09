@@ -2538,7 +2538,6 @@ btnEjecutar.addEventListener('click', async () => {
     try {
         await remove(ref(db, '2_asistencias')); 
         await remove(ref(db, '3_reservas'));
-        await remove(ref(db, '8_autorizaciones_menores')); // Limpieza de permisos de menores
         alert("✅ Nube limpiada con éxito."); 
         
         const modal = bootstrap.Modal.getInstance(document.getElementById('modalLimpieza'));
@@ -2692,13 +2691,15 @@ async function renderPanelMenoresBatch() {
     
     let container = document.getElementById('panelMenoresBatch');
     if (!container) {
+        // Buscar el contenedor padre real de la pestaña Mantenimiento (normalmente el tab-pane)
         let baseEl = document.getElementById('btnRespaldoMaestro');
         if (baseEl) {
-            let parentCard = baseEl.parentElement.parentElement;
+            // Subimos hasta encontrar el row principal o el tab-pane para que ocupe todo el ancho
+            let tabPane = baseEl.closest('.tab-pane') || baseEl.parentElement.parentElement.parentElement;
             container = document.createElement('div');
             container.id = 'panelMenoresBatch';
             container.className = 'card bg-dark border-warning mt-5 p-4 shadow-lg w-100';
-            parentCard.appendChild(container);
+            tabPane.appendChild(container);
         } else {
             return;
         }
@@ -2840,8 +2841,8 @@ La presente autorización es válida para el período en curso.`;
         });
         
     } catch(e) {
-        console.error(e);
-        container.innerHTML = '<div class="text-danger text-center">Error al cargar permisos.</div>';
+        console.error("Error cargando menores:", e);
+        container.innerHTML = `<div class="text-danger text-center fw-bold">❌ Error al cargar permisos.<br><small class="text-muted">${e.message}</small></div>`;
     }
 }
 
