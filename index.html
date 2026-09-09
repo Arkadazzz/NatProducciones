@@ -17,6 +17,7 @@
         .section-title { margin-bottom: 20px; color: #d6b3ff; font-size: 1.3em; }
         .separator { border-top: 2px dashed #333; margin: 30px 0; }
         #qr-container { background: white !important; padding: 20px; border-radius: 10px; display: inline-block; margin-top: 20px; }
+        .invertido { filter: invert(1) !important; }
         /* Bloqueo estricto de Dark Mode forzado para el QR */
         #qr-container img, #qr-container canvas { filter: invert(0) !important; mix-blend-mode: normal !important; background-color: white !important; }
     </style>
@@ -83,13 +84,17 @@
                     <label class="form-label text-success fw-bold">RUT <small class="text-muted">(Ingresa tu RUT para auto-completar)</small></label>
                     <input type="text" id="rut" class="form-control border-success" required placeholder="12345678-9">
                 </div>
-                <div class="col-6 mb-3">
+                <div class="col-12 mb-3">
                     <label class="form-label">Nombres</label>
                     <input type="text" id="nombres" class="form-control" required>
                 </div>
                 <div class="col-6 mb-3">
-                    <label class="form-label">Apellidos</label>
-                    <input type="text" id="apellidos" class="form-control" required>
+                    <label class="form-label">Apellido Paterno</label>
+                    <input type="text" id="apellidoPaterno" class="form-control" required>
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label">Apellido Materno</label>
+                    <input type="text" id="apellidoMaterno" class="form-control" required>
                 </div>
                 <div class="col-6 mb-3">
                     <label class="form-label">Fecha Nacimiento</label>
@@ -165,6 +170,50 @@
             </div>
 
             <div class="separator"></div>
+
+            <!-- SECCIÓN APODERADO (OCULTA POR DEFECTO) -->
+            <div id="seccionApoderado" class="d-none mb-4 p-4 rounded" style="background: #1a0a0a; border: 2px solid #ff9900;">
+                <h5 class="text-warning fw-bold mb-3">⚠️ Autorización de Menor de Edad</h5>
+                <p class="text-muted small">Según la fecha de nacimiento, el asistente es menor de 18 años. El padre, madre o tutor legal debe llenar y firmar esta autorización obligatoria.</p>
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label class="form-label text-warning">RUT Apoderado</label>
+                        <input type="text" id="rutApo" class="form-control border-warning" placeholder="12345678-9">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label text-warning">Nombre Completo Apoderado</label>
+                        <input type="text" id="nomApo" class="form-control border-warning">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label text-warning">Nacionalidad</label>
+                        <input type="text" id="nacApo" class="form-control border-warning">
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label class="form-label text-warning">Profesión / Oficio</label>
+                        <input type="text" id="profApo" class="form-control border-warning">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label text-warning">Domicilio Apoderado</label>
+                        <input type="text" id="domApo" class="form-control border-warning">
+                    </div>
+                    <div class="col-12 mb-3">
+                        <label class="form-label text-warning">Relación con el menor</label>
+                        <select id="relApo" class="form-select border-warning bg-dark text-white">
+                            <option value="">-- Seleccionar --</option>
+                            <option value="Padre">Padre</option>
+                            <option value="Madre">Madre</option>
+                            <option value="Tutor Legal">Tutor Legal</option>
+                        </select>
+                    </div>
+                    <div class="col-12 mb-3 text-center">
+                        <label class="form-label text-warning fw-bold w-100 text-start">Firma del Apoderado (Obligatoria)</label>
+                        <div style="background: white; border-radius: 8px; padding: 10px; display: inline-block; border: 2px solid #ff9900; width: 100%;">
+                            <canvas id="signature-pad-apoderado" style="width: 100%; height: 150px; touch-action: none;"></canvas>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger mt-2" onclick="window.signaturePadApoderado.clear()">Borrar firma</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- SECCIÓN 4: DATOS BANCARIOS -->
             <div id="seccionBancaria">
@@ -249,6 +298,7 @@
         <div id="qr-container"></div>
         <br>
         <button type="button" class="btn btn-info fw-bold px-4 py-2 mt-2 shadow" onclick="window.descargarQR()" style="border-radius: 8px; font-size: 1.1em; color: black;">💾 Descargar mi QR</button>
+        <button type="button" class="btn btn-outline-warning mt-3 w-100 fw-bold" onclick="document.getElementById('qr-container').classList.toggle('invertido')">🔄 Mi QR se ve negro (Invertir colores)</button>
         <h3 class="mt-4 text-warning fw-bold" id="displayRut"></h3>
         <p class="text-muted mt-2">O tómale una captura de pantalla por precaución.</p>
         <button type="button" class="btn btn-outline-light mt-3 w-100" onclick="window.location.reload()">Registrar a otra persona</button>
@@ -274,6 +324,47 @@
     const db = getDatabase(app);
 
     let programasDisponibles = {};
+    let signaturePadApoderado = null;
+    let esMenorEdad = false;
+    let edadCalculada = 0;
+
+    function initSignatureApoderado() {
+        if(!signaturePadApoderado) {
+            const canvasApo = document.getElementById('signature-pad-apoderado');
+            const ratioApo = Math.max(window.devicePixelRatio || 1, 1);
+            canvasApo.width = canvasApo.offsetWidth * ratioApo;
+            canvasApo.height = canvasApo.offsetHeight * ratioApo;
+            canvasApo.getContext("2d").scale(ratioApo, ratioApo);
+            signaturePadApoderado = new SignaturePad(canvasApo, { backgroundColor: 'rgb(255, 255, 255)' });
+            window.signaturePadApoderado = signaturePadApoderado;
+        }
+    }
+
+    document.getElementById('fechaNac').addEventListener('change', function() {
+        if (!this.value) return;
+        const hoy = new Date();
+        const cumple = new Date(this.value);
+        let edad = hoy.getFullYear() - cumple.getFullYear();
+        const m = hoy.getMonth() - cumple.getMonth();
+        if (m < 0 || (m === 0 && hoy.getDate() < cumple.getDate())) {
+            edad--;
+        }
+        edadCalculada = edad;
+        
+        const secApo = document.getElementById('seccionApoderado');
+        const reqFields = ['rutApo', 'nomApo', 'nacApo', 'profApo', 'domApo', 'relApo'];
+        
+        if (edad < 18) {
+            esMenorEdad = true;
+            secApo.classList.remove('d-none');
+            reqFields.forEach(id => document.getElementById(id).required = true);
+            setTimeout(initSignatureApoderado, 200);
+        } else {
+            esMenorEdad = false;
+            secApo.classList.add('d-none');
+            reqFields.forEach(id => document.getElementById(id).required = false);
+        }
+    });
 
     // DESCARGAR QR CON FONDO BLANCO GARANTIZADO
     window.descargarQR = function() {
@@ -411,7 +502,9 @@
                 if (snap.exists()) {
                     const d = snap.val();
                     document.getElementById('nombres').value = d.nombres || '';
-                    document.getElementById('apellidos').value = d.apellidos || '';
+                    const apellidosArr = (d.apellidos || '').trim().split(' ');
+                    document.getElementById('apellidoPaterno').value = apellidosArr[0] || '';
+                    document.getElementById('apellidoMaterno').value = apellidosArr.slice(1).join(' ') || '';
                     document.getElementById('fechaNac').value = d.fechaNacimiento || '';
                     document.getElementById('telefono').value = d.telefono || '';
                     document.getElementById('email').value = d.email || '';
@@ -470,6 +563,10 @@
             const rut = document.getElementById('rut').value.trim();
             const tipo = tipoIngreso.value;
 
+            if (esMenorEdad && (!signaturePadApoderado || signaturePadApoderado.isEmpty())) {
+                alert("❌ El apoderado o tutor legal debe firmar la autorización notarial de trabajo.");
+                throw new Error("Falta firma apoderado");
+            }
             if (tipo === "Pago" && prog.pin) {
                 if (pinInput.value !== prog.pin) {
                     alert("❌ PIN INCORRECTO. Pídeselo a tu captador.");
@@ -494,7 +591,7 @@
             const datosTrabajador = {
                 rut: rut,
                 nombres: document.getElementById('nombres').value.toUpperCase(),
-                apellidos: document.getElementById('apellidos').value.toUpperCase(),
+                apellidos: (document.getElementById('apellidoPaterno').value.trim() + ' ' + document.getElementById('apellidoMaterno').value.trim()).toUpperCase(),
                 fechaNacimiento: document.getElementById('fechaNac').value,
                 telefono: telefonoLimpio,
                 email: document.getElementById('email').value.toLowerCase(),
@@ -523,6 +620,23 @@
 
             await set(ref(db, `1_trabajadores/${rut}`), datosTrabajador);
 
+            if (esMenorEdad) {
+                await set(ref(db, `8_autorizaciones_menores/${prog.fecha}/${prog.nombre}/${rut}`), {
+                    rut_menor: rut,
+                    nombre_menor: datosTrabajador.nombres + " " + datosTrabajador.apellidos,
+                    edad_menor: edadCalculada,
+                    rut_apoderado: document.getElementById('rutApo').value.trim(),
+                    nombre_apoderado: document.getElementById('nomApo').value.toUpperCase(),
+                    nacionalidad_apoderado: document.getElementById('nacApo').value.toUpperCase(),
+                    profesion_apoderado: document.getElementById('profApo').value.toUpperCase(),
+                    domicilio_apoderado: document.getElementById('domApo').value.toUpperCase(),
+                    relacion_apoderado: document.getElementById('relApo').value,
+                    firma_apoderado: signaturePadApoderado.toDataURL('image/jpeg'),
+                    fecha_programa: prog.fecha,
+                    nombre_programa: prog.nombre
+                });
+            }
+            
             await set(ref(db, `3_reservas/${prog.fecha}/${prog.nombre}/${rut}`), {
                 rut: rut,
                 tipo: tipo,
