@@ -83,17 +83,13 @@
                     <label class="form-label text-success fw-bold">RUT <small class="text-muted">(Ingresa tu RUT para auto-completar)</small></label>
                     <input type="text" id="rut" class="form-control border-success" required placeholder="12345678-9">
                 </div>
-                <div class="col-12 mb-3">
+                <div class="col-6 mb-3">
                     <label class="form-label">Nombres</label>
                     <input type="text" id="nombres" class="form-control" required>
                 </div>
                 <div class="col-6 mb-3">
-                    <label class="form-label">Apellido Paterno</label>
-                    <input type="text" id="apellidoPaterno" class="form-control" required>
-                </div>
-                <div class="col-6 mb-3">
-                    <label class="form-label">Apellido Materno</label>
-                    <input type="text" id="apellidoMaterno" class="form-control" required>
+                    <label class="form-label">Apellidos</label>
+                    <input type="text" id="apellidos" class="form-control" required>
                 </div>
                 <div class="col-6 mb-3">
                     <label class="form-label">Fecha Nacimiento</label>
@@ -415,9 +411,7 @@
                 if (snap.exists()) {
                     const d = snap.val();
                     document.getElementById('nombres').value = d.nombres || '';
-                    const apellidosArr = (d.apellidos || '').trim().split(' ');
-                    document.getElementById('apellidoPaterno').value = apellidosArr[0] || '';
-                    document.getElementById('apellidoMaterno').value = apellidosArr.slice(1).join(' ') || '';
+                    document.getElementById('apellidos').value = d.apellidos || '';
                     document.getElementById('fechaNac').value = d.fechaNacimiento || '';
                     document.getElementById('telefono').value = d.telefono || '';
                     document.getElementById('email').value = d.email || '';
@@ -500,7 +494,7 @@
             const datosTrabajador = {
                 rut: rut,
                 nombres: document.getElementById('nombres').value.toUpperCase(),
-                apellidos: (document.getElementById('apellidoPaterno').value.trim() + ' ' + document.getElementById('apellidoMaterno').value.trim()).toUpperCase(),
+                apellidos: document.getElementById('apellidos').value.toUpperCase(),
                 fechaNacimiento: document.getElementById('fechaNac').value,
                 telefono: telefonoLimpio,
                 email: document.getElementById('email').value.toLowerCase(),
