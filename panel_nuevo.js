@@ -1751,11 +1751,18 @@ document.getElementById('efectivo-tab')?.addEventListener('click', renderPanelRe
 async function renderPanelRecibosBatch() {
     let container = document.getElementById('panelRecibosBatch');
     if (!container) {
-        const paneEl = document.getElementById('tab-efectivo');
+        // Encontrar el contenedor correcto sin importar cómo se llame el ID en el HTML
+        let paneEl = document.getElementById('tab-efectivo');
+        let btnRef = document.getElementById('btnBuscarEfectivo');
+        
+        if (!paneEl && btnRef) {
+            paneEl = btnRef.parentElement.parentElement; // Subimos dos niveles para quedar en la base de la pestaña
+        }
+        
         if(!paneEl) return;
         container = document.createElement('div');
         container.id = 'panelRecibosBatch';
-        container.className = 'card bg-dark border-info mt-5 p-4 shadow-lg';
+        container.className = 'card bg-dark border-info mt-5 p-4 shadow-lg w-100';
         paneEl.appendChild(container);
     }
     
