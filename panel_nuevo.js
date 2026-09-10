@@ -469,7 +469,10 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
                         bonoFinal = 0;
                     } else {
                         let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalidaMasiva, asis.monto, valorHoraExtraGlobal, fechaPrograma);
-                        pagoFinal = calculo.montoBaseNuevo + calculo.bonoExtra;
+                        
+                        // FIX JUSTO: Cierre masivo paga el 100% (sin multa) + horas extras
+                        let montoIntacto = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                        pagoFinal = montoIntacto + calculo.bonoExtra;
                         bonoFinal = calculo.bonoExtra;
                     }
                     
@@ -527,11 +530,11 @@ function activarRadares() {
         reservasGlobales = snapshot.exists() ? snapshot.val() : {};
         totalEsperados = Object.keys(reservasGlobales).length; 
         
-        window.totalIP = 0;
-        window.totalCortesia = 0;
+        totalIP = 0;
+        totalCortesia = 0;
         for (const r in reservasGlobales) {
-            if (reservasGlobales[r].tipo === "Cortesía") window.totalCortesia++;
-            else window.totalIP++;
+            if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
+            else totalIP++;
         }
         actualizarTablero();
     });
@@ -678,13 +681,6 @@ function actualizarTablero() {
         let htmlFaltantes = "";
         let esDalePlay = nombrePrograma.includes("Dale Play");
 
-        window.adentroIP = 0;
-        window.adentroCortesia = 0;
-        for (const r in asistenciasGlobales) {
-            if (asistenciasGlobales[r].tipo_ingreso === "Cortesía") window.adentroCortesia++;
-            else window.adentroIP++;
-        }
-
         for (const rut in reservasGlobales) {
             if (!asistenciasGlobales[rut]) {
                 const res = reservasGlobales[rut];
@@ -714,7 +710,7 @@ function actualizarTablero() {
             document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
             document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
         } else {
-            document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.totalIP || 0} | CORT: ${window.totalCortesia || 0}</span>`;
+            document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
             document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
         }
         
@@ -960,14 +956,7 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
     const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
     const now = new Date();
     const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    
-    // Cálculo Dinámico en Tiempo Real para evitar choque de números entre iPads
-    let numReal = 0;
-    for (const r in asistenciasGlobales) {
-        let n = parseInt(asistenciasGlobales[r].numero_asignado) || 0;
-        if (n > numReal) numReal = n;
-    }
-    const numeroFinal = numReal + 1;
+    const numeroFinal = document.getElementById('numeroAsignado').value;
     
     const textoInfo = document.getElementById('infoInvitado').innerText; 
     const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
@@ -2881,6 +2870,14 @@ async function renderPanelMenoresBatch() {
                     🗑️ Sí, Eliminar los ${totalPermisos} permisos de la Nube
                 </button>
             </div>
+
+            <div class="mt-4 p-3 shadow" style="background: rgba(255, 153, 0, 0.1); border: 2px dashed #ff9900; border-radius: 8px;">
+                <h5 class="text-warning fw-bold text-center mb-2">🩹 Herramienta de Emergencia</h5>
+                <p class="text-white text-center mb-3" style="font-size: 0.9em;">Si cerraste un día y el sistema le descontó el sueldo a todos por error, usa este botón para restaurarles la plata masivamente a toda esa sala.</p>
+                <button class="btn btn-warning fw-bold w-100 py-2 fs-5 text-dark shadow-sm" id="btnRestaurarSueldosError" style="border-radius: 8px;">
+                    💰 Restaurar Sueldos Dañados
+                </button>
+            </div>
         `;
         
         document.getElementById('btnDescargarZipMenores').addEventListener('click', async () => {
@@ -2975,6 +2972,58 @@ La presente autorización es válida para el período en curso.`;
         container.innerHTML = `<div class="text-danger text-center fw-bold">❌ Error al cargar permisos.<br><small class="text-muted">${e.message}</small></div>`;
     }
 }
+
+// Botón de Emergencia para Restaurar Sueldos
+document.body.addEventListener('click', async (e) => {
+    if (e.target && e.target.id === 'btnRestaurarSueldosError') {
+        let fec = prompt("Ingresa la FECHA del programa que se cerró mal (Ej: 2026-09-10):", new Date().toISOString().split('T')[0]);
+        if(!fec) return;
+        let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Público - Detrás del Muro):", "Público - Detrás del Muro");
+        if(!prog) return;
+        let montoReal = prompt(`¿Cuál era el SUELDO BASE REAL (100%) que debían recibir hoy por ${prog}? (Sin puntos)`, "15000");
+        if(!montoReal) return;
+        
+        montoReal = parseInt(montoReal);
+        
+        try {
+            const btn = document.getElementById('btnRestaurarSueldosError');
+            btn.innerText = "⏳ Restaurando...";
+            btn.disabled = true;
+            
+            const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
+            if (!snap.exists()) {
+                btn.innerText = "💰 Restaurar Sueldos Dañados";
+                btn.disabled = false;
+                return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos.");
+            }
+            
+            let asistentes = snap.val();
+            let updates = {};
+            let count = 0;
+            
+            for(let rut in asistentes) {
+                if (asistentes[rut].tipo_ingreso !== "Cortesía") {
+                    let bonos = parseInt(asistentes[rut].bono_horas_extras) || 0;
+                    updates[`2_asistencias/${fec}/${prog}/${rut}/monto`] = montoReal + bonos;
+                    count++;
+                }
+            }
+            if (count > 0) {
+                await update(ref(db), updates);
+                alert(`✅ ¡ÉXITO! Se restauraron los sueldos al 100% ($${montoReal}) a las ${count} personas afectadas.`);
+            } else {
+                alert("No habían personas de pago en esa sala.");
+            }
+            btn.innerText = "💰 Restaurar Sueldos Dañados";
+            btn.disabled = false;
+        } catch(err) {
+            alert("Error: " + err.message);
+            const btn = document.getElementById('btnRestaurarSueldosError');
+            btn.innerText = "💰 Restaurar Sueldos Dañados";
+            btn.disabled = false;
+        }
+    }
+});
 
 // Inicializar
 document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
