@@ -469,8 +469,6 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
                         bonoFinal = 0;
                     } else {
                         let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalidaMasiva, asis.monto, valorHoraExtraGlobal, fechaPrograma);
-                        
-                        // FIX JUSTO: Cierre masivo paga el 100% (sin multa) + horas extras
                         let montoIntacto = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                         pagoFinal = montoIntacto + calculo.bonoExtra;
                         bonoFinal = calculo.bonoExtra;
@@ -1567,35 +1565,25 @@ function descargarCSV(c, n) {
 // ==========================================
 // EFECTIVO (REDISEÑADO: LISTADO + RECICLAJE DE FIRMAS)
 // ==========================================
-let signaturePadEfectivo = null;
 let rutEfectivoActual = "";
 let deudaEfectivoActual = null;
 let firmaRecicladaBase64 = null;
 
-setTimeout(() => {
-    const inputEfe = document.getElementById('rutEfectivo');
-    if(inputEfe) inputEfe.placeholder = "🔍 Buscar Nombres, Apellidos o RUT...";
-}, 500);
-
+// Escuchar clic en la pestaña para cargar la lista
 document.getElementById('efectivo-tab')?.addEventListener('click', cargarListaEfectivo);
 
 async function cargarListaEfectivo() {
     let containerLista = document.getElementById('contenedorListaEfectivo');
     if (!containerLista) {
-        const btnBusq = document.getElementById('btnBuscarEfectivo');
-        if(!btnBusq) return;
+        const inputRef = document.getElementById('rutEfectivo');
+        if(!inputRef) return;
+        const searchBoxParent = inputRef.parentElement.parentElement;
         containerLista = document.createElement('div');
         containerLista.id = 'contenedorListaEfectivo';
-        
-        const searchBoxParent = btnBusq.parentElement.parentElement;
-        if(searchBoxParent && searchBoxParent.parentNode) {
-            searchBoxParent.parentNode.insertBefore(containerLista, searchBoxParent.nextSibling);
-        } else {
-            btnBusq.closest('.card-panel, .card, .container, body').appendChild(containerLista);
-        }
+        searchBoxParent.parentElement.insertBefore(containerLista, searchBoxParent.nextSibling);
     }
     
-    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold shadow-sm">⏳ Buscando personas con pagos pendientes en efectivo...</div>';
+    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold">⏳ Buscando personas con pagos pendientes en efectivo...</div>';
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([
@@ -1604,7 +1592,7 @@ async function cargarListaEfectivo() {
         ]);
         
         if (!asisSnap.exists()) {
-            containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold shadow-sm">✅ No hay pagos pendientes en el sistema.</div>';
+            containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ No hay pagos pendientes en el sistema.</div>';
             return;
         }
         
@@ -1612,6 +1600,7 @@ async function cargarListaEfectivo() {
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         let deudasEfectivo = {};
         
+        // Recorrer asistencias para armar el consolidado
         for (const f in todas) {
             for (const p in todas[f]) {
                 for (const r in todas[f][p]) {
@@ -1636,6 +1625,7 @@ async function cargarListaEfectivo() {
                             ruta: `2_asistencias/${f}/${p}/${r}`
                         });
                         
+                        // Rescate de firma por si el primer registro no tenía
                         if (!deudasEfectivo[r].firma && asis.firma_digital) {
                             deudasEfectivo[r].firma = asis.firma_digital;
                         }
@@ -1644,7 +1634,7 @@ async function cargarListaEfectivo() {
             }
         }
         
-        window.deudasEfectivoGlobal = deudasEfectivo; 
+        window.deudasEfectivoGlobal = deudasEfectivo; // Guardar global para el buscador local
         renderTablaDeudasEfectivo(deudasEfectivo, trabajadores);
         
     } catch (e) {
@@ -1657,15 +1647,15 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
     const ruts = Object.keys(deudasObj);
     
     if (ruts.length === 0) {
-        containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold shadow-sm">✅ La fila está vacía. No hay nadie esperando pago en efectivo.</div>';
+        containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ Ya no hay nadie esperando pago en efectivo.</div>';
         return;
     }
     
     let html = `
-    <div class="table-responsive mt-4 shadow-lg rounded">
-        <table class="table table-dark table-hover align-middle text-center mb-0" style="font-size: 0.9em; border: 1px solid #444;">
-            <thead style="background: #111;">
-                <tr><th style="color: #b066ff;">RUT</th><th style="color: #b066ff;">Nombre Completo</th><th style="color: #b066ff;">Monto Total</th><th style="color: #b066ff;">Acción</th></tr>
+    <div class="table-responsive mt-4">
+        <table class="table table-dark table-hover align-middle text-center" style="font-size: 0.9em; border: 1px solid #444;">
+            <thead style="color: #00d26a; background: #111;">
+                <tr><th>RUT</th><th>Nombre Completo</th><th>Monto Total</th><th>Acción</th></tr>
             </thead>
             <tbody>
     `;
@@ -1678,10 +1668,10 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
         html += `
         <tr>
             <td class="fw-bold">${r}</td>
-            <td class="fw-bold text-white">${nombreLimpio}</td>
+            <td>${nombreLimpio}</td>
             <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
             <td>
-                <button class="btn btn-success btn-sm fw-bold w-100 shadow" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\\'")}')">💸 Pagar Ahora</button>
+                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\'")}')">💸 Pagar</button>
             </td>
         </tr>
         `;
@@ -1691,12 +1681,10 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
     containerLista.innerHTML = html;
 }
 
+// Cambiar el comportamiento del botón "Buscar" para que filtre la lista renderizada
 document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
     const term = document.getElementById('rutEfectivo').value.trim().toLowerCase();
-    if(!window.deudasEfectivoGlobal) {
-        cargarListaEfectivo();
-        return;
-    }
+    if(!window.deudasEfectivoGlobal) return;
     
     get(ref(db, '1_trabajadores')).then(snap => {
         const trabObj = snap.exists() ? snap.val() : {};
@@ -1752,13 +1740,15 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
     document.querySelectorAll('.check-pago-parcial').forEach(chk => chk.addEventListener('change', recalcularTotal));
     recalcularTotal();
     
-    // Revelar el panel de pago PRIMERO, para que el canvas tenga dimensiones reales
-    document.getElementById('panelPagoEfectivo').classList.remove('d-none');
-    
+    // Configuración visual para Reciclaje de Firma
     firmaRecicladaBase64 = deuda.firma;
-    const canvasElement = document.getElementById('signature-pad-efectivo');
-    const btnLimpiar = document.getElementById('btnLimpiarFirmaEfectivo');
     
+    const canvasElement = document.getElementById('signature-pad-efectivo');
+    if (canvasElement) canvasElement.classList.add('d-none'); // Ocultar el espacio de firma manual
+    
+    const btnLimpiar = document.getElementById('btnLimpiarFirmaEfectivo');
+    if (btnLimpiar) btnLimpiar.classList.add('d-none'); // Ocultar botón borrar firma
+
     let msgDiv = document.getElementById('msgFirmaReciclada');
     if (!msgDiv) {
         msgDiv = document.createElement('div');
@@ -1770,7 +1760,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
         if (canvasElement) canvasElement.classList.add('d-none'); 
         if (btnLimpiar) btnLimpiar.classList.add('d-none'); 
         msgDiv.innerHTML = `
-            <div class="alert alert-success mt-2 p-3 text-center shadow-sm" style="border: 2px solid #00d26a;">
+            <div class="alert alert-success mt-2 p-3 text-center" style="border: 2px solid #00d26a;">
                 <span class="fw-bold fs-5">✅ Firma Encontrada</span><br>
                 <small>Se reciclará automáticamente la firma digital que la persona realizó en la puerta.</small>
             </div>`;
@@ -1778,37 +1768,38 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
         if (canvasElement) canvasElement.classList.remove('d-none'); 
         if (btnLimpiar) btnLimpiar.classList.remove('d-none'); 
         msgDiv.innerHTML = `
-            <div class="alert alert-warning mt-2 p-3 text-center shadow-sm" style="border: 2px dashed #ffcc00; background: #332b00;">
+            <div class="alert alert-warning mt-2 p-3 text-center" style="border: 2px dashed #ffcc00;">
                 <span class="fw-bold fs-5 text-warning">⚠️ Sin Firma Previa</span><br>
                 <small class="text-white">Esta persona no firmó en la puerta. <br><b>Por favor, que firme ahora en el recuadro blanco para entregarle su dinero.</b></small>
             </div>`;
-            
-        // Inicializar canvas AHORA que el panel es visible
-        if(!signaturePadEfectivo && canvasElement) {
-            signaturePadEfectivo = new SignaturePad(canvasElement, { backgroundColor: 'rgb(255, 255, 255)' });
-        }
-        if(signaturePadEfectivo && canvasElement) {
+        if(signaturePadEfectivo) {
+            signaturePadEfectivo.clear();
             setTimeout(() => {
                 const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
                 canvasElement.width = canvasElement.offsetWidth * ratioEfe;
                 canvasElement.height = canvasElement.offsetHeight * ratioEfe;
                 canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
                 signaturePadEfectivo.clear();
-            }, 100);
+            }, 300);
         }
+    } else {
+        msgDiv.innerHTML = `
+            <div class="alert alert-danger mt-2 p-3 text-center">
+                <span class="fw-bold fs-5">⚠️ Sin Firma Digital</span><br>
+                <small>La persona no firmó al entrar. El comprobante de dinero se guardará sin firma.</small>
+            </div>`;
     }
 
-    document.getElementById('panelPagoEfectivo').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('panelPagoEfectivo').classList.remove('d-none');
+    
+    // Mover el scroll al panel para mayor fluidez
+    document.getElementById('panelPagoEfectivo').scrollIntoView({ behavior: 'smooth' });
 
     rutEfectivoActual = rut;
     deudaEfectivoActual = deuda;
 };
 
 document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
-    if (!firmaRecicladaBase64 && (!signaturePadEfectivo || signaturePadEfectivo.isEmpty())) {
-        return alert("❌ ALERTA: La persona no firmó en la puerta. Debe firmar en el recuadro blanco para tener constancia legal del pago.");
-    }
-    
     let seleccionados = [];
     document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
         seleccionados.push(deudaEfectivoActual.programasDetalle[chk.value]);
@@ -1816,27 +1807,26 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
 
     if(seleccionados.length === 0) return alert("Debes seleccionar al menos un programa para pagar.");
 
-    if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO a esta persona?`)) return;
+    if (!confirm(`¿Estás seguro de entregar $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO a esta persona?`)) return;
     
     const btn = document.getElementById('btnConfirmarPagoEfectivo');
     const textOrg = btn.innerText;
     btn.disabled = true;
-    btn.innerText = "⏳ Guardando Recibo en la Nube...";
+    btn.innerText = "⏳ Confirmando y Reciclando Firma...";
 
     try {
-        const firmaFinal = firmaRecicladaBase64 || signaturePadEfectivo.toDataURL('image/jpeg');
         const nowIso = new Date().toISOString();
         const idRecibo = Date.now().toString();
         
         const nombresProgramas = seleccionados.map(s => s.nombreStr);
         const rutasActualizar = seleccionados.map(s => s.ruta);
         
-        // Guardar el recibo
+        // Guardar el recibo usando la firma reciclada
         await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
             rut: rutEfectivoActual,
             monto: deudaEfectivoActual.montoCalculado,
             fecha: nowIso,
-            firma: firmaFinal,
+            firma: firmaRecicladaBase64 || signaturePadEfectivo.toDataURL("image/jpeg"),
             programas: nombresProgramas
         });
         
@@ -1844,13 +1834,14 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
         rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
         await update(ref(db), updates);
 
-        alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado y archivado en la Bóveda de Recibos.\n\nNota: El PDF NO se descarga ahora. Podrás descargarlos todos juntos en un archivo ZIP desde esta pestaña.");
+        alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda.");
         
         document.getElementById('panelPagoEfectivo').classList.add('d-none');
         document.getElementById('rutEfectivo').value = "";
         
         // Recargar la lista para que la persona desaparezca mágicamente
         cargarListaEfectivo();
+        // Recargar bóveda batch abajo
         if(typeof renderPanelRecibosBatch === "function") renderPanelRecibosBatch();
         
     } catch (e) {
@@ -1861,8 +1852,6 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
         btn.innerText = "💾 Confirmar y Guardar Recibo";
     }
 });
-
-setTimeout(cargarListaEfectivo, 1500);
 
 // --- PESTAÑA EFECTIVO: GESTIÓN DE RECIBOS EN LOTE ---
 document.getElementById('efectivo-tab')?.addEventListener('click', renderPanelRecibosBatch);
@@ -2808,6 +2797,24 @@ async function renderPanelMenoresBatch() {
     let mantTab = document.getElementById('mantenimiento-tab');
     if(!mantTab) return;
     
+    // INYECCIÓN DE EMERGENCIA
+    let tabPaneEmergencia = document.getElementById('btnRespaldoMaestro')?.closest('.tab-pane') || document.getElementById('btnRespaldoMaestro')?.parentElement.parentElement.parentElement;
+    if (tabPaneEmergencia && !document.getElementById('btnRestaurarSueldosError')) {
+        let divEmergencia = document.createElement('div');
+        divEmergencia.className = "mt-4 p-4 shadow-lg w-100 mb-4";
+        divEmergencia.style.background = "rgba(255, 153, 0, 0.1)";
+        divEmergencia.style.border = "3px dashed #ff9900";
+        divEmergencia.style.borderRadius = "8px";
+        divEmergencia.innerHTML = `
+            <h5 class="text-warning fw-bold text-center mb-2">🩹 Herramienta de Emergencia (Sueldos)</h5>
+            <p class="text-white text-center mb-3" style="font-size: 0.9em;">Si cerraste un día y el sistema descontó la plata por error, usa este botón para restaurar el valor original a toda la sala de un golpe.</p>
+            <button class="btn btn-warning fw-bold w-100 py-3 fs-4 text-dark shadow-sm" id="btnRestaurarSueldosError" style="border-radius: 8px;">
+                💰 Restaurar Sueldos a $10.000
+            </button>
+        `;
+        tabPaneEmergencia.appendChild(divEmergencia);
+    }
+
     let container = document.getElementById('panelMenoresBatch');
     if (!container) {
         // Buscar el contenedor padre real de la pestaña Mantenimiento (normalmente el tab-pane)
@@ -2868,14 +2875,6 @@ async function renderPanelMenoresBatch() {
                 <p class="text-white text-center mb-3" style="font-size: 0.9em;">¿Ya descargaste el ZIP y confirmaste que los permisos están adentro?<br>Si es así, borra los registros de la nube.</p>
                 <button class="btn btn-danger fw-bold w-100 py-2 fs-5" id="btnVaciarMenores" style="border-radius: 8px;">
                     🗑️ Sí, Eliminar los ${totalPermisos} permisos de la Nube
-                </button>
-            </div>
-
-            <div class="mt-4 p-3 shadow" style="background: rgba(255, 153, 0, 0.1); border: 2px dashed #ff9900; border-radius: 8px;">
-                <h5 class="text-warning fw-bold text-center mb-2">🩹 Herramienta de Emergencia</h5>
-                <p class="text-white text-center mb-3" style="font-size: 0.9em;">Si cerraste un día y el sistema le descontó el sueldo a todos por error, usa este botón para restaurarles la plata masivamente a toda esa sala.</p>
-                <button class="btn btn-warning fw-bold w-100 py-2 fs-5 text-dark shadow-sm" id="btnRestaurarSueldosError" style="border-radius: 8px;">
-                    💰 Restaurar Sueldos Dañados
                 </button>
             </div>
         `;
@@ -2978,9 +2977,9 @@ document.body.addEventListener('click', async (e) => {
     if (e.target && e.target.id === 'btnRestaurarSueldosError') {
         let fec = prompt("Ingresa la FECHA del programa que se cerró mal (Ej: 2026-09-10):", new Date().toISOString().split('T')[0]);
         if(!fec) return;
-        let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Público - Detrás del Muro):", "Público - Detrás del Muro");
+        let prog = prompt("Ingresa el NOMBRE EXACTO del programa:", "Detrás del Muro");
         if(!prog) return;
-        let montoReal = prompt(`¿Cuál era el SUELDO BASE REAL (100%) que debían recibir hoy por ${prog}? (Sin puntos)`, "15000");
+        let montoReal = prompt(`¿Cuál era el SUELDO BASE REAL (100%) que debían recibir hoy por ${prog}? (Sin puntos)`, "10000");
         if(!montoReal) return;
         
         montoReal = parseInt(montoReal);
@@ -2992,9 +2991,9 @@ document.body.addEventListener('click', async (e) => {
             
             const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
             if (!snap.exists()) {
-                btn.innerText = "💰 Restaurar Sueldos Dañados";
+                btn.innerText = "💰 Restaurar Sueldos a $10.000";
                 btn.disabled = false;
-                return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos.");
+                return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos (ej: 'Detrás del Muro').");
             }
             
             let asistentes = snap.val();
@@ -3014,12 +3013,12 @@ document.body.addEventListener('click', async (e) => {
             } else {
                 alert("No habían personas de pago en esa sala.");
             }
-            btn.innerText = "💰 Restaurar Sueldos Dañados";
+            btn.innerText = "💰 Restaurar Sueldos a $10.000";
             btn.disabled = false;
         } catch(err) {
             alert("Error: " + err.message);
             const btn = document.getElementById('btnRestaurarSueldosError');
-            btn.innerText = "💰 Restaurar Sueldos Dañados";
+            btn.innerText = "💰 Restaurar Sueldos a $10.000";
             btn.disabled = false;
         }
     }
