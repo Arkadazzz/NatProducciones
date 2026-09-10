@@ -1562,87 +1562,157 @@ function descargarCSV(c, n) {
 }
 
 // ==========================================
-// EFECTIVO
+// EFECTIVO (REDISEÑADO: LISTADO + RECICLAJE DE FIRMAS)
 // ==========================================
-let signaturePadEfectivo = null;
 let rutEfectivoActual = "";
 let deudaEfectivoActual = null;
+let firmaRecicladaBase64 = null;
 
-// Cambiar placeholder dinámicamente para indicar que se puede buscar por nombre
-setTimeout(() => {
-    const inputEfe = document.getElementById('rutEfectivo');
-    if(inputEfe) inputEfe.placeholder = "Ingresa Nombres, Apellidos o RUT...";
-}, 500);
+// Escuchar clic en la pestaña para cargar la lista
+document.getElementById('efectivo-tab')?.addEventListener('click', cargarListaEfectivo);
 
-document.getElementById('btnBuscarEfectivo').addEventListener('click', async () => {
-    const inputVal = document.getElementById('rutEfectivo').value.trim().toLowerCase();
-    if (!inputVal) return alert("Por favor ingresa un RUT o Nombre válido.");
+async function cargarListaEfectivo() {
+    let containerLista = document.getElementById('contenedorListaEfectivo');
+    if (!containerLista) {
+        const inputRef = document.getElementById('rutEfectivo');
+        if(!inputRef) return;
+        const searchBoxParent = inputRef.parentElement.parentElement;
+        containerLista = document.createElement('div');
+        containerLista.id = 'contenedorListaEfectivo';
+        searchBoxParent.parentElement.insertBefore(containerLista, searchBoxParent.nextSibling);
+    }
     
-    const [asisSnap, trabSnap] = await Promise.all([
-        get(ref(db, '2_asistencias')),
-        get(ref(db, '1_trabajadores'))
-    ]);
+    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold">⏳ Buscando personas con pagos pendientes en efectivo...</div>';
     
-    if (!asisSnap.exists()) return alert("No hay registros de asistencias en el sistema.");
-    
-    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-    let targetRut = null;
-    let encontrados = [];
-
-    // Buscar por RUT exacto, o coincidencias en nombres/apellidos
-    for (const r in trabajadores) {
-        const t = trabajadores[r];
-        const nombreCompleto = `${t.nombres} ${t.apellidos}`.toLowerCase();
-        const rutLimpio = r.replace(/[^0-9kK]/g, '').toLowerCase();
-        const inputLimpio = inputVal.replace(/[^0-9kK]/g, '');
-
-        if (r.toLowerCase() === inputVal || rutLimpio === inputLimpio || nombreCompleto.includes(inputVal)) {
-            encontrados.push(r);
+    try {
+        const [asisSnap, trabSnap] = await Promise.all([
+            get(ref(db, '2_asistencias')),
+            get(ref(db, '1_trabajadores'))
+        ]);
+        
+        if (!asisSnap.exists()) {
+            containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ No hay pagos pendientes en el sistema.</div>';
+            return;
         }
-    }
-
-    if (encontrados.length === 0) {
-        targetRut = inputVal; // Intento directo
-    } else if (encontrados.length > 1) {
-        let msg = "Se encontraron varias personas. Por favor, sé más específico o usa el RUT exacto:\n\n";
-        encontrados.slice(0, 5).forEach((rut, i) => {
-            msg += `${i+1}. ${trabajadores[rut].nombres} ${trabajadores[rut].apellidos} (${rut})\n`;
-        });
-        return alert(msg);
-    } else {
-        targetRut = encontrados[0];
-    }
-    
-    const todas = asisSnap.val();
-    let deuda = { montoTotal: 0, programasDetalle: [] };
-    
-    for (const f in todas) {
-        for (const p in todas[f]) {
-            if (todas[f][p][targetRut]) {
-                const asis = todas[f][p][targetRut];
-                const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                
-                if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
-                    deuda.programasDetalle.push({
-                        fecha: f,
-                        prog: p,
-                        nombreStr: `${p.replace(" - ", " / ")} (${f})`,
-                        monto: montoLimpio,
-                        ruta: `2_asistencias/${f}/${p}/${targetRut}`
-                    });
-                    deuda.montoTotal += montoLimpio;
+        
+        const todas = asisSnap.val();
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        let deudasEfectivo = {};
+        
+        // Recorrer asistencias para armar el consolidado
+        for (const f in todas) {
+            for (const p in todas[f]) {
+                for (const r in todas[f][p]) {
+                    const asis = todas[f][p][r];
+                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                    
+                    if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
+                        if (!deudasEfectivo[r]) {
+                            deudasEfectivo[r] = {
+                                rut: r,
+                                montoTotal: 0,
+                                programasDetalle: [],
+                                firma: asis.firma_digital || null
+                            };
+                        }
+                        deudasEfectivo[r].montoTotal += montoLimpio;
+                        deudasEfectivo[r].programasDetalle.push({
+                            fecha: f,
+                            prog: p,
+                            nombreStr: `${p.replace(" - ", " / ")} (${f})`,
+                            monto: montoLimpio,
+                            ruta: `2_asistencias/${f}/${p}/${r}`
+                        });
+                        
+                        // Rescate de firma por si el primer registro no tenía
+                        if (!deudasEfectivo[r].firma && asis.firma_digital) {
+                            deudasEfectivo[r].firma = asis.firma_digital;
+                        }
+                    }
                 }
             }
         }
+        
+        window.deudasEfectivoGlobal = deudasEfectivo; // Guardar global para el buscador local
+        renderTablaDeudasEfectivo(deudasEfectivo, trabajadores);
+        
+    } catch (e) {
+        containerLista.innerHTML = '<div class="alert alert-danger text-center mt-4">Error de conexión al cargar la lista.</div>';
+    }
+}
+
+function renderTablaDeudasEfectivo(deudasObj, trabObj) {
+    const containerLista = document.getElementById('contenedorListaEfectivo');
+    const ruts = Object.keys(deudasObj);
+    
+    if (ruts.length === 0) {
+        containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ Ya no hay nadie esperando pago en efectivo.</div>';
+        return;
     }
     
-    if (deuda.montoTotal === 0) return alert("✅ Esta persona NO tiene pagos de honorarios pendientes.");
+    let html = `
+    <div class="table-responsive mt-4">
+        <table class="table table-dark table-hover align-middle text-center" style="font-size: 0.9em; border: 1px solid #444;">
+            <thead style="color: #00d26a; background: #111;">
+                <tr><th>RUT</th><th>Nombre Completo</th><th>Monto Total</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+    `;
     
-    const trab = trabajadores[targetRut] || {nombres: "Trabajador", apellidos: "No Registrado"};
+    ruts.forEach(r => {
+        const tr = trabObj[r] || { nombres: "Desconocido", apellidos: "" };
+        const d = deudasObj[r];
+        const nombreLimpio = `${tr.nombres} ${tr.apellidos}`;
+        
+        html += `
+        <tr>
+            <td class="fw-bold">${r}</td>
+            <td>${nombreLimpio}</td>
+            <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
+            <td>
+                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\'")}')">💸 Pagar</button>
+            </td>
+        </tr>
+        `;
+    });
     
-    document.getElementById('nombreEfectivo').innerText = `${trab.nombres} ${trab.apellidos}`;
+    html += `</tbody></table></div>`;
+    containerLista.innerHTML = html;
+}
+
+// Cambiar el comportamiento del botón "Buscar" para que filtre la lista renderizada
+document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
+    const term = document.getElementById('rutEfectivo').value.trim().toLowerCase();
+    if(!window.deudasEfectivoGlobal) return;
     
-    // Inyectar checkboxes
+    get(ref(db, '1_trabajadores')).then(snap => {
+        const trabObj = snap.exists() ? snap.val() : {};
+        if(!term) {
+            renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
+            return;
+        }
+        
+        let filtrado = {};
+        for (const r in window.deudasEfectivoGlobal) {
+            const tr = trabObj[r] || { nombres: "", apellidos: "" };
+            const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
+            const rutLimpio = r.replace(/[^0-9kK]/g, '');
+            const inputLimpio = term.replace(/[^0-9kK]/g, '');
+            
+            if (r.toLowerCase() === term || rutLimpio === inputLimpio || nombreCompleto.includes(term)) {
+                filtrado[r] = window.deudasEfectivoGlobal[r];
+            }
+        }
+        renderTablaDeudasEfectivo(filtrado, trabObj);
+    });
+});
+
+window.abrirPagoEfectivo = function(rut, nombrePersona) {
+    const deuda = window.deudasEfectivoGlobal[rut];
+    if(!deuda) return;
+    
+    document.getElementById('nombreEfectivo').innerText = nombrePersona;
+    
     let htmlCheckboxes = '<p class="text-warning mt-3 mb-2 fw-bold" style="font-size: 0.9em;">Selecciona qué programas liquidarás en efectivo ahora:</p>';
     deuda.programasDetalle.forEach((item, idx) => {
         htmlCheckboxes += `
@@ -1657,43 +1727,78 @@ document.getElementById('btnBuscarEfectivo').addEventListener('click', async () 
     
     document.getElementById('detalleProgramasEfectivo').innerHTML = htmlCheckboxes;
     
-    // Función para recalcular el monto dinámicamente
     const recalcularTotal = () => {
         let suma = 0;
         document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
             suma += deuda.programasDetalle[chk.value].monto;
         });
         document.getElementById('montoEfectivo').innerText = `$${suma.toLocaleString('es-CL')}`;
-        deuda.montoCalculado = suma; // FIX: Guardar en la variable local primero
+        deuda.montoCalculado = suma;
     };
 
     document.querySelectorAll('.check-pago-parcial').forEach(chk => chk.addEventListener('change', recalcularTotal));
     recalcularTotal();
     
+    // Configuración visual para Reciclaje de Firma
+    firmaRecicladaBase64 = deuda.firma;
+    
+    const canvasElement = document.getElementById('signature-pad-efectivo');
+    if (canvasElement) canvasElement.classList.add('d-none'); // Ocultar el espacio de firma manual
+    
+    const btnLimpiar = document.getElementById('btnLimpiarFirmaEfectivo');
+    if (btnLimpiar) btnLimpiar.classList.add('d-none'); // Ocultar botón borrar firma
+
+    let msgDiv = document.getElementById('msgFirmaReciclada');
+    if (!msgDiv) {
+        msgDiv = document.createElement('div');
+        msgDiv.id = 'msgFirmaReciclada';
+        canvasElement.parentElement.insertBefore(msgDiv, canvasElement);
+    }
+    
+    if (firmaRecicladaBase64) {
+        if (canvasElement) canvasElement.classList.add('d-none'); 
+        if (btnLimpiar) btnLimpiar.classList.add('d-none'); 
+        msgDiv.innerHTML = `
+            <div class="alert alert-success mt-2 p-3 text-center" style="border: 2px solid #00d26a;">
+                <span class="fw-bold fs-5">✅ Firma Encontrada</span><br>
+                <small>Se reciclará automáticamente la firma digital que la persona realizó en la puerta.</small>
+            </div>`;
+    } else {
+        if (canvasElement) canvasElement.classList.remove('d-none'); 
+        if (btnLimpiar) btnLimpiar.classList.remove('d-none'); 
+        msgDiv.innerHTML = `
+            <div class="alert alert-warning mt-2 p-3 text-center" style="border: 2px dashed #ffcc00;">
+                <span class="fw-bold fs-5 text-warning">⚠️ Sin Firma Previa</span><br>
+                <small class="text-white">Esta persona no firmó en la puerta. <br><b>Por favor, que firme ahora en el recuadro blanco para entregarle su dinero.</b></small>
+            </div>`;
+        if(signaturePadEfectivo) {
+            signaturePadEfectivo.clear();
+            setTimeout(() => {
+                const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
+                canvasElement.width = canvasElement.offsetWidth * ratioEfe;
+                canvasElement.height = canvasElement.offsetHeight * ratioEfe;
+                canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
+                signaturePadEfectivo.clear();
+            }, 300);
+        }
+    } else {
+        msgDiv.innerHTML = `
+            <div class="alert alert-danger mt-2 p-3 text-center">
+                <span class="fw-bold fs-5">⚠️ Sin Firma Digital</span><br>
+                <small>La persona no firmó al entrar. El comprobante de dinero se guardará sin firma.</small>
+            </div>`;
+    }
+
     document.getElementById('panelPagoEfectivo').classList.remove('d-none');
     
-    const canvasEfe = document.getElementById('signature-pad-efectivo');
-    const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
-    canvasEfe.width = canvasEfe.offsetWidth * ratioEfe;
-    canvasEfe.height = canvasEfe.offsetHeight * ratioEfe;
-    canvasEfe.getContext("2d").scale(ratioEfe, ratioEfe);
+    // Mover el scroll al panel para mayor fluidez
+    document.getElementById('panelPagoEfectivo').scrollIntoView({ behavior: 'smooth' });
 
-    if(!signaturePadEfectivo) {
-        signaturePadEfectivo = new SignaturePad(canvasEfe, { backgroundColor: 'rgb(255, 255, 255)' });
-    }
-    signaturePadEfectivo.clear();
-    
-    rutEfectivoActual = targetRut;
+    rutEfectivoActual = rut;
     deudaEfectivoActual = deuda;
-});
-
-document.getElementById('btnLimpiarFirmaEfectivo').addEventListener('click', () => { 
-    if(signaturePadEfectivo) signaturePadEfectivo.clear(); 
-});
+};
 
 document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
-    if (!firmaRecicladaBase64 && signaturePadEfectivo.isEmpty()) { return alert("❌ ALERTA: El trabajador debe firmar el recibo en el recuadro blanco para constancia legal."); }
-    
     let seleccionados = [];
     document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
         seleccionados.push(deudaEfectivoActual.programasDetalle[chk.value]);
@@ -1701,26 +1806,26 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
 
     if(seleccionados.length === 0) return alert("Debes seleccionar al menos un programa para pagar.");
 
-    if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO por los ${seleccionados.length} programa(s) seleccionado(s)?`)) return;
+    if (!confirm(`¿Estás seguro de entregar $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO a esta persona?`)) return;
     
     const btn = document.getElementById('btnConfirmarPagoEfectivo');
     const textOrg = btn.innerText;
     btn.disabled = true;
-    btn.innerText = "⏳ Guardando Recibo en la Nube...";
+    btn.innerText = "⏳ Confirmando y Reciclando Firma...";
 
     try {
-        const firmaBase64 = signaturePadEfectivo.toDataURL('image/jpeg');
         const nowIso = new Date().toISOString();
         const idRecibo = Date.now().toString();
         
         const nombresProgramas = seleccionados.map(s => s.nombreStr);
         const rutasActualizar = seleccionados.map(s => s.ruta);
         
+        // Guardar el recibo usando la firma reciclada
         await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
             rut: rutEfectivoActual,
             monto: deudaEfectivoActual.montoCalculado,
             fecha: nowIso,
-            firma: firmaBase64,
+            firma: firmaRecicladaBase64 || signaturePadEfectivo.toDataURL("image/jpeg"),
             programas: nombresProgramas
         });
         
@@ -1728,17 +1833,19 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
         rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
         await update(ref(db), updates);
 
-        alert("✅ Pago registrado con éxito y comprobante asegurado en la Bóveda de Recibos.\n\nNota: El PDF NO se descarga ahora. Podrás descargarlos todos juntos en un archivo ZIP desde la pestaña 'Efectivo'.");
+        alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda.");
         
         document.getElementById('panelPagoEfectivo').classList.add('d-none');
         document.getElementById('rutEfectivo').value = "";
-        rutEfectivoActual = "";
         
-        renderPanelRecibosBatch();
+        // Recargar la lista para que la persona desaparezca mágicamente
+        cargarListaEfectivo();
+        // Recargar bóveda batch abajo
+        if(typeof renderPanelRecibosBatch === "function") renderPanelRecibosBatch();
         
     } catch (e) {
         console.error(e);
-        alert("Error detallado: " + e.message);
+        alert("Error detallado al pagar: " + e.message);
     } finally {
         btn.disabled = false;
         btn.innerText = "💾 Confirmar y Guardar Recibo";
