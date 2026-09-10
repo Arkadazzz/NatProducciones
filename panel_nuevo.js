@@ -2797,23 +2797,7 @@ async function renderPanelMenoresBatch() {
     let mantTab = document.getElementById('mantenimiento-tab');
     if(!mantTab) return;
     
-    // INYECCIÓN DE EMERGENCIA
-    let tabPaneEmergencia = document.getElementById('btnRespaldoMaestro')?.closest('.tab-pane') || document.getElementById('btnRespaldoMaestro')?.parentElement.parentElement.parentElement;
-    if (tabPaneEmergencia && !document.getElementById('btnRestaurarSueldosError')) {
-        let divEmergencia = document.createElement('div');
-        divEmergencia.className = "mt-4 p-4 shadow-lg w-100 mb-4";
-        divEmergencia.style.background = "rgba(255, 153, 0, 0.1)";
-        divEmergencia.style.border = "3px dashed #ff9900";
-        divEmergencia.style.borderRadius = "8px";
-        divEmergencia.innerHTML = `
-            <h5 class="text-warning fw-bold text-center mb-2">🩹 Herramienta de Emergencia (Sueldos)</h5>
-            <p class="text-white text-center mb-3" style="font-size: 0.9em;">Si cerraste un día y el sistema descontó la plata por error, usa este botón para restaurar el valor original a toda la sala de un golpe.</p>
-            <button class="btn btn-warning fw-bold w-100 py-3 fs-4 text-dark shadow-sm" id="btnRestaurarSueldosError" style="border-radius: 8px;">
-                💰 Restaurar Sueldos a $10.000
-            </button>
-        `;
-        tabPaneEmergencia.appendChild(divEmergencia);
-    }
+
 
     let container = document.getElementById('panelMenoresBatch');
     if (!container) {
@@ -2972,28 +2956,44 @@ La presente autorización es válida para el período en curso.`;
     }
 }
 
-// Botón de Emergencia para Restaurar Sueldos
-document.body.addEventListener('click', async (e) => {
-    if (e.target && e.target.id === 'btnRestaurarSueldosError') {
+// Inicializar
+document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
+setTimeout(renderPanelMenoresBatch, 3000);
+
+// ==========================================
+// BOTÓN FLOTANTE DE EMERGENCIA (ARREGLO SUELDOS)
+// ==========================================
+if (!document.getElementById('btnFlotanteEmergencia')) {
+    let btnFix = document.createElement('button');
+    btnFix.id = 'btnFlotanteEmergencia';
+    btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+    btnFix.style.position = "fixed";
+    btnFix.style.bottom = "30px";
+    btnFix.style.right = "30px";
+    btnFix.style.zIndex = "9999";
+    btnFix.style.padding = "15px 25px";
+    btnFix.style.fontSize = "1.2em";
+    btnFix.style.border = "2px solid #000";
+    btnFix.className = "btn btn-warning fw-bold shadow-lg";
+    
+    btnFix.onclick = async () => {
         let fec = prompt("Ingresa la FECHA del programa que se cerró mal (Ej: 2026-09-10):", new Date().toISOString().split('T')[0]);
         if(!fec) return;
-        let prog = prompt("Ingresa el NOMBRE EXACTO del programa:", "Detrás del Muro");
+        let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Detrás del Muro):", "Detrás del Muro");
         if(!prog) return;
         let montoReal = prompt(`¿Cuál era el SUELDO BASE REAL (100%) que debían recibir hoy por ${prog}? (Sin puntos)`, "10000");
         if(!montoReal) return;
         
         montoReal = parseInt(montoReal);
+        btnFix.innerText = "⏳ Restaurando...";
+        btnFix.disabled = true;
         
         try {
-            const btn = document.getElementById('btnRestaurarSueldosError');
-            btn.innerText = "⏳ Restaurando...";
-            btn.disabled = true;
-            
             const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
             if (!snap.exists()) {
-                btn.innerText = "💰 Restaurar Sueldos a $10.000";
-                btn.disabled = false;
-                return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos (ej: 'Detrás del Muro').");
+                btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+                btnFix.disabled = false;
+                return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos.");
             }
             
             let asistentes = snap.val();
@@ -3010,20 +3010,17 @@ document.body.addEventListener('click', async (e) => {
             if (count > 0) {
                 await update(ref(db), updates);
                 alert(`✅ ¡ÉXITO! Se restauraron los sueldos al 100% ($${montoReal}) a las ${count} personas afectadas.`);
+                btnFix.style.display = 'none'; // Ocultar si ya triunfó
             } else {
                 alert("No habían personas de pago en esa sala.");
+                btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+                btnFix.disabled = false;
             }
-            btn.innerText = "💰 Restaurar Sueldos a $10.000";
-            btn.disabled = false;
         } catch(err) {
             alert("Error: " + err.message);
-            const btn = document.getElementById('btnRestaurarSueldosError');
-            btn.innerText = "💰 Restaurar Sueldos a $10.000";
-            btn.disabled = false;
+            btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+            btnFix.disabled = false;
         }
-    }
-});
-
-// Inicializar
-document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
-setTimeout(renderPanelMenoresBatch, 3000);
+    };
+    document.body.appendChild(btnFix);
+}
