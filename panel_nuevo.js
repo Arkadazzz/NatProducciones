@@ -6,7 +6,6 @@ import { getDatabase, ref, get, set, remove, child, onValue, update } from "http
 // ==========================================
 // FIRMA LEGAL DE PRODUCCIÓN (CAMILA FEVRE)
 // ==========================================
-// Pega aquí adentro de las comillas tu código Base64 de la firma de Camila.
 const FIRMA_CAMILA_BASE64 = "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";
 
 const firebaseConfig = {
@@ -36,7 +35,7 @@ onAuthStateChanged(auth, (user) => {
     } else {
         const correoLimpio = user.email.trim().toLowerCase();
         const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
-        window.localStorage.setItem('correoStaffNat', correoLimpio); // Guardamos para uso en tabs dinámicos
+        window.localStorage.setItem('correoStaffNat', correoLimpio); 
         
         if (!esAdmin) {
             const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab', 'contador-tab'];
@@ -120,7 +119,6 @@ function inicializarContador() {
     const resumenMes = document.getElementById('resumenMesContador');
 
     if (!selectMes) return;
-
     if (selectMes.options.length > 1 && window.infoMesesGlobal) return; 
 
     selectMes.innerHTML = '<option value="">⏳ Sincronizando Base de Datos...</option>';
@@ -189,7 +187,6 @@ function inicializarContador() {
         selectMes.innerHTML = htmlOptions;
 
     }).catch((error) => {
-        console.error("Error al cargar contador:", error);
         selectMes.innerHTML = '<option value="">❌ Error de conexión con el servidor</option>';
     });
 }
@@ -316,6 +313,7 @@ if (tabFinanzas) {
 // ==========================================
 onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     const container = document.getElementById('contenedorProgramasActivos'); 
+    if(!container) return;
     container.innerHTML = "";
     
     if (snapshot.exists()) {
@@ -342,37 +340,40 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     }
 });
 
-document.getElementById('btnActivarWeb').addEventListener('click', async () => {
-    const nom = document.getElementById('nombrePrograma').value;
-    const fec = document.getElementById('fechaPrograma').value;
-    const mon = document.getElementById('montoPago').value;
-    const horaCitacion = document.getElementById('horaCitacion').value; 
-    const valorHE = document.getElementById('valorHoraExtra').value || 0;
-    const horaSal = document.getElementById('horaTermino').value;
-    
-    if (!nom || !fec || !mon || !horaSal || !horaCitacion) {
-        return alert("Completa todos los campos obligatorios.");
-    }
+const btnActivoWeb = document.getElementById('btnActivarWeb');
+if(btnActivoWeb) {
+    btnActivoWeb.addEventListener('click', async () => {
+        const nom = document.getElementById('nombrePrograma').value;
+        const fec = document.getElementById('fechaPrograma').value;
+        const mon = document.getElementById('montoPago').value;
+        const horaCitacion = document.getElementById('horaCitacion').value; 
+        const valorHE = document.getElementById('valorHoraExtra').value || 0;
+        const horaSal = document.getElementById('horaTermino').value;
+        
+        if (!nom || !fec || !mon || !horaSal || !horaCitacion) {
+            return alert("Completa todos los campos obligatorios.");
+        }
 
-    let pinGenerado = ""; 
-    if (nom.includes("Detrás del Muro")) {
-        pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
-    }
-    
-    const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
-    
-    await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
-        nombre: nom, 
-        fecha: fec, 
-        monto: mon, 
-        pin: pinGenerado, 
-        hora_termino: horaSal, 
-        valor_hora_extra: valorHE, 
-        hora_citacion: horaCitacion 
+        let pinGenerado = ""; 
+        if (nom.includes("Detrás del Muro")) {
+            pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
+        }
+        
+        const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
+        
+        await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
+            nombre: nom, 
+            fecha: fec, 
+            monto: mon, 
+            pin: pinGenerado, 
+            hora_termino: horaSal, 
+            valor_hora_extra: valorHE, 
+            hora_citacion: horaCitacion 
+        });
+        
+        window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion);
     });
-    
-    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion);
-});
+}
 
 window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaCit) {
     claveActual = clave; 
@@ -389,7 +390,9 @@ window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaC
         titulo += ` <span class="badge bg-warning text-dark ms-2">PIN: ${pinActivo}</span>`;
     }
     
-    document.getElementById('tituloEscaner').innerHTML = titulo;
+    const tituloEscaner = document.getElementById('tituloEscaner');
+    if(tituloEscaner) tituloEscaner.innerHTML = titulo;
+    
     document.getElementById('seccionConfiguracion').classList.add('d-none');
     document.getElementById('seccionEscaner').classList.remove('d-none');
     document.getElementById('seccionLista').classList.remove('d-none');
@@ -436,7 +439,7 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
     } else {
         let diffMins = Math.floor((tSal - tTer) / 60000);
         if (diffMins > 0 && valorHE > 0) {
-            let horasCompletas = Math.floor(diffMins / 60); // Ahora requiere 60 mins exactos para sumar 1
+            let horasCompletas = Math.floor(diffMins / 60); 
             bonoExtra = horasCompletas * parseInt(valorHE);
         }
     }
@@ -444,57 +447,61 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
     return { montoBaseNuevo: nuevoMontoBase, bonoExtra: bonoExtra };
 }
 
-document.getElementById('btnEsUnDia').addEventListener('click', async () => {
-    if (!claveActual) return;
-    const now = new Date();
-    const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+const btnEsUnDia = document.getElementById('btnEsUnDia');
+if(btnEsUnDia) {
+    btnEsUnDia.addEventListener('click', async () => {
+        if (!claveActual) return;
+        const now = new Date();
+        const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
+        if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} sin penalizaciones.\n\n¿Proceder?`)) return;
 
-    try {
-        const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
-        if (snap.exists()) {
-            const asistencias = snap.val();
-            let actualizacionesFirebase = {};
-            let procesados = 0;
+        try {
+            const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
+            if (snap.exists()) {
+                const asistencias = snap.val();
+                let actualizacionesFirebase = {};
+                let procesados = 0;
 
-            for (const rut in asistencias) {
-                const asis = asistencias[rut];
-                if (!asis.hora_salida) {
-                    let pagoFinal = 0;
-                    let bonoFinal = 0;
+                for (const rut in asistencias) {
+                    const asis = asistencias[rut];
+                    if (!asis.hora_salida) {
+                        let pagoFinal = 0;
+                        let bonoFinal = 0;
 
-                    if (asis.tipo_ingreso === "Cortesía") {
-                        pagoFinal = 0;
-                        bonoFinal = 0;
-                    } else {
-                        let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalidaMasiva, asis.monto, valorHoraExtraGlobal, fechaPrograma);
-                        let montoIntacto = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                        pagoFinal = montoIntacto + calculo.bonoExtra;
-                        bonoFinal = calculo.bonoExtra;
+                        if (asis.tipo_ingreso === "Cortesía") {
+                            pagoFinal = 0;
+                            bonoFinal = 0;
+                        } else {
+                            let calculo = calcularPagoYBonos(horaCitacionGeneral, horaTerminoGeneral, horaSalidaMasiva, asis.monto, valorHoraExtraGlobal, fechaPrograma);
+                            let montoIntacto = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                            pagoFinal = montoIntacto + calculo.bonoExtra;
+                            bonoFinal = calculo.bonoExtra;
+                        }
+                        
+                        actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
+                        actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoFinal;
+                        actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = pagoFinal;
+                        procesados++;
                     }
-                    
-                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/hora_salida`] = horaSalidaMasiva;
-                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/bono_horas_extras`] = bonoFinal;
-                    actualizacionesFirebase[`2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}/monto`] = pagoFinal;
-                    procesados++;
+                }
+
+                if (Object.keys(actualizacionesFirebase).length > 0) {
+                    await update(ref(db), actualizacionesFirebase);
+                    alert(`✅ Checkout Masivo Exitoso.\nSe calculó la salida y el pago a ${procesados} personas.`);
                 }
             }
-
-            if (Object.keys(actualizacionesFirebase).length > 0) {
-                await update(ref(db), actualizacionesFirebase);
-                alert(`✅ Checkout Masivo Exitoso.\nSe calculó la salida y el pago a ${procesados} personas.`);
-            }
+            await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
+            alert("¡Jornada terminada con éxito!");
+            salirDeSala();
+        } catch (error) { 
+            alert("Error al intentar cerrar la jornada masivamente."); 
         }
-        await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
-        alert("¡Jornada terminada con éxito!");
-        salirDeSala();
-    } catch (error) { 
-        alert("Error al intentar cerrar la jornada masivamente."); 
-    }
-});
+    });
+}
 
-document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
+const btnVolverMenu = document.getElementById('btnVolverMenu');
+if(btnVolverMenu) btnVolverMenu.addEventListener('click', salirDeSala);
 
 function salirDeSala() {
     claveActual = ""; 
@@ -510,7 +517,8 @@ function salirDeSala() {
     document.getElementById('seccionEscaner').classList.add('d-none');
     document.getElementById('seccionFirma').classList.add('d-none');
     document.getElementById('seccionLista').classList.add('d-none');
-    document.getElementById('tablaAsistentes').innerHTML = "";
+    const tablaAsist = document.getElementById('tablaAsistentes');
+    if(tablaAsist) tablaAsist.innerHTML = "";
     
     if (unsubscribeReservas) unsubscribeReservas();
     if (unsubscribeAsistencias) unsubscribeAsistencias();
@@ -528,11 +536,11 @@ function activarRadares() {
         reservasGlobales = snapshot.exists() ? snapshot.val() : {};
         totalEsperados = Object.keys(reservasGlobales).length; 
         
-        totalIP = 0;
-        totalCortesia = 0;
+        window.totalIP = 0;
+        window.totalCortesia = 0;
         for (const r in reservasGlobales) {
-            if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
-            else totalIP++;
+            if (reservasGlobales[r].tipo === "Cortesía") window.totalCortesia++;
+            else window.totalIP++;
         }
         actualizarTablero();
     });
@@ -542,7 +550,6 @@ function activarRadares() {
         totalFirmados = Object.keys(asistenciasGlobales).length; 
         actualizarTablero();
         
-        // Inyectar barra de búsqueda y orden
         let seccionLista = document.getElementById('seccionLista');
         if(seccionLista && !document.getElementById('controlesPuerta')) {
             let div = document.createElement('div');
@@ -659,15 +666,19 @@ function activarRadares() {
         
         window.siguienteTicketAutomatico = maxNumero + 1;
         
+        const listaInvitadosEl = document.getElementById('secConteoInvitados');
         if (nombrePrograma.includes("Detrás del Muro")) {
-            document.getElementById('seccionConteoInvitados').classList.remove('d-none');
+            let secConteo = document.getElementById('seccionConteoInvitados');
+            if(secConteo) secConteo.classList.remove('d-none');
             let htmlConteo = "";
             for(const staff in conteoStaff) {
                 htmlConteo += `<span class="badge bg-dark border border-warning fs-6 text-white">${staff}: <b class="text-warning fs-5 ms-1">${conteoStaff[staff]}</b></span>`;
             }
-            document.getElementById('listaConteoInvitados').innerHTML = htmlConteo || "<small style='color: #aaaaaa;'>Nadie ha llegado.</small>";
+            const listaInvEl = document.getElementById('listaConteoInvitados');
+            if(listaInvEl) listaInvEl.innerHTML = htmlConteo || "<small style='color: #aaaaaa;'>Nadie ha llegado.</small>";
         } else { 
-            document.getElementById('seccionConteoInvitados').classList.add('d-none'); 
+            let secConteo = document.getElementById('seccionConteoInvitados');
+            if(secConteo) secConteo.classList.add('d-none'); 
         }
     };
 }
@@ -678,6 +689,13 @@ function actualizarTablero() {
         let faltanCortesia = 0;
         let htmlFaltantes = "";
         let esDalePlay = nombrePrograma.includes("Dale Play");
+
+        window.adentroIP = 0;
+        window.adentroCortesia = 0;
+        for (const r in asistenciasGlobales) {
+            if (asistenciasGlobales[r].tipo_ingreso === "Cortesía") window.adentroCortesia++;
+            else window.adentroIP++;
+        }
 
         for (const rut in reservasGlobales) {
             if (!asistenciasGlobales[rut]) {
@@ -704,12 +722,14 @@ function actualizarTablero() {
             htmlFaltantes = "<p class='text-success p-3 fw-bold mb-0 text-center'>✅ ¡Todos los inscritos ya están adentro!</p>";
         }
 
+        const contEsp = document.getElementById('contEsperados');
+        const contFirm = document.getElementById('contFirmados');
         if (esDalePlay) {
-            document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
-            document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
+            if(contEsp) contEsp.innerHTML = `${totalEsperados}`;
+            if(contFirm) contFirm.innerHTML = `${totalFirmados}`;
         } else {
-            document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
-            document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
+            if(contEsp) contEsp.innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.totalIP || 0} | CORT: ${window.totalCortesia || 0}</span>`;
+            if(contFirm) contFirm.innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
         }
         
         let faltan = totalEsperados - totalFirmados; 
@@ -722,7 +742,8 @@ function actualizarTablero() {
             textoFaltan += `<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:2px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:1px;">¡EN CAMINO!</span>`;
         }
         
-        document.getElementById('contFaltan').innerHTML = textoFaltan;
+        const contFalt = document.getElementById('contFaltan');
+        if(contFalt) contFalt.innerHTML = textoFaltan;
 
         let divFaltantes = document.getElementById('listaFaltantesPanel');
         if(!divFaltantes) {
@@ -731,15 +752,15 @@ function actualizarTablero() {
             divFaltantes.className = 'mt-3 mb-4';
             
             const seccionLista = document.getElementById('seccionLista');
-            const tableResp = seccionLista.querySelector('.table-responsive');
+            const tableResp = seccionLista?.querySelector('.table-responsive');
             if(tableResp) {
                 seccionLista.insertBefore(divFaltantes, tableResp);
-            } else {
+            } else if(seccionLista) {
                 seccionLista.prepend(divFaltantes);
             }
         }
 
-        if (!divFaltantes.innerHTML.includes('accFaltantes')) {
+        if (divFaltantes && !divFaltantes.innerHTML.includes('accFaltantes')) {
             divFaltantes.innerHTML = `
                 <div class="accordion shadow-sm" id="accFaltantes">
                   <div class="accordion-item" style="background: #1a0a0a; border: 1px solid #ff3333;">
@@ -857,17 +878,21 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     }
 }
 
-document.getElementById('btnIngresoManual').addEventListener('click', () => {
-    const rutIngresado = document.getElementById('rutManual').value.trim();
-    if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
-    onScanSuccess(rutIngresado); 
-    document.getElementById('rutManual').value = "";
-});
+const btnIngresoManual = document.getElementById('btnIngresoManual');
+if(btnIngresoManual) {
+    btnIngresoManual.addEventListener('click', () => {
+        const rutIngresado = document.getElementById('rutManual').value.trim();
+        if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
+        onScanSuccess(rutIngresado); 
+        document.getElementById('rutManual').value = "";
+    });
+}
 
 async function onScanSuccess(decodedText) {
     try { if(html5QrcodeScanner) html5QrcodeScanner.pause(); } catch(e) {} 
     
-    document.getElementById('mensajeEscaneo').classList.remove('d-none'); 
+    const msgEscaneo = document.getElementById('mensajeEscaneo');
+    if(msgEscaneo) msgEscaneo.classList.remove('d-none'); 
     rutActual = decodedText; 
     
     try {
@@ -875,7 +900,7 @@ async function onScanSuccess(decodedText) {
         if (blacklistSnap.exists()) { 
             alert(`⛔ ACCESO DENEGADO ⛔\nLa persona no tiene permitido el ingreso.`); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+            if(msgEscaneo) msgEscaneo.classList.add('d-none'); 
             return; 
         }
         
@@ -885,18 +910,19 @@ async function onScanSuccess(decodedText) {
         if (snapshot.exists()) {
             const datos = snapshot.val(); 
             listaGlobalCRM[rutActual] = datos; 
-            document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
+            const nombreAsistDisp = document.getElementById('nombreAsistenteDisplay');
+            if(nombreAsistDisp) nombreAsistDisp.innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
             
             const esCortesia = reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía";
-            infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
+            if(infoInvitado) infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
 
             const opcionesDiv = document.getElementById('opcionesFirmaAdmin');
-            opcionesDiv.classList.remove('d-none');
+            if(opcionesDiv) opcionesDiv.classList.remove('d-none');
             
             if (esCortesia) {
                 const nombreActual = reservaSnap.exists() ? reservaSnap.val().invitado_por : "";
-                opcionesDiv.innerHTML = `
+                if(opcionesDiv) opcionesDiv.innerHTML = `
                     <label class="form-label text-warning mb-1">Corregir "Invitado Por":</label>
                     <select id="editInvitadoPor" class="form-select bg-dark text-white border-warning">
                         <option value="Luis Jorquera" ${nombreActual==="Luis Jorquera"?'selected':''}>Luis Jorquera</option>
@@ -912,7 +938,7 @@ async function onScanSuccess(decodedText) {
                     </select>
                 `;
             } else {
-                opcionesDiv.innerHTML = `
+                if(opcionesDiv) opcionesDiv.innerHTML = `
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="checkAplicaContrato" checked style="transform: scale(1.3); margin-right: 10px;">
                         <label class="form-check-label text-white fw-bold" for="checkAplicaContrato">Generar Contrato Laboral DT</label>
@@ -921,77 +947,91 @@ async function onScanSuccess(decodedText) {
                 `;
             }
 
-            document.getElementById('seccionFirma').classList.remove('d-none'); 
-            document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
+            const secFirma = document.getElementById('seccionFirma');
+            if(secFirma) secFirma.classList.remove('d-none'); 
+            const numAsignado = document.getElementById('numeroAsignado');
+            if(numAsignado) numAsignado.value = window.siguienteTicketAutomatico;
             
             const canvasAdmin = document.getElementById('signature-pad');
-            const ratioAdmin = Math.max(window.devicePixelRatio || 1, 1);
-            canvasAdmin.width = canvasAdmin.offsetWidth * ratioAdmin;
-            canvasAdmin.height = canvasAdmin.offsetHeight * ratioAdmin;
-            canvasAdmin.getContext("2d").scale(ratioAdmin, ratioAdmin);
+            if(canvasAdmin) {
+                const ratioAdmin = Math.max(window.devicePixelRatio || 1, 1);
+                canvasAdmin.width = canvasAdmin.offsetWidth * ratioAdmin;
+                canvasAdmin.height = canvasAdmin.offsetHeight * ratioAdmin;
+                canvasAdmin.getContext("2d").scale(ratioAdmin, ratioAdmin);
 
-            if(!signaturePad) {
-                signaturePad = new SignaturePad(canvasAdmin, { backgroundColor: 'rgb(255, 255, 255)' }); 
+                if(!signaturePad) {
+                    signaturePad = new SignaturePad(canvasAdmin, { backgroundColor: 'rgb(255, 255, 255)' }); 
+                }
+                signaturePad.clear(); 
             }
-            signaturePad.clear(); 
-            document.getElementById('mensajeEscaneo').classList.add('d-none');
+            if(msgEscaneo) msgEscaneo.classList.add('d-none');
             
         } else { 
             alert("RUT no encontrado en la base de datos."); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+            if(msgEscaneo) msgEscaneo.classList.add('d-none'); 
         }
     } catch (error) { 
         try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
     }
 }
 
-document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
+const btnLimpiarFirma = document.getElementById('btnLimpiarFirma');
+if(btnLimpiarFirma) btnLimpiarFirma.addEventListener('click', () => signaturePad?.clear());
 
-document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
-    if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
-    
-    const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
-    const now = new Date();
-    const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    const numeroFinal = document.getElementById('numeroAsignado').value;
-    
-    const textoInfo = document.getElementById('infoInvitado').innerText; 
-    const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
-    
-    let invitadoPor = "";
-    let aplicaContrato = false;
-
-    if (tipo === "Cortesía") {
-        invitadoPor = document.getElementById('editInvitadoPor') ? document.getElementById('editInvitadoPor').value : "";
-        aplicaContrato = false; 
-    } else {
-        aplicaContrato = document.getElementById('checkAplicaContrato') ? document.getElementById('checkAplicaContrato').checked : true;
-    }
-
-    try {
-        await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
-            rut: rutActual, 
-            nombre_programa: nombrePrograma, 
-            monto: (tipo === "Pago" ? montoPago : 0), 
-            tipo_ingreso: tipo, 
-            hora_ingreso: horaActual, 
-            firma_digital: firmaBase64, 
-            estado_pago: "Pendiente", 
-            numero_asignado: numeroFinal, 
-            invitado_por: invitadoPor, 
-            aplica_contrato: aplicaContrato, 
-            estado_dt: "Pendiente" 
-        });
+const btnGuardarIngreso = document.getElementById('btnGuardarIngreso');
+if(btnGuardarIngreso) {
+    btnGuardarIngreso.addEventListener('click', async () => {
+        if (!signaturePad || signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
         
-        document.getElementById('seccionFirma').classList.add('d-none'); 
-        signaturePad.clear(); 
-        try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-        rutActual = "";
-    } catch (error) { 
-        alert("Error al guardar."); 
-    }
-});
+        const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
+        const now = new Date();
+        const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        
+        let numReal = 0;
+        for (const r in asistenciasGlobales) {
+            let n = parseInt(asistenciasGlobales[r].numero_asignado) || 0;
+            if (n > numReal) numReal = n;
+        }
+        const numeroFinal = numReal + 1;
+        
+        const textoInfo = document.getElementById('infoInvitado').innerText; 
+        const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
+        
+        let invitadoPor = "";
+        let aplicaContrato = false;
+
+        if (tipo === "Cortesía") {
+            invitadoPor = document.getElementById('editInvitadoPor') ? document.getElementById('editInvitadoPor').value : "";
+            aplicaContrato = false; 
+        } else {
+            aplicaContrato = document.getElementById('checkAplicaContrato') ? document.getElementById('checkAplicaContrato').checked : true;
+        }
+
+        try {
+            await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
+                rut: rutActual, 
+                nombre_programa: nombrePrograma, 
+                monto: (tipo === "Pago" ? montoPago : 0), 
+                tipo_ingreso: tipo, 
+                hora_ingreso: horaActual, 
+                firma_digital: firmaBase64, 
+                estado_pago: "Pendiente", 
+                numero_asignado: numeroFinal, 
+                invitado_por: invitadoPor, 
+                aplica_contrato: aplicaContrato, 
+                estado_dt: "Pendiente" 
+            });
+            
+            document.getElementById('seccionFirma').classList.add('d-none'); 
+            signaturePad.clear(); 
+            try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
+            rutActual = "";
+        } catch (error) { 
+            alert("Error al guardar."); 
+        }
+    });
+}
 
 window.anularAsistencia = async function(rut) { 
     if(confirm("¿Seguro que deseas anular esta asistencia?")) {
@@ -1095,7 +1135,6 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
     doc.text("CAMILA FEVRE SEGUEL", 50, y + 10, null, null, "center"); 
 
     
-    // Dibujar firma de Camila
     if (FIRMA_CAMILA_BASE64 && FIRMA_CAMILA_BASE64 !== "PEGAR_AQUI_TU_BASE64_DE_LA_CAMI") {
         try {
             let formatoCami = FIRMA_CAMILA_BASE64.toUpperCase().includes("IMAGE/PNG") ? "PNG" : "JPEG";
@@ -1118,7 +1157,6 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
     doc.text("Firma Asistente", 155, y + 5, null, null, "center"); 
     doc.setFont("helvetica", "normal"); 
     doc.text(nombreCompleto, 155, y + 10, null, null, "center");
-    // RUT INCLUIDO BAJO LA FIRMA
     doc.text(`RUT: ${rut}`, 155, y + 15, null, null, "center"); 
 }
 
@@ -1126,20 +1164,24 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
 // ==========================================
 // CRM Y EDICIÓN
 // ==========================================
-document.getElementById('crm-tab').addEventListener('click', async () => {
-    const [trabSnap, blackSnap] = await Promise.all([ 
-        get(ref(db, '1_trabajadores')), 
-        get(ref(db, '4_blacklist')) 
-    ]);
-    
-    listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; 
-    blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
-    
-    renderCRM(listaGlobalCRM);
-});
+const crmTab = document.getElementById('crm-tab');
+if(crmTab) {
+    crmTab.addEventListener('click', async () => {
+        const [trabSnap, blackSnap] = await Promise.all([ 
+            get(ref(db, '1_trabajadores')), 
+            get(ref(db, '4_blacklist')) 
+        ]);
+        
+        listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; 
+        blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
+        
+        renderCRM(listaGlobalCRM);
+    });
+}
 
 function renderCRM(datos) {
     const tbody = document.getElementById('tablaCRM'); 
+    if(!tbody) return;
     tbody.innerHTML = "";
     
     for (const rut in datos) {
@@ -1153,24 +1195,26 @@ function renderCRM(datos) {
             <td>${p.nombres} ${p.apellidos}</td>
             <td>${p.telefono || '-'}</td>
             <td>${estadoBadge}</td>
-            <td><button class="btn btn-outline-info btn-sm" onclick="verPerfil('${rut}')">Editar / Ficha</button></td>
+            <td><button class="btn btn-outline-info btn-sm" onclick="window.verPerfil('${rut}')">Editar / Ficha</button></td>
         `;
         tbody.appendChild(tr);
     }
 }
 
-document.getElementById('buscadorCRM').addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtrados = Object.keys(listaGlobalCRM).reduce((acc, rut) => {
-        const nombreCompl = `${listaGlobalCRM[rut].nombres} ${listaGlobalCRM[rut].apellidos}`.toLowerCase();
-        if (rut.toLowerCase().includes(term) || nombreCompl.includes(term)) {
-            acc[rut] = listaGlobalCRM[rut]; 
-        }
-        return acc;
-    }, {}); 
-    
-    renderCRM(filtrados);
-});
+const buscadorCRM = document.getElementById('buscadorCRM');
+if(buscadorCRM) {
+    buscadorCRM.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        const filtrados = Object.keys(listaGlobalCRM).reduce((acc, rut) => {
+            const nombreCompl = `${listaGlobalCRM[rut].nombres} ${listaGlobalCRM[rut].apellidos}`.toLowerCase();
+            if (rut.toLowerCase().includes(term) || nombreCompl.includes(term)) {
+                acc[rut] = listaGlobalCRM[rut]; 
+            }
+            return acc;
+        }, {}); 
+        renderCRM(filtrados);
+    });
+}
 
 let rutPerfilActual = "";
 
@@ -1178,7 +1222,9 @@ window.verPerfil = function(rut) {
     rutPerfilActual = rut; 
     const p = listaGlobalCRM[rut];
     
-    document.getElementById('contenidoFicha').innerHTML = `
+    const ficha = document.getElementById('contenidoFicha');
+    if(!ficha) return;
+    ficha.innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos}"></div>
@@ -1187,9 +1233,9 @@ window.verPerfil = function(rut) {
             <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
             <div class="col-12 mb-2"><label class="text-muted small">Dirección</label><input type="text" class="form-control bg-dark text-white" id="editDir" value="${p.direccion || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small text-warning">Contacto Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaNombre" value="${p.emergenciaNombre || ''}" placeholder="Nombre del contacto"></div>
-            <div class="col-6 mb-2"><label class="text-muted small text-warning">Tel. de Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaTelefono" value="${p.emergenciaTelefono || ''}" placeholder="Número"></div>
-            <div class="col-12 mb-3"><label class="text-muted small text-danger">Enfermedades Base / Alergias</label><input type="text" class="form-control bg-dark text-white border-danger" id="editEnfermedades" value="${p.enfermedades || ''}" placeholder="Indicar patologías o 'Ninguna'"></div>
+            <div class="col-6 mb-2"><label class="text-muted small text-warning">Contacto Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaNombre" value="${p.emergenciaNombre || ''}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small text-warning">Tel. de Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaTelefono" value="${p.emergenciaTelefono || ''}"></div>
+            <div class="col-12 mb-3"><label class="text-muted small text-danger">Enfermedades Base / Alergias</label><input type="text" class="form-control bg-dark text-white border-danger" id="editEnfermedades" value="${p.enfermedades || ''}"></div>
             
             <div class="col-6 mb-2"><label class="text-muted small">Sexo</label>
                 <select class="form-select bg-dark text-white" id="editSexo">
@@ -1245,24 +1291,21 @@ window.verPerfil = function(rut) {
                 </select>
             </div>
             <div class="col-6 mb-2"><label class="text-muted small">N° Cuenta</label><input type="text" class="form-control bg-dark text-white" id="editCuenta" value="${p.numeroCuenta || ''}"></div>
-            <div class="col-12 mt-4 pt-3 border-top border-secondary">
-                <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
-                <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
-                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/'/g, "\\'")}')">
-                    ➕ Añadir a Jornada Pasada
-                </button>
-            </div>
         </div>`;
     
+    const motivoBloqueo = document.getElementById('motivoBloqueo');
+    const btnBloquear = document.getElementById('btnBloquear');
+    const btnDesbloquear = document.getElementById('btnDesbloquear');
+
     if (blacklistGlobal[rut]) {
-        document.getElementById('motivoBloqueo').classList.add('d-none'); 
-        document.getElementById('btnBloquear').classList.add('d-none'); 
-        document.getElementById('btnDesbloquear').classList.remove('d-none');
+        if(motivoBloqueo) motivoBloqueo.classList.add('d-none'); 
+        if(btnBloquear) btnBloquear.classList.add('d-none'); 
+        if(btnDesbloquear) btnDesbloquear.classList.remove('d-none');
     } else {
-        document.getElementById('motivoBloqueo').classList.remove('d-none'); 
-        document.getElementById('motivoBloqueo').value = ""; 
-        document.getElementById('btnBloquear').classList.remove('d-none'); 
-        document.getElementById('btnDesbloquear').classList.add('d-none');
+        if(motivoBloqueo) motivoBloqueo.classList.remove('d-none'); 
+        if(motivoBloqueo) motivoBloqueo.value = ""; 
+        if(btnBloquear) btnBloquear.classList.remove('d-none'); 
+        if(btnDesbloquear) btnDesbloquear.classList.add('d-none');
     }
     
     if(!modalFichaInstance) {
@@ -1271,85 +1314,38 @@ window.verPerfil = function(rut) {
     modalFichaInstance.show();
 }
 
-
-window.forzarIngresoPasado = async function(rut, nombre) {
-    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.\n\nIngresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
-    if(!fec) return;
-    
-    let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Detrás del Muro):", "Detrás del Muro");
-    if(!prog) return;
-    
-    let monto = prompt(`¿Cuánto se le debe pagar a ${nombre} por ese día? (Sin puntos, ej: 10000)`, "10000");
-    if(!monto) return;
-    
-    if(!confirm(`¿Seguro que deseas inyectar a ${nombre} en el programa ${prog} del día ${fec} por $${monto}?`)) return;
-    
-    try {
-        const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
-        let numReal = 0;
-        if (snap.exists()) {
-            let asistentes = snap.val();
-            for (const r in asistentes) {
-                let n = parseInt(asistentes[r].numero_asignado) || 0;
-                if (n > numReal) numReal = n;
-            }
+const btnGuardarEdicion = document.getElementById('btnGuardarEdicion');
+if(btnGuardarEdicion) {
+    btnGuardarEdicion.addEventListener('click', async () => {
+        try {
+            await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
+                nombres: document.getElementById('editNombres').value, 
+                apellidos: document.getElementById('editApellidos').value,
+                fechaNacimiento: document.getElementById('editNacimiento').value,
+                telefono: document.getElementById('editTel').value, 
+                email: document.getElementById('editEmail').value,
+                direccion: document.getElementById('editDir').value,
+                emergenciaNombre: document.getElementById('editEmergenciaNombre').value,
+                emergenciaTelefono: document.getElementById('editEmergenciaTelefono').value,
+                enfermedades: document.getElementById('editEnfermedades').value,
+                sexo: document.getElementById('editSexo').value,
+                afp: document.getElementById('editAfp').value, 
+                salud: document.getElementById('editSalud').value,
+                banco: document.getElementById('editBanco').value, 
+                tipoCuenta: document.getElementById('editTipoCuenta').value,
+                numeroCuenta: document.getElementById('editCuenta').value
+            });
+            alert("Datos actualizados correctamente."); 
+            listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
+            renderCRM(listaGlobalCRM); 
+            modalFichaInstance.hide();
+        } catch (e) { 
+            alert("Error al guardar."); 
         }
-        const numeroFinal = numReal + 1;
-        
-        await set(ref(db, `2_asistencias/${fec}/${prog}/${rut}`), {
-            rut: rut,
-            nombre_programa: prog,
-            monto: parseInt(monto),
-            tipo_ingreso: "Pago",
-            hora_ingreso: "10:00", // Hora genérica
-            hora_salida: "20:00",  // Hora genérica para que cuente como día completo
-            bono_horas_extras: 0,
-            firma_digital: "", // Sin firma, ingreso administrativo
-            estado_pago: "Pendiente",
-            numero_asignado: numeroFinal,
-            invitado_por: "Administración",
-            aplica_contrato: true,
-            estado_dt: "Pendiente",
-            ingreso_administrativo: true
-        });
-        
-        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.\nSi vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
-        
-    } catch(e) {
-        alert("Error al inyectar: " + e.message);
-    }
+    });
 }
 
-document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
-    try {
-        await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
-            nombres: document.getElementById('editNombres').value, 
-            apellidos: document.getElementById('editApellidos').value,
-            fechaNacimiento: document.getElementById('editNacimiento').value,
-            telefono: document.getElementById('editTel').value, 
-            email: document.getElementById('editEmail').value,
-            direccion: document.getElementById('editDir').value,
-            emergenciaNombre: document.getElementById('editEmergenciaNombre').value,
-            emergenciaTelefono: document.getElementById('editEmergenciaTelefono').value,
-            enfermedades: document.getElementById('editEnfermedades').value,
-            sexo: document.getElementById('editSexo').value,
-            afp: document.getElementById('editAfp').value, 
-            salud: document.getElementById('editSalud').value,
-            banco: document.getElementById('editBanco').value, 
-            tipoCuenta: document.getElementById('editTipoCuenta').value,
-            numeroCuenta: document.getElementById('editCuenta').value
-        });
-        
-        alert("Datos actualizados correctamente."); 
-        listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
-        renderCRM(listaGlobalCRM); 
-        modalFichaInstance.hide();
-    } catch (e) { 
-        alert("Error al guardar."); 
-    }
-});
-
-document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
+document.getElementById('btnEliminarTrabajador')?.addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; 
@@ -1359,7 +1355,7 @@ document.getElementById('btnEliminarTrabajador').addEventListener('click', async
     }
 });
 
-document.getElementById('btnBloquear').addEventListener('click', async () => {
+document.getElementById('btnBloquear')?.addEventListener('click', async () => {
     const motivo = document.getElementById('motivoBloqueo').value.trim(); 
     if(!motivo) return alert("Debes escribir un motivo.");
     
@@ -1372,7 +1368,7 @@ document.getElementById('btnBloquear').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnDesbloquear').addEventListener('click', async () => {
+document.getElementById('btnDesbloquear')?.addEventListener('click', async () => {
     if(confirm("¿Quitar de la lista negra?")) {
         await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); 
         delete blacklistGlobal[rutPerfilActual]; 
@@ -1385,7 +1381,7 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 // ==========================================
 // FINANZAS Y BÓVEDA
 // ==========================================
-document.getElementById('finanzas-tab').addEventListener('click', async () => {
+document.getElementById('finanzas-tab')?.addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); 
     if (!snap.exists()) return;
     
@@ -1429,7 +1425,7 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
+document.getElementById('btnLiquidarSemana')?.addEventListener('click', async () => {
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) {
         return alert("No hay plata retenida.");
     }
@@ -1445,7 +1441,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        const tr = listaGlobalCRM[rut] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
+        const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
@@ -1469,7 +1465,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
 
 let modalPagosInstance;
 
-document.getElementById('btnExcelBanco').addEventListener('click', async () => {
+document.getElementById('btnExcelBanco')?.addEventListener('click', async () => {
     const btn = document.getElementById('btnExcelBanco');
     btn.innerText = "⏳ Buscando pendientes..."; 
     btn.disabled = true;
@@ -1543,7 +1539,7 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     btn.disabled = false;
 });
 
-document.getElementById('btnGenerarNominaBanco').addEventListener('click', async () => {
+document.getElementById('btnGenerarNominaBanco')?.addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.check-pago:checked');
     const seleccionados = Array.from(checkboxes).map(cb => cb.value);
 
@@ -1621,25 +1617,35 @@ function descargarCSV(c, n) {
 // ==========================================
 // EFECTIVO (REDISEÑADO: LISTADO + RECICLAJE DE FIRMAS)
 // ==========================================
+let signaturePadEfectivo = null;
 let rutEfectivoActual = "";
 let deudaEfectivoActual = null;
 let firmaRecicladaBase64 = null;
 
-// Escuchar clic en la pestaña para cargar la lista
+setTimeout(() => {
+    const inputEfe = document.getElementById('rutEfectivo');
+    if(inputEfe) inputEfe.placeholder = "🔍 Buscar Nombres, Apellidos o RUT...";
+}, 500);
+
 document.getElementById('efectivo-tab')?.addEventListener('click', cargarListaEfectivo);
 
 async function cargarListaEfectivo() {
     let containerLista = document.getElementById('contenedorListaEfectivo');
     if (!containerLista) {
-        const inputRef = document.getElementById('rutEfectivo');
-        if(!inputRef) return;
-        const searchBoxParent = inputRef.parentElement.parentElement;
+        const btnBusq = document.getElementById('btnBuscarEfectivo');
+        if(!btnBusq) return;
         containerLista = document.createElement('div');
         containerLista.id = 'contenedorListaEfectivo';
-        searchBoxParent.parentElement.insertBefore(containerLista, searchBoxParent.nextSibling);
+        
+        const searchBoxParent = btnBusq.parentElement.parentElement;
+        if(searchBoxParent && searchBoxParent.parentNode) {
+            searchBoxParent.parentNode.insertBefore(containerLista, searchBoxParent.nextSibling);
+        } else {
+            btnBusq.closest('.card-panel, .card, .container, body').appendChild(containerLista);
+        }
     }
     
-    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold">⏳ Buscando personas con pagos pendientes en efectivo...</div>';
+    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold shadow-sm">⏳ Buscando personas con pagos pendientes en efectivo...</div>';
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([
@@ -1648,7 +1654,7 @@ async function cargarListaEfectivo() {
         ]);
         
         if (!asisSnap.exists()) {
-            containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ No hay pagos pendientes en el sistema.</div>';
+            containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold shadow-sm">✅ No hay pagos pendientes en el sistema.</div>';
             return;
         }
         
@@ -1656,7 +1662,6 @@ async function cargarListaEfectivo() {
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         let deudasEfectivo = {};
         
-        // Recorrer asistencias para armar el consolidado
         for (const f in todas) {
             for (const p in todas[f]) {
                 for (const r in todas[f][p]) {
@@ -1681,7 +1686,6 @@ async function cargarListaEfectivo() {
                             ruta: `2_asistencias/${f}/${p}/${r}`
                         });
                         
-                        // Rescate de firma por si el primer registro no tenía
                         if (!deudasEfectivo[r].firma && asis.firma_digital) {
                             deudasEfectivo[r].firma = asis.firma_digital;
                         }
@@ -1690,7 +1694,7 @@ async function cargarListaEfectivo() {
             }
         }
         
-        window.deudasEfectivoGlobal = deudasEfectivo; // Guardar global para el buscador local
+        window.deudasEfectivoGlobal = deudasEfectivo; 
         renderTablaDeudasEfectivo(deudasEfectivo, trabajadores);
         
     } catch (e) {
@@ -1700,18 +1704,19 @@ async function cargarListaEfectivo() {
 
 function renderTablaDeudasEfectivo(deudasObj, trabObj) {
     const containerLista = document.getElementById('contenedorListaEfectivo');
+    if(!containerLista) return;
     const ruts = Object.keys(deudasObj);
     
     if (ruts.length === 0) {
-        containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ Ya no hay nadie esperando pago en efectivo.</div>';
+        containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold shadow-sm">✅ La fila está vacía. No hay nadie esperando pago en efectivo.</div>';
         return;
     }
     
     let html = `
-    <div class="table-responsive mt-4">
-        <table class="table table-dark table-hover align-middle text-center" style="font-size: 0.9em; border: 1px solid #444;">
-            <thead style="color: #00d26a; background: #111;">
-                <tr><th>RUT</th><th>Nombre Completo</th><th>Monto Total</th><th>Acción</th></tr>
+    <div class="table-responsive mt-4 shadow-lg rounded">
+        <table class="table table-dark table-hover align-middle text-center mb-0" style="font-size: 0.9em; border: 1px solid #444;">
+            <thead style="background: #111;">
+                <tr><th style="color: #b066ff;">RUT</th><th style="color: #b066ff;">Nombre Completo</th><th style="color: #b066ff;">Monto Total</th><th style="color: #b066ff;">Acción</th></tr>
             </thead>
             <tbody>
     `;
@@ -1724,10 +1729,10 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
         html += `
         <tr>
             <td class="fw-bold">${r}</td>
-            <td>${nombreLimpio}</td>
+            <td class="fw-bold text-white">${nombreLimpio}</td>
             <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
             <td>
-                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\'")}')">💸 Pagar</button>
+                <button class="btn btn-success btn-sm fw-bold w-100 shadow" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\\'")}')">💸 Pagar Ahora</button>
             </td>
         </tr>
         `;
@@ -1737,32 +1742,37 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
     containerLista.innerHTML = html;
 }
 
-// Cambiar el comportamiento del botón "Buscar" para que filtre la lista renderizada
-document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
-    const term = document.getElementById('rutEfectivo').value.trim().toLowerCase();
-    if(!window.deudasEfectivoGlobal) return;
-    
-    get(ref(db, '1_trabajadores')).then(snap => {
-        const trabObj = snap.exists() ? snap.val() : {};
-        if(!term) {
-            renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
+const btnBusqEfe = document.getElementById('btnBuscarEfectivo');
+if(btnBusqEfe) {
+    btnBusqEfe.addEventListener('click', () => {
+        const term = document.getElementById('rutEfectivo').value.trim().toLowerCase();
+        if(!window.deudasEfectivoGlobal) {
+            cargarListaEfectivo();
             return;
         }
         
-        let filtrado = {};
-        for (const r in window.deudasEfectivoGlobal) {
-            const tr = trabObj[r] || { nombres: "", apellidos: "" };
-            const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
-            const rutLimpio = r.replace(/[^0-9kK]/g, '');
-            const inputLimpio = term.replace(/[^0-9kK]/g, '');
-            
-            if (r.toLowerCase() === term || rutLimpio === inputLimpio || nombreCompleto.includes(term)) {
-                filtrado[r] = window.deudasEfectivoGlobal[r];
+        get(ref(db, '1_trabajadores')).then(snap => {
+            const trabObj = snap.exists() ? snap.val() : {};
+            if(!term) {
+                renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
+                return;
             }
-        }
-        renderTablaDeudasEfectivo(filtrado, trabObj);
+            
+            let filtrado = {};
+            for (const r in window.deudasEfectivoGlobal) {
+                const tr = trabObj[r] || { nombres: "", apellidos: "" };
+                const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
+                const rutLimpio = r.replace(/[^0-9kK]/g, '');
+                const inputLimpio = term.replace(/[^0-9kK]/g, '');
+                
+                if (r.toLowerCase() === term || rutLimpio === inputLimpio || nombreCompleto.includes(term)) {
+                    filtrado[r] = window.deudasEfectivoGlobal[r];
+                }
+            }
+            renderTablaDeudasEfectivo(filtrado, trabObj);
+        });
     });
-});
+}
 
 window.abrirPagoEfectivo = function(rut, nombrePersona) {
     const deuda = window.deudasEfectivoGlobal[rut];
@@ -1796,15 +1806,12 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
     document.querySelectorAll('.check-pago-parcial').forEach(chk => chk.addEventListener('change', recalcularTotal));
     recalcularTotal();
     
-    // Configuración visual para Reciclaje de Firma
+    document.getElementById('panelPagoEfectivo').classList.remove('d-none');
+    
     firmaRecicladaBase64 = deuda.firma;
-    
     const canvasElement = document.getElementById('signature-pad-efectivo');
-    if (canvasElement) canvasElement.classList.add('d-none'); // Ocultar el espacio de firma manual
-    
     const btnLimpiar = document.getElementById('btnLimpiarFirmaEfectivo');
-    if (btnLimpiar) btnLimpiar.classList.add('d-none'); // Ocultar botón borrar firma
-
+    
     let msgDiv = document.getElementById('msgFirmaReciclada');
     if (!msgDiv) {
         msgDiv = document.createElement('div');
@@ -1816,7 +1823,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
         if (canvasElement) canvasElement.classList.add('d-none'); 
         if (btnLimpiar) btnLimpiar.classList.add('d-none'); 
         msgDiv.innerHTML = `
-            <div class="alert alert-success mt-2 p-3 text-center" style="border: 2px solid #00d26a;">
+            <div class="alert alert-success mt-2 p-3 text-center shadow-sm" style="border: 2px solid #00d26a;">
                 <span class="fw-bold fs-5">✅ Firma Encontrada</span><br>
                 <small>Se reciclará automáticamente la firma digital que la persona realizó en la puerta.</small>
             </div>`;
@@ -1824,90 +1831,91 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
         if (canvasElement) canvasElement.classList.remove('d-none'); 
         if (btnLimpiar) btnLimpiar.classList.remove('d-none'); 
         msgDiv.innerHTML = `
-            <div class="alert alert-warning mt-2 p-3 text-center" style="border: 2px dashed #ffcc00;">
+            <div class="alert alert-warning mt-2 p-3 text-center shadow-sm" style="border: 2px dashed #ffcc00; background: #332b00;">
                 <span class="fw-bold fs-5 text-warning">⚠️ Sin Firma Previa</span><br>
                 <small class="text-white">Esta persona no firmó en la puerta. <br><b>Por favor, que firme ahora en el recuadro blanco para entregarle su dinero.</b></small>
             </div>`;
-        if(signaturePadEfectivo) {
-            signaturePadEfectivo.clear();
+            
+        if(!signaturePadEfectivo && canvasElement) {
+            signaturePadEfectivo = new SignaturePad(canvasElement, { backgroundColor: 'rgb(255, 255, 255)' });
+        }
+        if(signaturePadEfectivo && canvasElement) {
             setTimeout(() => {
                 const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
                 canvasElement.width = canvasElement.offsetWidth * ratioEfe;
                 canvasElement.height = canvasElement.offsetHeight * ratioEfe;
                 canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
                 signaturePadEfectivo.clear();
-            }, 300);
+            }, 100);
         }
-    } else {
-        msgDiv.innerHTML = `
-            <div class="alert alert-danger mt-2 p-3 text-center">
-                <span class="fw-bold fs-5">⚠️ Sin Firma Digital</span><br>
-                <small>La persona no firmó al entrar. El comprobante de dinero se guardará sin firma.</small>
-            </div>`;
     }
 
-    document.getElementById('panelPagoEfectivo').classList.remove('d-none');
-    
-    // Mover el scroll al panel para mayor fluidez
-    document.getElementById('panelPagoEfectivo').scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('panelPagoEfectivo').scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     rutEfectivoActual = rut;
     deudaEfectivoActual = deuda;
 };
 
-document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
-    let seleccionados = [];
-    document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
-        seleccionados.push(deudaEfectivoActual.programasDetalle[chk.value]);
-    });
-
-    if(seleccionados.length === 0) return alert("Debes seleccionar al menos un programa para pagar.");
-
-    if (!confirm(`¿Estás seguro de entregar $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO a esta persona?`)) return;
-    
-    const btn = document.getElementById('btnConfirmarPagoEfectivo');
-    const textOrg = btn.innerText;
-    btn.disabled = true;
-    btn.innerText = "⏳ Confirmando y Reciclando Firma...";
-
-    try {
-        const nowIso = new Date().toISOString();
-        const idRecibo = Date.now().toString();
+const btnConfPagoEfe = document.getElementById('btnConfirmarPagoEfectivo');
+if(btnConfPagoEfe) {
+    btnConfPagoEfe.addEventListener('click', async () => {
+        if (!firmaRecicladaBase64 && (!signaturePadEfectivo || signaturePadEfectivo.isEmpty())) {
+            return alert("❌ ALERTA: La persona no firmó en la puerta. Debe firmar en el recuadro blanco para tener constancia legal del pago.");
+        }
         
-        const nombresProgramas = seleccionados.map(s => s.nombreStr);
-        const rutasActualizar = seleccionados.map(s => s.ruta);
-        
-        // Guardar el recibo usando la firma reciclada
-        await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
-            rut: rutEfectivoActual,
-            monto: deudaEfectivoActual.montoCalculado,
-            fecha: nowIso,
-            firma: firmaRecicladaBase64 || signaturePadEfectivo.toDataURL("image/jpeg"),
-            programas: nombresProgramas
+        let seleccionados = [];
+        document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
+            seleccionados.push(deudaEfectivoActual.programasDetalle[chk.value]);
         });
-        
-        let updates = {};
-        rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
-        await update(ref(db), updates);
 
-        alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda.");
+        if(seleccionados.length === 0) return alert("Debes seleccionar al menos un programa para pagar.");
+
+        if (!confirm(`¿Confirmas que estás entregando $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO a esta persona?`)) return;
         
-        document.getElementById('panelPagoEfectivo').classList.add('d-none');
-        document.getElementById('rutEfectivo').value = "";
-        
-        // Recargar la lista para que la persona desaparezca mágicamente
-        cargarListaEfectivo();
-        // Recargar bóveda batch abajo
-        if(typeof renderPanelRecibosBatch === "function") renderPanelRecibosBatch();
-        
-    } catch (e) {
-        console.error(e);
-        alert("Error detallado al pagar: " + e.message);
-    } finally {
-        btn.disabled = false;
-        btn.innerText = "💾 Confirmar y Guardar Recibo";
-    }
-});
+        const btn = document.getElementById('btnConfirmarPagoEfectivo');
+        btn.disabled = true;
+        btn.innerText = "⏳ Guardando Recibo en la Nube...";
+
+        try {
+            const firmaFinal = firmaRecicladaBase64 || signaturePadEfectivo.toDataURL('image/jpeg');
+            const nowIso = new Date().toISOString();
+            const idRecibo = Date.now().toString();
+            
+            const nombresProgramas = seleccionados.map(s => s.nombreStr);
+            const rutasActualizar = seleccionados.map(s => s.ruta);
+            
+            await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
+                rut: rutEfectivoActual,
+                monto: deudaEfectivoActual.montoCalculado,
+                fecha: nowIso,
+                firma: firmaFinal,
+                programas: nombresProgramas
+            });
+            
+            let updates = {};
+            rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
+            await update(ref(db), updates);
+
+            alert("✅ Pago registrado con éxito y comprobante asegurado en la Bóveda de Recibos.");
+            
+            document.getElementById('panelPagoEfectivo').classList.add('d-none');
+            const rutEfeInput = document.getElementById('rutEfectivo');
+            if(rutEfeInput) rutEfeInput.value = "";
+            rutEfectivoActual = "";
+            
+            cargarListaEfectivo();
+            if(typeof renderPanelRecibosBatch === "function") renderPanelRecibosBatch();
+            
+        } catch (e) {
+            alert("Error detallado: " + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "💾 Confirmar y Guardar Recibo";
+        }
+    });
+}
+
+setTimeout(cargarListaEfectivo, 1500);
 
 // --- PESTAÑA EFECTIVO: GESTIÓN DE RECIBOS EN LOTE ---
 document.getElementById('efectivo-tab')?.addEventListener('click', renderPanelRecibosBatch);
@@ -1915,12 +1923,11 @@ document.getElementById('efectivo-tab')?.addEventListener('click', renderPanelRe
 async function renderPanelRecibosBatch() {
     let container = document.getElementById('panelRecibosBatch');
     if (!container) {
-        // Encontrar el contenedor correcto sin importar cómo se llame el ID en el HTML
         let paneEl = document.getElementById('tab-efectivo');
         let btnRef = document.getElementById('btnBuscarEfectivo');
         
         if (!paneEl && btnRef) {
-            paneEl = btnRef.parentElement.parentElement; // Subimos dos niveles para quedar en la base de la pestaña
+            paneEl = btnRef.parentElement.parentElement; 
         }
         
         if(!paneEl) return;
@@ -2003,11 +2010,9 @@ async function renderPanelRecibosBatch() {
                     const pdfBlob = doc.output('blob');
                     const safeName = nombreCompleto.replace(/[^a-zA-Z0-9]/g, "_");
                     
-                    // Crear carpeta dinámica usando el nombre y fecha del programa
                     const primerPrograma = (rec.programas && rec.programas.length > 0) ? rec.programas[0] : "Pagos_Varios";
                     let nombreCarpeta = primerPrograma.replace(/[^a-zA-Z0-9\-]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, '');
                     
-                    // Si se le pagaron varios programas a la vez, lo indicamos en la carpeta
                     if (rec.programas && rec.programas.length > 1) {
                         nombreCarpeta += "_Y_OTROS";
                     }
@@ -2047,8 +2052,9 @@ setTimeout(renderPanelRecibosBatch, 2500);
 // ==========================================
 // CONTRATOS DT
 // ==========================================
-document.getElementById('contratos-dt-tab').addEventListener('click', () => {
-    document.getElementById('btnCargarContratosDT').click();
+document.getElementById('contratos-dt-tab')?.addEventListener('click', () => {
+    const btnCargar = document.getElementById('btnCargarContratosDT');
+    if(btnCargar) btnCargar.click();
 });
 
 window.agrupacionDTGlobal = {};
@@ -2071,198 +2077,204 @@ function getWeekIdentifier(dateStr) {
     return { label: `Semana del ${monStr} al ${sunStr}`, sortKey: sortKey };
 }
 
-document.getElementById('btnCargarContratosDT').addEventListener('click', async () => {
-    const contenedor = document.getElementById('contenedorContratosDT');
-    contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
+const btnCargarContratosDT = document.getElementById('btnCargarContratosDT');
+if(btnCargarContratosDT) {
+    btnCargarContratosDT.addEventListener('click', async () => {
+        const contenedor = document.getElementById('contenedorContratosDT');
+        if(!contenedor) return;
+        contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
-    try {
-        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
-        
-        if (!asisSnap.exists()) {
-            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes.</div>";
-            return;
-        }
-
-        const todas = asisSnap.val();
-        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-        window.agrupacionDTGlobal = {};
-
-        for (const fecha in todas) {
-            const weekInfo = getWeekIdentifier(fecha);
+        try {
+            const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
             
-            for (const prog in todas[fecha]) {
-                if (!window.agrupacionDTGlobal[prog]) window.agrupacionDTGlobal[prog] = {};
-                if (!window.agrupacionDTGlobal[prog][weekInfo.sortKey]) {
-                    window.agrupacionDTGlobal[prog][weekInfo.sortKey] = { label: weekInfo.label, ruts: {}, totalAplica: 0, totalArchivados: 0 };
-                }
+            if (!asisSnap.exists()) {
+                contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes.</div>";
+                return;
+            }
+
+            const todas = asisSnap.val();
+            const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+            window.agrupacionDTGlobal = {};
+
+            for (const fecha in todas) {
+                const weekInfo = getWeekIdentifier(fecha);
                 
-                for (const rut in todas[fecha][prog]) {
-                    const asis = todas[fecha][prog][rut];
+                for (const prog in todas[fecha]) {
+                    if (!window.agrupacionDTGlobal[prog]) window.agrupacionDTGlobal[prog] = {};
+                    if (!window.agrupacionDTGlobal[prog][weekInfo.sortKey]) {
+                        window.agrupacionDTGlobal[prog][weekInfo.sortKey] = { label: weekInfo.label, ruts: {}, totalAplica: 0, totalArchivados: 0 };
+                    }
                     
-                    if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato !== false) {
-                        window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalAplica++;
+                    for (const rut in todas[fecha][prog]) {
+                        const asis = todas[fecha][prog][rut];
                         
-                        if (asis.dt_archivado) {
-                            window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalArchivados++;
-                        } else {
-                            let objRut = window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut];
-                            if (!objRut) {
-                                const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", email: "-", telefono: "-", direccion: "-" };
+                        if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato !== false) {
+                            window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalAplica++;
+                            
+                            if (asis.dt_archivado) {
+                                window.agrupacionDTGlobal[prog][weekInfo.sortKey].totalArchivados++;
+                            } else {
+                                let objRut = window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut];
+                                if (!objRut) {
+                                    const tr = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", email: "-", telefono: "-", direccion: "-" };
+                                    const telefonoLimpio = (tr.telefono || "-").replace(/^\+56\s*9/, '9').replace(/^\+56/, '9');
+                                    
+                                    objRut = {
+                                        nombres: `${tr.nombres} ${tr.apellidos}`,
+                                        email: tr.email || "-",
+                                        telefono: telefonoLimpio,
+                                        direccion: tr.direccion || "-",
+                                        fechas: [],
+                                        tickets: [],
+                                        rutasFirebase: [],
+                                        todoLiquidado: !!asis.dt_liquidado,
+                                        montoSuma: 0
+                                    };
+                                    window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut] = objRut;
+                                }
                                 
-                                const telefonoLimpio = (tr.telefono || "-").replace(/^\+56\s*9/, '9').replace(/^\+56/, '9');
+                                objRut.fechas.push(fecha);
+                                objRut.tickets.push(asis.numero_asignado || '-');
                                 
-                                objRut = {
-                                    nombres: `${tr.nombres} ${tr.apellidos}`,
-                                    email: tr.email || "-",
-                                    telefono: telefonoLimpio,
-                                    direccion: tr.direccion || "-",
-                                    fechas: [],
-                                    tickets: [],
-                                    rutasFirebase: [],
-                                    todoLiquidado: !!asis.dt_liquidado,
-                                    montoSuma: 0
-                                };
-                                window.agrupacionDTGlobal[prog][weekInfo.sortKey].ruts[rut] = objRut;
+                                const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                                objRut.montoSuma += montoLimpio;
+                                objRut.rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${rut}`);
+                                
+                                if (!asis.dt_liquidado) objRut.todoLiquidado = false;
                             }
-                            
-                            objRut.fechas.push(fecha);
-                            objRut.tickets.push(asis.numero_asignado || '-');
-                            
-                            const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                            objRut.montoSuma += montoLimpio;
-                            
-                            objRut.rutasFirebase.push(`2_asistencias/${fecha}/${prog}/${rut}`);
-                            
-                            if (!asis.dt_liquidado) objRut.todoLiquidado = false;
                         }
                     }
                 }
             }
-        }
 
-        for (const prog in window.agrupacionDTGlobal) {
-            for (const wk in window.agrupacionDTGlobal[prog]) {
-                if (window.agrupacionDTGlobal[prog][wk].totalAplica === 0) {
-                    delete window.agrupacionDTGlobal[prog][wk]; 
+            for (const prog in window.agrupacionDTGlobal) {
+                for (const wk in window.agrupacionDTGlobal[prog]) {
+                    if (window.agrupacionDTGlobal[prog][wk].totalAplica === 0) {
+                        delete window.agrupacionDTGlobal[prog][wk]; 
+                    }
+                }
+                if (Object.keys(window.agrupacionDTGlobal[prog]).length === 0) {
+                    delete window.agrupacionDTGlobal[prog];
                 }
             }
-            if (Object.keys(window.agrupacionDTGlobal[prog]).length === 0) {
-                delete window.agrupacionDTGlobal[prog];
+
+            if (Object.keys(window.agrupacionDTGlobal).length === 0) {
+                contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ Todos los contratos están listos y archivados.</div>";
+                return;
             }
-        }
 
-        if (Object.keys(window.agrupacionDTGlobal).length === 0) {
-            contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ Todos los contratos están listos y archivados.</div>";
-            return;
-        }
-
-        let html = '<div class="accordion" id="accProgramas">';
-        let progIdx = 0;
-        
-        const progKeys = Object.keys(window.agrupacionDTGlobal).sort();
-        for (const prog of progKeys) {
-            progIdx++;
-            html += `
-            <div class="accordion-item" style="border: 1px solid #b066ff; margin-bottom: 10px; background: #1a1a1a;">
-                <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}" style="background: #2d1b4e; color: white; font-size: 1.1em;">
-                        🎬 Programa: ${prog.replace(" - ", " / ")}
-                    </button>
-                </h2>
-                <div id="colProg_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accProgramas">
-                    <div class="accordion-body" style="background: #141414;">
-                        <div class="accordion" id="accWeeks_${progIdx}">`;
+            let html = '<div class="accordion" id="accProgramas">';
+            let progIdx = 0;
             
-            let wkIdx = 0;
-            const weekKeys = Object.keys(window.agrupacionDTGlobal[prog]).sort().reverse();
-            for (const wk of weekKeys) {
-                wkIdx++;
-                const weekData = window.agrupacionDTGlobal[prog][wk];
-                const todosArchivados = (weekData.totalArchivados > 0 && weekData.totalArchivados === weekData.totalAplica);
+            const progKeys = Object.keys(window.agrupacionDTGlobal).sort();
+            for (const prog of progKeys) {
+                progIdx++;
+                html += `
+                <div class="accordion-item" style="border: 1px solid #b066ff; margin-bottom: 10px; background: #1a1a1a;">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}" style="background: #2d1b4e; color: white; font-size: 1.1em;">
+                            🎬 Programa: ${prog.replace(" - ", " / ")}
+                        </button>
+                    </h2>
+                    <div id="colProg_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accProgramas">
+                        <div class="accordion-body" style="background: #141414;">
+                            <div class="accordion" id="accWeeks_${progIdx}">`;
                 
-                if (todosArchivados) {
-                    html += `
-                    <div class="accordion-item" style="border: 1px solid #00d26a; margin-bottom: 5px; background: #0a1a0a;">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" style="background: #0a1a0a; color: #00d26a;" disabled>
-                                📅 ${weekData.label} &nbsp; <span class="badge bg-success ms-auto fs-6">✅ Contratos Listos</span>
-                            </button>
-                        </h2>
-                    </div>`;
-                } else {
-                    const numPersonas = Object.keys(weekData.ruts).length;
-                    html += `
-                    <div class="accordion-item" style="border: 1px solid #444; margin-bottom: 5px; background: #111;">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}_wk_${wkIdx}" style="background: #1a1a1a; color: #00d26a;">
-                                📅 ${weekData.label} &nbsp; <span class="badge bg-secondary ms-2">${numPersonas} personas pendientes</span>
-                            </button>
-                        </h2>
-                        <div id="colProg_${progIdx}_wk_${wkIdx}" class="accordion-collapse collapse" data-bs-parent="#accWeeks_${progIdx}">
-                            <div class="accordion-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-dark table-hover table-bordered mb-0 align-middle text-center" style="font-size: 0.9em;">
-                                        <thead style="color: #b066ff;">
-                                            <tr><th>N° Ticket</th><th>RUT</th><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Domicilio</th><th>Fechas Asistidas</th><th>Montos (Base / +25%)</th><th>Acción</th></tr>
-                                        </thead>
-                                        <tbody>`;
+                let wkIdx = 0;
+                const weekKeys = Object.keys(window.agrupacionDTGlobal[prog]).sort().reverse();
+                for (const wk of weekKeys) {
+                    wkIdx++;
+                    const weekData = window.agrupacionDTGlobal[prog][wk];
+                    const todosArchivados = (weekData.totalArchivados > 0 && weekData.totalArchivados === weekData.totalAplica);
                     
-                    for (const rut in weekData.ruts) {
-                        const asisData = weekData.ruts[rut];
-                        const rowClass = asisData.todoLiquidado ? 'table-success' : '';
-                        const textColor = asisData.todoLiquidado ? 'text-dark' : 'text-white';
-                        const btnClass = asisData.todoLiquidado ? 'btn-success text-dark' : 'btn-outline-success';
-                        const btnText = asisData.todoLiquidado ? '✅ Listo' : 'Marcar Contrato';
-                        const montoImpuestos = Math.round(asisData.montoSuma * 1.25);
-                        
-                        const trId = `tr_${progIdx}_${wkIdx}_${rut}`;
-                        const btnId = `btn_${progIdx}_${wkIdx}_${rut}`;
-
+                    if (todosArchivados) {
                         html += `
-                                            <tr class="${rowClass}" style="transition: 0.3s;" id="${trId}">
-                                                <td class="fw-bold text-warning dt-text-element">${asisData.tickets.join(', ')}</td>
-                                                <td class="fw-bold ${textColor} dt-text-element">${rut}</td>
-                                                <td class="${textColor} dt-text-element">${asisData.nombres}</td>
-                                                <td class="${textColor} dt-text-element">${asisData.email}</td>
-                                                <td class="${textColor} dt-text-element">${asisData.telefono}</td>
-                                                <td class="${textColor} dt-text-element">${asisData.direccion}</td>
-                                                <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
-                                                <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
-                                                <td>
-                                                    <div class="d-flex justify-content-center gap-1">
-                                                        <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana(event, '${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
-                                                            ${btnText}
-                                                        </button>
-                                                        <button class="btn btn-outline-danger btn-sm fw-bold" onclick="window.eliminarContratoDT(event, '${rut}', '${prog}', '${wk}')">
-                                                            🗑️ Se retiró
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>`;
-                    }
-                    html += `
-                                        </tbody>
-                                    </table>
+                        <div class="accordion-item" style="border: 1px solid #00d26a; margin-bottom: 5px; background: #0a1a0a;">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" style="background: #0a1a0a; color: #00d26a;" disabled>
+                                    📅 ${weekData.label} &nbsp; <span class="badge bg-success ms-auto fs-6">✅ Contratos Listos</span>
+                                </button>
+                            </h2>
+                        </div>`;
+                    } else {
+                        const numPersonas = Object.keys(weekData.ruts).length;
+                        html += `
+                        <div class="accordion-item" style="border: 1px solid #444; margin-bottom: 5px; background: #111;">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}_wk_${wkIdx}" style="background: #1a1a1a; color: #00d26a;">
+                                    📅 ${weekData.label} &nbsp; <span class="badge bg-secondary ms-2">${numPersonas} personas pendientes</span>
+                                </button>
+                            </h2>
+                            <div id="colProg_${progIdx}_wk_${wkIdx}" class="accordion-collapse collapse" data-bs-parent="#accWeeks_${progIdx}">
+                                <div class="accordion-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-dark table-hover table-bordered mb-0 align-middle text-center" style="font-size: 0.9em;">
+                                            <thead style="color: #b066ff;">
+                                                <tr><th>N° Ticket</th><th>RUT</th><th>Nombre</th><th>Correo</th><th>Teléfono</th><th>Domicilio</th><th>Fechas Asistidas</th><th>Montos (Base / +25%)</th><th>Acción</th></tr>
+                                            </thead>
+                                            <tbody>`;
+                        
+                        // Ordenar de mayor a menor asistencia
+                        const rutsOrdenados = Object.keys(weekData.ruts).sort((a, b) => {
+                            return weekData.ruts[b].fechas.length - weekData.ruts[a].fechas.length;
+                        });
+                        
+                        for (const rut of rutsOrdenados) {
+                            const asisData = weekData.ruts[rut];
+                            const rowClass = asisData.todoLiquidado ? 'table-success' : '';
+                            const textColor = asisData.todoLiquidado ? 'text-dark' : 'text-white';
+                            const btnClass = asisData.todoLiquidado ? 'btn-success text-dark' : 'btn-outline-success';
+                            const btnText = asisData.todoLiquidado ? '✅ Listo' : 'Marcar Contrato';
+                            const montoImpuestos = Math.round(asisData.montoSuma * 1.25);
+                            
+                            const trId = `tr_${progIdx}_${wkIdx}_${rut}`;
+                            const btnId = `btn_${progIdx}_${wkIdx}_${rut}`;
+
+                            html += `
+                                                <tr class="${rowClass}" style="transition: 0.3s;" id="${trId}">
+                                                    <td class="fw-bold text-warning dt-text-element">${asisData.tickets.join(', ')}</td>
+                                                    <td class="fw-bold ${textColor} dt-text-element">${rut}</td>
+                                                    <td class="${textColor} dt-text-element">${asisData.nombres}</td>
+                                                    <td class="${textColor} dt-text-element">${asisData.email}</td>
+                                                    <td class="${textColor} dt-text-element">${asisData.telefono}</td>
+                                                    <td class="${textColor} dt-text-element">${asisData.direccion}</td>
+                                                    <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
+                                                    <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
+                                                    <td>
+                                                        <div class="d-flex justify-content-center gap-1">
+                                                            <button id="${btnId}" class="btn ${btnClass} btn-sm fw-bold" onclick="window.toggleContratoSemana(event, '${rut}', '${prog}', '${wk}', '${trId}', '${btnId}')">
+                                                                ${btnText}
+                                                            </button>
+                                                            <button class="btn btn-outline-danger btn-sm fw-bold" onclick="window.eliminarContratoDT(event, '${rut}', '${prog}', '${wk}')">
+                                                                🗑️ Se retiró
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>`;
+                        }
+                        html += `
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>`;
+                        </div>`;
+                    }
                 }
-            }
-            html += `
+                html += `
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>`;
+                </div>`;
+            }
+            html += '</div>';
+            contenedor.innerHTML = html;
+
+        } catch (e) {
+            contenedor.innerHTML = "<p class='text-danger text-center'>Error al cargar los datos.</p>";
         }
-        html += '</div>';
-        contenedor.innerHTML = html;
-
-    } catch (e) {
-        contenedor.innerHTML = "<p class='text-danger text-center'>Error al cargar los datos.</p>";
-    }
-});
-
+    });
+}
 
 window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, btnId) {
     event.preventDefault();
@@ -2298,7 +2310,6 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
         await update(ref(db), updates);
         asisData.todoLiquidado = nuevoEstado;
     } catch (e) {
-        console.error("Error al actualizar estado en BD", e);
         alert("Aviso: Hubo una falla de red. Verifica tu conexión.");
     }
 }
@@ -2323,69 +2334,70 @@ window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
     }
 }
 
-document.getElementById('btnArchivarContratosDT').addEventListener('click', async () => {
-    if (!window.agrupacionDTGlobal || Object.keys(window.agrupacionDTGlobal).length === 0) return;
-    
-    let updates = {};
-    let rutsArchivados = 0;
-    let resumenProgramas = new Set();
+const btnArchivarContratosDT = document.getElementById('btnArchivarContratosDT');
+if(btnArchivarContratosDT) {
+    btnArchivarContratosDT.addEventListener('click', async () => {
+        if (!window.agrupacionDTGlobal || Object.keys(window.agrupacionDTGlobal).length === 0) return;
+        
+        let updates = {};
+        let rutsArchivados = 0;
+        let resumenProgramas = new Set();
 
-    for (const prog in window.agrupacionDTGlobal) {
-        for (const wk in window.agrupacionDTGlobal[prog]) {
-            if (!window.agrupacionDTGlobal[prog][wk].ruts) continue;
-            for (const rut in window.agrupacionDTGlobal[prog][wk].ruts) {
-                const asisData = window.agrupacionDTGlobal[prog][wk].ruts[rut];
-                if (asisData.todoLiquidado) {
-                    rutsArchivados++;
-                    resumenProgramas.add(prog.replace(" - ", " / "));
-                    asisData.rutasFirebase.forEach(ruta => {
-                        updates[`${ruta}/dt_archivado`] = true;
-                    });
+        for (const prog in window.agrupacionDTGlobal) {
+            for (const wk in window.agrupacionDTGlobal[prog]) {
+                if (!window.agrupacionDTGlobal[prog][wk].ruts) continue;
+                for (const rut in window.agrupacionDTGlobal[prog][wk].ruts) {
+                    const asisData = window.agrupacionDTGlobal[prog][wk].ruts[rut];
+                    if (asisData.todoLiquidado) {
+                        rutsArchivados++;
+                        resumenProgramas.add(prog.replace(" - ", " / "));
+                        asisData.rutasFirebase.forEach(ruta => {
+                            updates[`${ruta}/dt_archivado`] = true;
+                        });
+                    }
                 }
             }
         }
-    }
 
-    if (rutsArchivados === 0) {
-        return alert("No hay contratos marcados en verde (Listos) para archivar.");
-    }
+        if (rutsArchivados === 0) {
+            return alert("No hay contratos marcados en verde (Listos) para archivar.");
+        }
 
-    if (!confirm(`¿Archivar definitivamente los ${rutsArchivados} contratos que están en verde?\nEsto registrará la semana como 'Lista' y ya no podrás ver las filas internas.`)) return;
+        if (!confirm(`¿Archivar definitivamente los ${rutsArchivados} contratos que están en verde?\nEsto registrará la semana como 'Lista' y ya no podrás ver las filas internas.`)) return;
 
-    const idHistorico = Date.now().toString();
-    updates[`5_historial_dt/archivos/${idHistorico}`] = {
-        fecha_archivo: new Date().toISOString(),
-        cantidad_archivos: rutsArchivados,
-        programas: Array.from(resumenProgramas)
-    };
+        const idHistorico = Date.now().toString();
+        updates[`5_historial_dt/archivos/${idHistorico}`] = {
+            fecha_archivo: new Date().toISOString(),
+            cantidad_archivos: rutsArchivados,
+            programas: Array.from(resumenProgramas)
+        };
 
-    try {
-        await update(ref(db), updates);
-        alert(`✅ ¡Éxito! Se archivaron ${rutsArchivados} contratos de los programas:\n${Array.from(resumenProgramas).join(', ')}`);
-        document.getElementById('btnCargarContratosDT').click();
-    } catch (e) {
-        alert("Error al archivar en Firebase.");
-    }
-});
-
+        try {
+            await update(ref(db), updates);
+            alert(`✅ ¡Éxito! Se archivaron ${rutsArchivados} contratos de los programas:\n${Array.from(resumenProgramas).join(', ')}`);
+            document.getElementById('btnCargarContratosDT').click();
+        } catch (e) {
+            alert("Error al archivar en Firebase.");
+        }
+    });
+}
 
 // ==========================================
-// PESTAÑA 4: SEGURIDAD (ACORDEÓN MES -> PROGRAMA)
+// PESTAÑA 4: SEGURIDAD
 // ==========================================
 async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
+    if(!contenedor) return;
     const btnRefresh = document.getElementById('btnRefrescarSeguridad');
     
-    btnRefresh.innerText = "⏳ Cargando..."; 
-    btnRefresh.disabled = true;
+    if(btnRefresh) { btnRefresh.innerText = "⏳ Cargando..."; btnRefresh.disabled = true; }
     
     const [asisSnap, trabSnap] = await Promise.all([ 
         get(ref(db, '2_asistencias')), 
         get(ref(db, '1_trabajadores')) 
     ]);
     
-    btnRefresh.innerText = "🔄 Actualizar Lista en Vivo"; 
-    btnRefresh.disabled = false;
+    if(btnRefresh) { btnRefresh.innerText = "🔄 Actualizar Lista en Vivo"; btnRefresh.disabled = false; }
 
     if (!asisSnap.exists()) { 
         contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros de asistencia.</p>"; 
@@ -2559,134 +2571,138 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
     }
 }
 
-document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
-document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
+document.getElementById('seguridad-tab')?.addEventListener('click', cargarReportesDT);
+document.getElementById('btnRefrescarSeguridad')?.addEventListener('click', cargarReportesDT);
 
 
 // ==========================================
 // MANTENIMIENTO 
 // ==========================================
-document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
-    try {
-        const snap = await get(ref(db, '2_asistencias')); 
-        if (!snap.exists()) return alert("No hay datos de asistencias.");
-        
-        const trabSnap = await get(ref(db, '1_trabajadores')); 
-        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
-        
-        let agrupado = {};
-        const todas = snap.val();
-        
-        for (const fecha in todas) { 
-            for (const prog in todas[fecha]) { 
-                for (const r in todas[fecha][prog]) {
-                    const asis = todas[fecha][prog][r]; 
-                    
-                    if (!agrupado[r]) {
-                        agrupado[r] = { 
-                            programas: [], 
-                            montoTotal: 0 
-                        };
-                    }
-                    
-                    let montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                    agrupado[r].montoTotal += montoLimpio;
-                    agrupado[r].programas.push(`${prog.replace(" - ", " / ")} (${fecha} N°${asis.numero_asignado || '-'})`);
-                }
-            }
-        }
-
-        let csv = "\uFEFFRUT;Nombres;Apellidos;Total Dias Asistidos;Monto Total Historico;Programas y Fechas\n";
-        
-        for (const r in agrupado) {
-            const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
-            const asisData = agrupado[r];
+const btnRespMaestro = document.getElementById('btnRespaldoMaestro');
+if(btnRespMaestro) {
+    btnRespMaestro.addEventListener('click', async () => {
+        try {
+            const snap = await get(ref(db, '2_asistencias')); 
+            if (!snap.exists()) return alert("No hay datos de asistencias.");
             
-            const programasStr = asisData.programas.join(" | ");
+            const trabSnap = await get(ref(db, '1_trabajadores')); 
+            if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
             
-            csv += `${r};${trab.nombres};${trab.apellidos};${asisData.programas.length};$${asisData.montoTotal};${programasStr}\n`;
-        }
-        
-        descargarCSV(csv, `Respaldo_Maestro_Agrupado_${new Date().toISOString().split('T')[0]}.csv`);
-        
-    } catch (error) { 
-        alert("Error al generar el respaldo maestro."); 
-    }
-});
-
-document.getElementById('btnRespaldoPDFs').addEventListener('click', async () => {
-    const btn = document.getElementById('btnRespaldoPDFs');
-    try {
-        btn.innerText = "⏳ Empaquetando PDFs... (Espera)"; 
-        btn.disabled = true;
-        
-        const snap = await get(ref(db, '2_asistencias')); 
-        if (!snap.exists()) { 
-            alert("No hay contratos."); 
-            resetBtnZip(btn); 
-            return; 
-        }
-        
-        const trabSnap = await get(ref(db, '1_trabajadores')); 
-        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
-        
-        const todas = snap.val(); 
-        const zip = new JSZip(); 
-        let pdfsGenerados = 0; 
-        const { jsPDF } = window.jspdf;
-        
-        for (const fecha in todas) { 
-            for (const prog in todas[fecha]) {
-                const carpetaPrograma = zip.folder(`${fecha}_${prog.replace(/[ \/]/g, "_")}`);
-                
-                for (const r in todas[fecha][prog]) {
-                    const asis = todas[fecha][prog][r]; 
-                    const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
-                    
-                    if (asis.firma_digital) {
-                        const doc = new jsPDF({ format: 'legal' }); 
-                        dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog.replace(" - ", " / "));
+            let agrupado = {};
+            const todas = snap.val();
+            
+            for (const fecha in todas) { 
+                for (const prog in todas[fecha]) { 
+                    for (const r in todas[fecha][prog]) {
+                        const asis = todas[fecha][prog][r]; 
                         
-                        const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
-                        const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
-                        
-                        let nombreArchivo = "";
-                        if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
-                            nombreArchivo = `Cesion_Imagen_${ticketStr}_${nombreCompletoLimpio}_${r}.pdf`;
-                        } else {
-                            nombreArchivo = `Contrato_${ticketStr}_${nombreCompletoLimpio}_${r}.pdf`;
+                        if (!agrupado[r]) {
+                            agrupado[r] = { 
+                                programas: [], 
+                                montoTotal: 0 
+                            };
                         }
                         
-                        const pdfBlob = doc.output('blob'); 
-                        carpetaPrograma.file(nombreArchivo, pdfBlob); 
-                        pdfsGenerados++;
+                        let montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                        agrupado[r].montoTotal += montoLimpio;
+                        agrupado[r].programas.push(`${prog.replace(" - ", " / ")} (${fecha} N°${asis.numero_asignado || '-'})`);
                     }
                 }
             }
+
+            let csv = "\uFEFFRUT;Nombres;Apellidos;Total Dias Asistidos;Monto Total Historico;Programas y Fechas\n";
+            
+            for (const r in agrupado) {
+                const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+                const asisData = agrupado[r];
+                const programasStr = asisData.programas.join(" | ");
+                
+                csv += `${r};${trab.nombres};${trab.apellidos};${asisData.programas.length};$${asisData.montoTotal};${programasStr}\n`;
+            }
+            
+            descargarCSV(csv, `Respaldo_Maestro_Agrupado_${new Date().toISOString().split('T')[0]}.csv`);
+        } catch (error) { 
+            alert("Error al generar el respaldo maestro."); 
         }
-        
-        if (pdfsGenerados === 0) { 
-            alert("No hay firmas digitales."); 
+    });
+}
+
+const btnRespPDFs = document.getElementById('btnRespaldoPDFs');
+if(btnRespPDFs) {
+    btnRespPDFs.addEventListener('click', async () => {
+        const btn = document.getElementById('btnRespaldoPDFs');
+        try {
+            btn.innerText = "⏳ Empaquetando PDFs..."; 
+            btn.disabled = true;
+            
+            const snap = await get(ref(db, '2_asistencias')); 
+            if (!snap.exists()) { 
+                alert("No hay contratos."); 
+                resetBtnZip(btn); 
+                return; 
+            }
+            
+            const trabSnap = await get(ref(db, '1_trabajadores')); 
+            if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
+            
+            const todas = snap.val(); 
+            const zip = new JSZip(); 
+            let pdfsGenerados = 0; 
+            const { jsPDF } = window.jspdf;
+            
+            for (const fecha in todas) { 
+                for (const prog in todas[fecha]) {
+                    const carpetaPrograma = zip.folder(`${fecha}_${prog.replace(/[ \/]/g, "_")}`);
+                    
+                    for (const r in todas[fecha][prog]) {
+                        const asis = todas[fecha][prog][r]; 
+                        const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+                        
+                        if (asis.firma_digital) {
+                            const doc = new jsPDF({ format: 'legal' }); 
+                            dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog.replace(" - ", " / "));
+                            
+                            const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
+                            const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
+                            
+                            let nombreArchivo = "";
+                            if (asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false) {
+                                nombreArchivo = `Cesion_Imagen_${ticketStr}_${nombreCompletoLimpio}_${r}.pdf`;
+                            } else {
+                                nombreArchivo = `Contrato_${ticketStr}_${nombreCompletoLimpio}_${r}.pdf`;
+                            }
+                            
+                            const pdfBlob = doc.output('blob'); 
+                            carpetaPrograma.file(nombreArchivo, pdfBlob); 
+                            pdfsGenerados++;
+                        }
+                    }
+                }
+            }
+            
+            if (pdfsGenerados === 0) { 
+                alert("No hay firmas digitales."); 
+                resetBtnZip(btn); 
+                return; 
+            }
+            
+            const zipContent = await zip.generateAsync({type:"blob"}); 
+            const a = document.createElement("a"); 
+            a.href = URL.createObjectURL(zipContent); 
+            a.download = `Respaldo_Contratos_PDF_${new Date().toISOString().split('T')[0]}.zip`; 
+            a.click();
+            
+            alert(`¡Éxito! Se empaquetaron ${pdfsGenerados} contratos legales.`); 
+            resetBtnZip(btn);
+        } catch (error) { 
+            alert("Error al empaquetar los PDFs."); 
             resetBtnZip(btn); 
-            return; 
         }
-        
-        const zipContent = await zip.generateAsync({type:"blob"}); 
-        const a = document.createElement("a"); 
-        a.href = URL.createObjectURL(zipContent); 
-        a.download = `Respaldo_Contratos_PDF_${new Date().toISOString().split('T')[0]}.zip`; 
-        a.click();
-        
-        alert(`¡Éxito! Se empaquetaron ${pdfsGenerados} contratos legales.`); 
-        resetBtnZip(btn);
-        
-    } catch (error) { 
-        alert("Error al empaquetar los PDFs."); 
-        resetBtnZip(btn); 
-    }
-});
+    });
+}
 
 function resetBtnZip(btn) { 
+    if(!btn) return;
     btn.innerText = "🗂️ Descargar ZIP de Contratos"; 
     btn.disabled = false; 
 }
@@ -2694,157 +2710,174 @@ function resetBtnZip(btn) {
 const inputConfirmar = document.getElementById('inputConfirmarLimpieza'); 
 const btnEjecutar = document.getElementById('btnEjecutarLimpieza');
 
-inputConfirmar.addEventListener('input', (e) => { 
-    btnEjecutar.disabled = (e.target.value !== "1812"); 
-});
+if(inputConfirmar && btnEjecutar) {
+    inputConfirmar.addEventListener('input', (e) => { 
+        btnEjecutar.disabled = (e.target.value !== "1812"); 
+    });
 
-btnEjecutar.addEventListener('click', async () => {
-    try {
-        await remove(ref(db, '2_asistencias')); 
-        await remove(ref(db, '3_reservas'));
-        alert("✅ Nube limpiada con éxito."); 
-        
-        const modal = bootstrap.Modal.getInstance(document.getElementById('modalLimpieza'));
-        modal.hide(); 
-        inputConfirmar.value = ""; 
-        btnEjecutar.disabled = true; 
-        
-        window.location.reload();
-    } catch (error) { 
-        alert("Error al limpiar."); 
-    }
-});
+    btnEjecutar.addEventListener('click', async () => {
+        try {
+            await remove(ref(db, '2_asistencias')); 
+            await remove(ref(db, '3_reservas'));
+            await remove(ref(db, '8_autorizaciones_menores'));
+            alert("✅ Nube limpiada con éxito."); 
+            
+            const modalEl = document.getElementById('modalLimpieza');
+            if(modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if(modal) modal.hide();
+            }
+            inputConfirmar.value = ""; 
+            btnEjecutar.disabled = true; 
+            window.location.reload();
+        } catch (error) { 
+            alert("Error al limpiar."); 
+        }
+    });
+}
 
 // ==========================================
 // SORTEO DALE PLAY 
 // ==========================================
-document.getElementById('sorteo-tab').addEventListener('click', async () => {
-    const contenedorFechas = document.getElementById('listaFechasSorteo');
-    contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
-    
-    try {
-        const [snapAsis, snapSorteos] = await Promise.all([ 
-            get(ref(db, '2_asistencias')), 
-            get(ref(db, '6_sorteos_fechas_usadas')) 
-        ]);
+const sorteoTab = document.getElementById('sorteo-tab');
+if(sorteoTab) {
+    sorteoTab.addEventListener('click', async () => {
+        const contenedorFechas = document.getElementById('listaFechasSorteo');
+        if(!contenedorFechas) return;
+        contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
         
-        if (!snapAsis.exists()) return contenedorFechas.innerHTML = "<p class='text-muted'>No hay asistencias registradas.</p>";
-        
-        const todas = snapAsis.val();
-        const fechasUsadas = snapSorteos.exists() ? snapSorteos.val() : {};
-        let fechasDalePlay = [];
-        
-        for (const fecha in todas) {
-            for (const prog in todas[fecha]) {
-                if (prog.includes("Dale Play")) {
-                    if (!fechasUsadas[fecha] && !fechasDalePlay.includes(fecha)) {
-                        fechasDalePlay.push(fecha);
+        try {
+            const [snapAsis, snapSorteos] = await Promise.all([ 
+                get(ref(db, '2_asistencias')), 
+                get(ref(db, '6_sorteos_fechas_usadas')) 
+            ]);
+            
+            if (!snapAsis.exists()) return contenedorFechas.innerHTML = "<p class='text-muted'>No hay asistencias registradas.</p>";
+            
+            const todas = snapAsis.val();
+            const fechasUsadas = snapSorteos.exists() ? snapSorteos.val() : {};
+            let fechasDalePlay = [];
+            
+            for (const fecha in todas) {
+                for (const prog in todas[fecha]) {
+                    if (prog.includes("Dale Play")) {
+                        if (!fechasUsadas[fecha] && !fechasDalePlay.includes(fecha)) {
+                            fechasDalePlay.push(fecha);
+                        }
                     }
                 }
             }
-        }
-        
-        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-success fw-bold'>✅ No hay fechas nuevas disponibles para sortear.</p>";
-        
-        fechasDalePlay.sort().reverse();
-        
-        let htmlFechas = "";
-        fechasDalePlay.forEach(fecha => {
-            htmlFechas += `
-            <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px; width: 100%; max-width: 260px;">
-                <input class="form-check-input check-sorteo" type="checkbox" value="${fecha}" id="chk_${fecha}" checked style="transform: scale(1.4); margin-top: 8px; cursor: pointer;">
-                <label class="form-check-label fw-bold ms-2 text-white" for="chk_${fecha}" style="cursor: pointer; width: 100%;">
-                    🎬 Dale Play<br><small class="text-warning">${fecha}</small>
-                </label>
-            </div>`;
-        });
-        
-        contenedorFechas.innerHTML = htmlFechas;
-        
-    } catch (e) {
-        contenedorFechas.innerHTML = "<p class='text-danger'>Error al cargar las fechas.</p>";
-    }
-});
-
-document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
-    const checkboxes = document.querySelectorAll('.check-sorteo:checked');
-    const fechasSeleccionadas = Array.from(checkboxes).map(cb => cb.value);
-    const totalFechasRequeridas = fechasSeleccionadas.length;
-    
-    if (totalFechasRequeridas === 0) return alert("Debes seleccionar al menos una fecha de Dale Play para el sorteo.");
-    
-    const btnSorteo = document.getElementById('btnRealizarSorteo');
-    btnSorteo.innerText = "🎰 Filtrando asistencia perfecta y girando ruleta...";
-    btnSorteo.disabled = true;
-    document.getElementById('resultadoSorteo').classList.add('d-none');
-    
-    try {
-        const [asisSnap, trabSnap] = await Promise.all([ 
-            get(ref(db, '2_asistencias')), 
-            get(ref(db, '1_trabajadores')) 
-        ]);
-        
-        if (!asisSnap.exists()) throw new Error("No hay datos");
-        
-        const todas = asisSnap.val();
-        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-        let candidatosPerfectos = []; 
-        
-        for (const rut in trabajadores) {
-            let asistenciasConfirmadas = 0;
             
-            fechasSeleccionadas.forEach(fecha => {
-                let asistioEnEstaFecha = false;
-                for (const prog in todas[fecha]) {
-                    if (prog.includes("Dale Play") && todas[fecha][prog][rut]) {
-                        asistioEnEstaFecha = true;
-                    }
-                }
-                if (asistioEnEstaFecha) asistenciasConfirmadas++;
+            if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-success fw-bold'>✅ No hay fechas nuevas disponibles para sortear.</p>";
+            
+            fechasDalePlay.sort().reverse();
+            
+            let htmlFechas = "";
+            fechasDalePlay.forEach(fecha => {
+                htmlFechas += `
+                <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px; width: 100%; max-width: 260px;">
+                    <input class="form-check-input check-sorteo" type="checkbox" value="${fecha}" id="chk_${fecha}" checked style="transform: scale(1.4); margin-top: 8px; cursor: pointer;">
+                    <label class="form-check-label fw-bold ms-2 text-white" for="chk_${fecha}" style="cursor: pointer; width: 100%;">
+                        🎬 Dale Play<br><small class="text-warning">${fecha}</small>
+                    </label>
+                </div>`;
             });
             
-            if (asistenciasConfirmadas === totalFechasRequeridas) {
-                candidatosPerfectos.push(rut);
-            }
+            contenedorFechas.innerHTML = htmlFechas;
+        } catch (e) {
+            contenedorFechas.innerHTML = "<p class='text-danger'>Error al cargar las fechas.</p>";
         }
-        
-        if (candidatosPerfectos.length === 0) {
-            setTimeout(() => {
-                document.getElementById('ganadorNombre').innerText = "SIN GANADOR 😔";
-                document.getElementById('ganadorRut').innerText = "";
-                document.getElementById('ganadorFechas').innerText = "Ninguna persona cumplió con el requisito de asistir a TODAS las fechas seleccionadas.";
-                
-                document.getElementById('resultadoSorteo').classList.remove('d-none');
-                btnSorteo.innerText = "🔄 Intentar con otras fechas";
-                btnSorteo.disabled = false;
-            }, 1000);
-            return;
-        }
-        
-        const indiceAleatorio = Math.floor(Math.random() * candidatosPerfectos.length);
-        const rutGanador = candidatosPerfectos[indiceAleatorio];
-        const trabGanador = trabajadores[rutGanador];
-        
-        let updatesSorteo = {};
-        fechasSeleccionadas.forEach(f => updatesSorteo[`6_sorteos_fechas_usadas/${f}`] = true);
-        await update(ref(db), updatesSorteo);
+    });
+}
 
-        setTimeout(() => {
-            document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
-            document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
-            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
-            
-            document.getElementById('resultadoSorteo').classList.remove('d-none');
-            btnSorteo.innerText = "🔄 Realizar otro Sorteo";
-            btnSorteo.disabled = false;
-        }, 2000);
+const btnRealizarSorteo = document.getElementById('btnRealizarSorteo');
+if(btnRealizarSorteo) {
+    btnRealizarSorteo.addEventListener('click', async () => {
+        const checkboxes = document.querySelectorAll('.check-sorteo:checked');
+        const fechasSeleccionadas = Array.from(checkboxes).map(cb => cb.value);
+        const totalFechasRequeridas = fechasSeleccionadas.length;
         
-    } catch (e) {
-        alert("Error al realizar el sorteo.");
-        btnSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
-        btnSorteo.disabled = false;
-    }
-});
+        if (totalFechasRequeridas === 0) return alert("Debes seleccionar al menos una fecha de Dale Play para el sorteo.");
+        
+        btnRealizarSorteo.innerText = "🎰 Filtrando asistencia perfecta y girando ruleta...";
+        btnRealizarSorteo.disabled = true;
+        const resSorteo = document.getElementById('resultadoSorteo');
+        if(resSorteo) resSorteo.classList.add('d-none');
+        
+        try {
+            const [asisSnap, trabSnap] = await Promise.all([ 
+                get(ref(db, '2_asistencias')), 
+                get(ref(db, '1_trabajadores')) 
+            ]);
+            
+            if (!asisSnap.exists()) throw new Error("No hay datos");
+            
+            const todas = asisSnap.val();
+            const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+            let candidatosPerfectos = []; 
+            
+            for (const rut in trabajadores) {
+                let asistenciasConfirmadas = 0;
+                
+                fechasSeleccionadas.forEach(fecha => {
+                    let asistioEnEstaFecha = false;
+                    for (const prog in todas[fecha]) {
+                        if (prog.includes("Dale Play") && todas[fecha][prog][rut]) {
+                            asistioEnEstaFecha = true;
+                        }
+                    }
+                    if (asistioEnEstaFecha) asistenciasConfirmadas++;
+                });
+                
+                if (asistenciasConfirmadas === totalFechasRequeridas) {
+                    candidatosPerfectos.push(rut);
+                }
+            }
+            
+            if (candidatosPerfectos.length === 0) {
+                setTimeout(() => {
+                    const gNombre = document.getElementById('ganadorNombre');
+                    const gRut = document.getElementById('ganadorRut');
+                    const gFechas = document.getElementById('ganadorFechas');
+                    if(gNombre) gNombre.innerText = "SIN GANADOR 😔";
+                    if(gRut) gRut.innerText = "";
+                    if(gFechas) gFechas.innerText = "Ninguna persona cumplió con el requisito de asistir a TODAS las fechas seleccionadas.";
+                    
+                    if(resSorteo) resSorteo.classList.remove('d-none');
+                    btnRealizarSorteo.innerText = "🔄 Intentar con otras fechas";
+                    btnRealizarSorteo.disabled = false;
+                }, 1000);
+                return;
+            }
+            
+            const indiceAleatorio = Math.floor(Math.random() * candidatosPerfectos.length);
+            const rutGanador = candidatosPerfectos[indiceAleatorio];
+            const trabGanador = trabajadores[rutGanador];
+            
+            let updatesSorteo = {};
+            fechasSeleccionadas.forEach(f => updatesSorteo[`6_sorteos_fechas_usadas/${f}`] = true);
+            await update(ref(db), updatesSorteo);
+
+            setTimeout(() => {
+                const gNombre = document.getElementById('ganadorNombre');
+                const gRut = document.getElementById('ganadorRut');
+                const gFechas = document.getElementById('ganadorFechas');
+                if(gNombre) gNombre.innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
+                if(gRut) gRut.innerText = `RUT Acreditado: ${rutGanador}`;
+                if(gFechas) gFechas.innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas.`;
+                
+                if(resSorteo) resSorteo.classList.remove('d-none');
+                btnRealizarSorteo.innerText = "🔄 Realizar otro Sorteo";
+                btnRealizarSorteo.disabled = false;
+            }, 2000);
+            
+        } catch (e) {
+            alert("Error al realizar el sorteo.");
+            btnRealizarSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
+            btnRealizarSorteo.disabled = false;
+        }
+    });
+}
 
 // ==========================================
 // MANTENIMIENTO - AUTORIZACIONES MENORES
@@ -2853,30 +2886,10 @@ async function renderPanelMenoresBatch() {
     let mantTab = document.getElementById('mantenimiento-tab');
     if(!mantTab) return;
     
-    // INYECCIÓN DE EMERGENCIA
-    let tabPaneEmergencia = document.getElementById('btnRespaldoMaestro')?.closest('.tab-pane') || document.getElementById('btnRespaldoMaestro')?.parentElement.parentElement.parentElement;
-    if (tabPaneEmergencia && !document.getElementById('btnRestaurarSueldosError')) {
-        let divEmergencia = document.createElement('div');
-        divEmergencia.className = "mt-4 p-4 shadow-lg w-100 mb-4";
-        divEmergencia.style.background = "rgba(255, 153, 0, 0.1)";
-        divEmergencia.style.border = "3px dashed #ff9900";
-        divEmergencia.style.borderRadius = "8px";
-        divEmergencia.innerHTML = `
-            <h5 class="text-warning fw-bold text-center mb-2">🩹 Herramienta de Emergencia (Sueldos)</h5>
-            <p class="text-white text-center mb-3" style="font-size: 0.9em;">Si cerraste un día y el sistema descontó la plata por error, usa este botón para restaurar el valor original a toda la sala de un golpe.</p>
-            <button class="btn btn-warning fw-bold w-100 py-3 fs-4 text-dark shadow-sm" id="btnRestaurarSueldosError" style="border-radius: 8px;">
-                💰 Restaurar Sueldos a $10.000
-            </button>
-        `;
-        tabPaneEmergencia.appendChild(divEmergencia);
-    }
-
     let container = document.getElementById('panelMenoresBatch');
     if (!container) {
-        // Buscar el contenedor padre real de la pestaña Mantenimiento (normalmente el tab-pane)
         let baseEl = document.getElementById('btnRespaldoMaestro');
         if (baseEl) {
-            // Subimos hasta encontrar el row principal o el tab-pane para que ocupe todo el ancho
             let tabPane = baseEl.closest('.tab-pane') || baseEl.parentElement.parentElement.parentElement;
             container = document.createElement('div');
             container.id = 'panelMenoresBatch';
@@ -2920,7 +2933,7 @@ async function renderPanelMenoresBatch() {
             <div class="d-flex justify-content-between align-items-center mb-3 border-bottom border-warning pb-2">
                 <h4 class="text-warning mb-0">🚸 Permisos Notariales Menores (${totalPermisos})</h4>
             </div>
-            <p class="text-muted" style="font-size: 0.95em;">Descarga el ZIP con las autorizaciones firmadas por los apoderados, organizadas por carpetas de eventos.</p>
+            <p class="text-muted" style="font-size: 0.95em;">Descarga el ZIP con las autorizaciones firmadas por los apoderados.</p>
             
             <button class="btn btn-warning fw-bold py-3 shadow w-100 fs-5 text-dark" id="btnDescargarZipMenores" style="border-radius: 10px;">
                 📥 Descargar ZIP con los ${totalPermisos} Permisos
@@ -2928,7 +2941,6 @@ async function renderPanelMenoresBatch() {
             
             <div id="zonaEliminarMenores" class="d-none mt-4 p-3" style="background: rgba(255, 0, 0, 0.1); border: 2px dashed #ff3333; border-radius: 8px;">
                 <h5 class="text-danger fw-bold text-center mb-3">⚠️ Zona de Limpieza Segura</h5>
-                <p class="text-white text-center mb-3" style="font-size: 0.9em;">¿Ya descargaste el ZIP y confirmaste que los permisos están adentro?<br>Si es así, borra los registros de la nube.</p>
                 <button class="btn btn-danger fw-bold w-100 py-2 fs-5" id="btnVaciarMenores" style="border-radius: 8px;">
                     🗑️ Sí, Eliminar los ${totalPermisos} permisos de la Nube
                 </button>
@@ -2948,7 +2960,6 @@ async function renderPanelMenoresBatch() {
                     const doc = new jsPDF();
                     doc.setFont("helvetica", "bold"); doc.setFontSize(14);
                     doc.text("AUTORIZACIÓN PARA TRABAJO DE MENOR DE EDAD", 105, 20, null, null, "center");
-                    
                     doc.setFont("helvetica", "normal"); doc.setFontSize(11);
                     
                     const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -2957,25 +2968,7 @@ async function renderPanelMenoresBatch() {
                     const mes = meses[parseInt(partesFecha[1]) - 1];
                     const anio = partesFecha[0];
 
-                    const texto = `En Santiago de Chile a ${dia} de ${mes} de ${anio}, yo ${auto.nombre_apoderado}, nacionalidad ${auto.nacionalidad_apoderado}, profesión/oficio ${auto.profesion_apoderado}, Cédula de Identidad N° ${auto.rut_apoderado}, con domicilio en ${auto.domicilio_apoderado}, en mi calidad de ${auto.relacion_apoderado} del menor ${auto.nombre_menor}, Cédula de Identidad N° ${auto.rut_menor}, de ${auto.edad_menor} años de edad, vengo en otorgar mi autorización expresa para que mi hijo(a)/pupilo(a) pueda desempeñarse laboralmente con la empresa:
-
-RAZÓN SOCIAL: Camila Alejandra Fevre Seguel E.I.R.L. Producción. NOMBRE DE FANTASÍA: Nat Producciones
-
-1. Objeto de la Prestación de Servicios
-El menor queda autorizado para participar en las siguientes actividades:
-• Desempeñarse como extra en series y películas.
-• Participar como público en programas de televisión del canal Mega. (Dale Play)
-
-2. Condiciones de Seguridad y Bienestar
-Declaro haber sido informado(a) de que la productora garantiza las condiciones de seguridad y dignidad para el menor durante la ejecución de sus labores, contando con:
-• Presencia de un Prevencionista de Riesgos en terreno.
-• Acceso a servicio de Enfermería y primeros auxilios.
-• Suministro de agua potable, servicios higiénicos y cobertura de necesidades básicas.
-
-3. Declaración de Cumplimiento Legal
-Esta autorización se otorga conforme a lo establecido en el Código del Trabajo de Chile, asegurando que las labores no interrumpirán los estudios del menor ni perjudicarán su salud o desarrollo físico y moral.
-
-La presente autorización es válida para el período en curso.`;
+                    const texto = `En Santiago de Chile a ${dia} de ${mes} de ${anio}, yo ${auto.nombre_apoderado}, nacionalidad ${auto.nacionalidad_apoderado}, profesión/oficio ${auto.profesion_apoderado}, Cédula de Identidad N° ${auto.rut_apoderado}, con domicilio en ${auto.domicilio_apoderado}, en mi calidad de ${auto.relacion_apoderado} del menor ${auto.nombre_menor}, Cédula de Identidad N° ${auto.rut_menor}, de ${auto.edad_menor} años de edad, vengo en otorgar mi autorización expresa para que mi hijo(a)/pupilo(a) pueda desempeñarse laboralmente con la empresa:\n\nRAZÓN SOCIAL: Camila Alejandra Fevre Seguel E.I.R.L. Producción. NOMBRE DE FANTASÍA: Nat Producciones\n\n1. Objeto de la Prestación de Servicios\nEl menor queda autorizado para participar en las siguientes actividades:\n• Desempeñarse como extra en series y películas.\n• Participar como público en programas de televisión del canal Mega. (Dale Play)\n\n2. Condiciones de Seguridad y Bienestar\nDeclaro haber sido informado(a) de que la productora garantiza las condiciones de seguridad y dignidad para el menor durante la ejecución de sus labores, contando con:\n• Presencia de un Prevencionista de Riesgos en terreno.\n• Acceso a servicio de Enfermería y primeros auxilios.\n• Suministro de agua potable, servicios higiénicos y cobertura de necesidades básicas.\n\n3. Declaración de Cumplimiento Legal\nEsta autorización se otorga conforme a lo establecido en el Código del Trabajo de Chile, asegurando que las labores no interrumpirán los estudios del menor ni perjudicarán su salud o desarrollo físico y moral.\n\nLa presente autorización es válida para el período en curso.`;
                     
                     const lineas = doc.splitTextToSize(texto, 170);
                     doc.text(lineas, 20, 40);
@@ -3006,7 +2999,6 @@ La presente autorización es válida para el período en curso.`;
                 
                 btn.innerText = "✅ ZIP Descargado Exitosamente";
                 document.getElementById('zonaEliminarMenores').classList.remove('d-none');
-                
             } catch(e) {
                 alert("Error armando el ZIP: " + e.message);
                 btn.innerText = "📥 Intentar de nuevo";
@@ -3015,41 +3007,54 @@ La presente autorización es válida para el período en curso.`;
         });
         
         document.getElementById('btnVaciarMenores').addEventListener('click', async () => {
-            if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los permisos están guardados?\n\nSi aceptas, estos registros se eliminarán de la base de datos para no mezclarse con los de mañana.`)) {
+            if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el ZIP y los permisos están guardados?`)) {
                 await remove(ref(db, '8_autorizaciones_menores'));
                 alert("✅ Carpeta de permisos de menores ha sido vaciada.");
                 renderPanelMenoresBatch();
             }
         });
-        
     } catch(e) {
-        console.error("Error cargando menores:", e);
-        container.innerHTML = `<div class="text-danger text-center fw-bold">❌ Error al cargar permisos.<br><small class="text-muted">${e.message}</small></div>`;
+        container.innerHTML = `<div class="text-danger text-center fw-bold">❌ Error al cargar permisos.</div>`;
     }
 }
 
-// Botón de Emergencia para Restaurar Sueldos
-document.body.addEventListener('click', async (e) => {
-    if (e.target && e.target.id === 'btnRestaurarSueldosError') {
+document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
+setTimeout(renderPanelMenoresBatch, 3000);
+
+// ==========================================
+// BOTÓN FLOTANTE DE EMERGENCIA (ARREGLO SUELDOS)
+// ==========================================
+if (!document.getElementById('btnFlotanteEmergencia')) {
+    let btnFix = document.createElement('button');
+    btnFix.id = 'btnFlotanteEmergencia';
+    btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+    btnFix.style.position = "fixed";
+    btnFix.style.bottom = "30px";
+    btnFix.style.right = "30px";
+    btnFix.style.zIndex = "9999";
+    btnFix.style.padding = "15px 25px";
+    btnFix.style.fontSize = "1.2em";
+    btnFix.style.border = "2px solid #000";
+    btnFix.className = "btn btn-warning fw-bold shadow-lg";
+    
+    btnFix.onclick = async () => {
         let fec = prompt("Ingresa la FECHA del programa que se cerró mal (Ej: 2026-09-10):", new Date().toISOString().split('T')[0]);
         if(!fec) return;
-        let prog = prompt("Ingresa el NOMBRE EXACTO del programa:", "Detrás del Muro");
+        let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Público - Detrás del Muro):", "Público - Detrás del Muro");
         if(!prog) return;
         let montoReal = prompt(`¿Cuál era el SUELDO BASE REAL (100%) que debían recibir hoy por ${prog}? (Sin puntos)`, "10000");
         if(!montoReal) return;
         
         montoReal = parseInt(montoReal);
+        btnFix.innerText = "⏳ Restaurando...";
+        btnFix.disabled = true;
         
         try {
-            const btn = document.getElementById('btnRestaurarSueldosError');
-            btn.innerText = "⏳ Restaurando...";
-            btn.disabled = true;
-            
             const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
             if (!snap.exists()) {
-                btn.innerText = "💰 Restaurar Sueldos a $10.000";
-                btn.disabled = false;
-                return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos (ej: 'Detrás del Muro').");
+                btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+                btnFix.disabled = false;
+                return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos.");
             }
             
             let asistentes = snap.val();
@@ -3066,20 +3071,18 @@ document.body.addEventListener('click', async (e) => {
             if (count > 0) {
                 await update(ref(db), updates);
                 alert(`✅ ¡ÉXITO! Se restauraron los sueldos al 100% ($${montoReal}) a las ${count} personas afectadas.`);
+                btnFix.style.display = 'none'; 
             } else {
                 alert("No habían personas de pago en esa sala.");
+                btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+                btnFix.disabled = false;
             }
-            btn.innerText = "💰 Restaurar Sueldos a $10.000";
-            btn.disabled = false;
         } catch(err) {
             alert("Error: " + err.message);
-            const btn = document.getElementById('btnRestaurarSueldosError');
-            btn.innerText = "💰 Restaurar Sueldos a $10.000";
-            btn.disabled = false;
+            btnFix.innerHTML = "🚨 Arreglar Sueldos 🚨";
+            btnFix.disabled = false;
         }
-    }
-});
-
-// Inicializar
-document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
-setTimeout(renderPanelMenoresBatch, 3000);
+    };
+    document.body.appendChild(btnFix);
+}
+// --- FIN ABSOLUTO DEL ARCHIVO ---
