@@ -3127,7 +3127,7 @@ setTimeout(renderPanelMenoresBatch, 3000);
 // ==========================================
 // PESTAÑA: CESIONES MEGA
 // ==========================================
-document.getElementById('cesiones-tab')?.addEventListener('click', async () => {
+window.renderPanelCesiones = async function() {
     const contenedor = document.getElementById('panelCesionesBatch');
     if (!contenedor) {
         let parent = document.querySelector('#tab-cesiones');
@@ -3255,7 +3255,7 @@ document.getElementById('cesiones-tab')?.addEventListener('click', async () => {
     } catch (e) {
         cont.innerHTML = `<div class="alert alert-danger text-center">Error al cargar datos.</div>`;
     }
-});
+};
 
 window.descargarZipCesiones = async function(fechaElegida, programaElegido, btnId) {
     const btn = document.getElementById(btnId);
@@ -3341,9 +3341,7 @@ setTimeout(() => {
             nav.appendChild(li);
             
             // Añadir evento al recien creado
-            li.querySelector('a').addEventListener('click', () => {
-                document.getElementById('cesiones-tab')?.click();
-            });
+            li.querySelector('a').addEventListener('click', window.renderPanelCesiones);
         }
     }
 }, 1000);
