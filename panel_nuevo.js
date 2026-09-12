@@ -331,7 +331,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                         <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'} | H.Extra: $${p.valor_hora_extra || 0}</small>
                     </div>
                     <div>
-                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}', '${p.hora_citacion || ''}', ${p.incluye_almuerzo || false})">🚪 Entrar</button>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}', '${p.hora_citacion || ''}')">🚪 Entrar</button>
                         <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
                     </div>
                 </div>`;
@@ -354,8 +354,6 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
         return alert("Completa todos los campos obligatorios.");
     }
 
-    let incluyeAlmuerzo = confirm("🍱 ¿La jornada de hoy INCLUYE ALMUERZO para el público?\n(Si aceptas, se habilitarán los contadores de menú Normal/Veggie en la puerta)");
-
     let pinGenerado = ""; 
     if (nom.includes("Detrás del Muro")) {
         pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
@@ -370,16 +368,13 @@ document.getElementById('btnActivarWeb').addEventListener('click', async () => {
         pin: pinGenerado, 
         hora_termino: horaSal, 
         valor_hora_extra: valorHE, 
-        hora_citacion: horaCitacion,
-        incluye_almuerzo: incluyeAlmuerzo
+        hora_citacion: horaCitacion 
     });
     
-    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion, incluyeAlmuerzo);
+    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion);
 });
 
-window.incluyeAlmuerzoGlobal = false;
-window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaCit, almuerzo) {
-    window.incluyeAlmuerzoGlobal = almuerzo || false;
+window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaCit) {
     claveActual = clave; 
     nombrePrograma = nom; 
     fechaPrograma = fec; 
@@ -1032,6 +1027,102 @@ window.generarContratoPDF = async function(rut) {
     doc.save(nombreArchivo);
 }
 
+
+window.generarCesionPDF = async function(rut, fechaProg, nombreProg) {
+    const trab = listaGlobalCRM[rut]; 
+    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaProg}/${nombreProg}/${rut}`));
+    
+    if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
+    
+    const asis = asisSnap.val(); 
+    const { jsPDF } = window.jspdf; 
+    const doc = new jsPDF({ format: 'letter' }); // Generalmente formato carta para cesiones
+    
+    dibujarCesionEnPDF(doc, rut, trab, asis, fechaProg, nombreProg.replace(" - ", " / "));
+    
+    const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
+    const nombreArchivo = `Casino_${nombreCompletoLimpio}.pdf`;
+    
+    doc.save(nombreArchivo);
+}
+
+function dibujarCesionEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
+    let y = 15; 
+    doc.setFont("helvetica", "bold"); 
+    doc.setFontSize(14);
+    doc.text("CESION Y AUTORIZACION", 105, y, null, null, "center"); 
+    y += 10;
+    
+    doc.setFont("helvetica", "normal"); 
+    doc.setFontSize(8.5); // Letra pequeña para que quepa todo el texto legal
+    
+    const fechaFormat = fechaProg.split('-').reverse().join('-');
+    const nombreCompleto = `${trab.nombres || ''} ${trab.apellidos || ''}`.toUpperCase();
+
+    const textoCesion = `En Santiago de Chile, quien suscribe la presente autorización, declara y deja expresa constancia de lo siguiente:
+PRIMERO: Por el presente instrumento y, en este acto, autorizo a MEGAMEDIA S.A., en adelante MEGAMEDIA, y a los terceros que ésta designe, para que utilicen mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad, en adelante "mi imagen" (i) en los programas de televisión o casting de estos, en que haya intervenido, participado o haya tenido alguna presencia; (ii) en aquellos productos, bienes, servicios y/o negocios que se comercialicen y/o desarrollen por MEGAMEDIA o por los terceros que designe, que incluyan mi imagen; y (iii) en la publicidad o promoción de (i) y (ii) anteriores. La autorización de que da cuenta este instrumento se presta en forma exclusiva; sin cargo adicional alguno; en forma irrevocable; ilimitada; por el plazo durante el cual se transmitan los programas de televisión en los cuales participe o haya participado o aparecido, en forma individual o en conjunto, y/o durante el plazo en que se comercialicen los productos, bienes, servicios y/o negocios en los que se utilice mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad ya sea en forma individual o en conjunto con otros - y en Chile y el Extranjero; y tanto para sistemas de televisión de libre recepción, servicios limitados de televisión, televisión satelital, televisión digital, internet, radio o en cualquier otro medio o sistema de comunicación como para cualquier otro soporte material; y/o de audio; y/o audiovisual que se utilicen para estos efectos por MEGAMEDIA o por los terceros que MEGAMEDIA determine. Todos los soportes materiales; y/o de audio; y/o de audio y video en que se incluya o aparezca mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material de mi imagen o personalidad, es y será de propiedad exclusiva de MEGAMEDIA. En consecuencia, podrán proceder, personalmente o a través de terceros, a la elaboración y comercialización de cuantos productos considere oportunos y sin que esta enumeración se considere taxativa: discos compactos con obras musicales ejecutadas o interpretadas por mi, en forma individual o en conjunto con otros, dvds, u otros soportes de audio, video y/o de audio y video, entre otros, en los que aparezca, por ejemplo, mi imagen o nombre, así como expresiones que se hayan podido popularizar durante la emisión del programa de televisión. Asimismo y sin perjuicio de los derechos de televisión que corresponden a MEGAMEDIA, en forma exclusiva, podrán proceder a la grabación, publicación y copia de actuaciones, ejecuciones o interpretaciones, en cualquier tipo de forma o soporte; la reproducción y adaptación de la actuación como cantante, solista o como parte de un grupo musical o de mi intervención en el programa de televisión, el muestreo, la representación mímica, la mezcla y el doblaje de la actuación o intervención, la reproducción y comunicación pública mediante la utilización de cualquier soporte, así como, en general, cualquier otro medio. También y sin perjuicio de los derechos de televisión y de los derechos musicales que corresponden a MEGAMEDIA, en forma exclusiva, podrá difundir, en cualquier otra forma, información respecto mi persona mediante imágenes y/o sonido, incluyéndose los pases o transmisiones mediante sistemas de comunicación de libre recepción, sistemas de comunicación por satélite, sistemas de comunicación por cable (por ejemplo; como parte de una suscripción o abono a una cadena de televisión de pago o a través de la modalidad de "pay per view" o a través de un circuito cerrado de televisión e incluso como parte de un paquete o compilación de programas), internet, radio, música y cualquier otro medio actualmente conocido o que se conozca en el futuro. Sin perjuicio de lo ya señalado, autorizo la cesión, en este mismo acto, a MEGAMEDIA por lo que respecta a los derechos de televisión y musicales, la totalidad de los derechos de explotación y, en especial, los de reproducción, distribución y/o comunicación pública que me pudieren corresponder sobre mi intervención o participación o presencia en el programa de televisión de acuerdo con la legislación vigente en la República de Chile en materia de propiedad intelectual, efectuándose dicha cesión por el plazo máximo de protección legal, en forma ilimitada, por un número ilimitado de veces, en Chile y el extranjero. Por último, MEGAMEDIA, por lo que respecta a los derechos de televisión y musicales, gozará del derecho a explotar el programa de televisión y las obras musicales en que cante o ejecute, en cualquier forma y a través de cualquier medio, actualmente conocido o que se conozca en el futuro, pudiendo hacerlo, directamente, o a través de cualquier tercero al que, a su vez, ceda, total o parcialmente, los derechos de explotación cuya titularidad ostenta. Asimismo, reconozco y acepto que MEGAMEDIA podrá, directamente o a través de un tercero, producir discos, álbumes musicales u otros soportes materiales conteniendo fonogramas interpretados por mi, en forma individual o en conjunto con otros, en el programa de televisión y que podrá o no a criterio de MEGAMEDIA contener fonogramas interpretados por mi. En tal sentido, en conformidad a la presente autorización, otorgo a MEGAMEDIA el derecho exclusivo para efectuar grabaciones fonográficas de las interpretaciones efectuadas por mi, sea como solista y/o en conjunto con otro u otros participantes del programa de televisión y/o artistas, con o sin imágenes, efectuadas por cualquier medio creado o crearse en el futuro y el derecho exclusivo para fabricar, producir, licenciar, promover y/o de cualquier otra forma explotar fonogramas y/o álbumes y/o videogramas conteniendo dichas grabaciones sin límite de tiempo, ni de territorios, pudiendo ceder este derecho a terceros, sin limitación alguna. Durante toda la vigencia de la presente autorización, ya sea como solista o en conjunto, otorgo a MEGAMEDIA la plena y absoluta exclusividad de mis interpretaciones para fijaciones sonoras y audiovisuales, que se realicen por cualquier medio o tecnología creada o a crearse, comprometiéndome a no grabarlas para mí mismo ni para terceros, ya sea actuando como solista o como integrante de un conjunto y aun sin mención de mi nombre o seudónimo. Asimismo, me obligo a no re-grabar ningún trabajo musical contenido en las grabaciones y/o en los videogramas y/o álbumes y/o fonogramas en los que se incluyan interpretaciones y/o grabaciones, durante un período de 2 años contados desde la finalización del periodo de vigencia de la presente autorización
+SEGUNDO: Sin perjuicio de lo señalado en la cláusula anterior, en particular y sin que ello importe limitación alguna, y sólo a título ejemplar, MEGAMEDIA estará autorizada y será titular de todos los derechos de:
+1) Transmisión televisiva, en directo o diferido, por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro del programa de televisión y de mi imagen, en Chile y en el extranjero, a través de los sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro que MEGAMEDIA designe.
+2) Grabación, reproducción, adaptación y/o edición del programa de televisión y de mi imagen en cualesquiera soportes materiales que permitan la retransmisión televisiva del programa de televisión y de mi imagen o de sus adaptaciones y/o ediciones, por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro. Todo el material de fijación de imágenes y/o sonidos sobre cualquier base material del programa de televisión y de mi imagen es y será única y exclusivamente de propiedad de MEGAMEDIA.
+3) La retransmisión televisiva por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro de las grabaciones, adaptaciones y/o ediciones de las imágenes, referidas en el N° 2 anterior, en Chile y en el extranjero, a través de los sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro que MEGA designe, por un número ilimitado de veces y por el plazo máximo de protección legal del programa de televisión y de mi imagen.
+Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representante.`;
+
+    const lineas = doc.splitTextToSize(textoCesion, 185); 
+    doc.text(lineas, 15, y); 
+    y += (lineas.length * 3.5) + 10; 
+    
+    // Si la hoja se acabó, añadimos otra para las firmas
+    if (y > 250) {
+        doc.addPage();
+        y = 20;
+    }
+
+    // Datos del firmante según plantilla original
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`Fecha:`, 15, y);
+    doc.setFont("helvetica", "normal"); 
+    doc.text(fechaFormat, 40, y);
+    y += 6;
+
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`Nombre:`, 15, y);
+    doc.setFont("helvetica", "normal"); 
+    doc.text(nombreCompleto, 40, y);
+    y += 6;
+
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`RUT:`, 15, y);
+    doc.setFont("helvetica", "normal"); 
+    doc.text(rut, 40, y);
+    y += 6;
+
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`Empresa (si aplica):`, 15, y);
+    y += 6;
+
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`RUT (si aplica):`, 15, y);
+    y += 6;
+
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`Teléfono:`, 15, y);
+    doc.setFont("helvetica", "normal"); 
+    doc.text((trab.telefono || "").toString(), 40, y);
+    y += 6;
+
+    doc.setFont("helvetica", "bold"); 
+    doc.text(`Firma:`, 15, y + 10);
+    
+    // Inyectar firma real del usuario que tenemos guardada de la puerta
+    if (asis.firma_digital) { 
+        try { 
+            doc.addImage(asis.firma_digital, 'JPEG', 40, y - 5, 50, 20); 
+        } catch(e) {} 
+    }
+    
+    doc.text(`pp. MEGAMEDIA S.A.`, 130, y + 10);
+}
+
 function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
     let y = 15; 
     doc.setFont("helvetica", "bold"); 
@@ -1080,9 +1171,7 @@ NOVENO. Se deja constancia que el trabajador ingresó al servicio del empleador,
 
 DÉCIMO. El presente contrato se firma en dos ejemplares del mismo tenor y fecha.
 
-UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple validada en plataforma.
-
-DUODÉCIMO. El trabajador autoriza expresamente a la productora a reutilizar la firma electrónica estampada en este documento para la generación, validación y constancia legal de los recibos de pago en efectivo asociados exclusivamente a esta jornada.`;
+UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple validada en plataforma.`;
     }
 
     doc.text(titulo, 105, y, null, null, "center"); 
@@ -1252,13 +1341,6 @@ window.verPerfil = function(rut) {
                 </select>
             </div>
             <div class="col-6 mb-2"><label class="text-muted small">N° Cuenta</label><input type="text" class="form-control bg-dark text-white" id="editCuenta" value="${p.numeroCuenta || ''}"></div>
-            <div class="col-12 mt-4 pt-3 border-top border-secondary">
-                <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
-                <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
-                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/'/g, "\\'")}')">
-                    ➕ Añadir a Jornada Pasada
-                </button>
-            </div>
         </div>`;
     
     if (blacklistGlobal[rut]) {
@@ -1276,55 +1358,6 @@ window.verPerfil = function(rut) {
         modalFichaInstance = new bootstrap.Modal(document.getElementById('modalFicha'));
     }
     modalFichaInstance.show();
-}
-
-
-window.forzarIngresoPasado = async function(rut, nombre) {
-    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.\n\nIngresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
-    if(!fec) return;
-    
-    let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Detrás del Muro):", "Detrás del Muro");
-    if(!prog) return;
-    
-    let monto = prompt(`¿Cuánto se le debe pagar a ${nombre} por ese día? (Sin puntos, ej: 10000)`, "10000");
-    if(!monto) return;
-    
-    if(!confirm(`¿Seguro que deseas inyectar a ${nombre} en el programa ${prog} del día ${fec} por $${monto}?`)) return;
-    
-    try {
-        const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
-        let numReal = 0;
-        if (snap.exists()) {
-            let asistentes = snap.val();
-            for (const r in asistentes) {
-                let n = parseInt(asistentes[r].numero_asignado) || 0;
-                if (n > numReal) numReal = n;
-            }
-        }
-        const numeroFinal = numReal + 1;
-        
-        await set(ref(db, `2_asistencias/${fec}/${prog}/${rut}`), {
-            rut: rut,
-            nombre_programa: prog,
-            monto: parseInt(monto),
-            tipo_ingreso: "Pago",
-            hora_ingreso: "10:00", // Hora genérica
-            hora_salida: "20:00",  // Hora genérica para que cuente como día completo
-            bono_horas_extras: 0,
-            firma_digital: "", // Sin firma, ingreso administrativo
-            estado_pago: "Pendiente",
-            numero_asignado: numeroFinal,
-            invitado_por: "Administración",
-            aplica_contrato: true,
-            estado_dt: "Pendiente",
-            ingreso_administrativo: true
-        });
-        
-        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.\nSi vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
-        
-    } catch(e) {
-        alert("Error al inyectar: " + e.message);
-    }
 }
 
 document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
@@ -3090,3 +3123,227 @@ document.body.addEventListener('click', async (e) => {
 // Inicializar
 document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
 setTimeout(renderPanelMenoresBatch, 3000);
+
+// ==========================================
+// PESTAÑA: CESIONES MEGA
+// ==========================================
+document.getElementById('cesiones-tab')?.addEventListener('click', async () => {
+    const contenedor = document.getElementById('panelCesionesBatch');
+    if (!contenedor) {
+        let parent = document.querySelector('#tab-cesiones');
+        if (!parent) {
+            // Inyectamos el pane si no existe en HTML
+            const tabContent = document.querySelector('.tab-content');
+            if(tabContent) {
+                parent = document.createElement('div');
+                parent.id = 'tab-cesiones';
+                parent.className = 'tab-pane fade';
+                tabContent.appendChild(parent);
+            } else return;
+        }
+        parent.innerHTML = `<div id="panelCesionesBatch" class="card bg-dark border-secondary mt-5 p-4 shadow-lg w-100"></div>`;
+    }
+    
+    const cont = document.getElementById('panelCesionesBatch');
+    cont.innerHTML = '<div class="text-center text-info fs-5">⏳ Cargando historial de programas para Cesiones...</div>';
+
+    try {
+        const snap = await get(ref(db, '2_asistencias'));
+        if (!snap.exists()) {
+            cont.innerHTML = '<div class="alert alert-warning text-center">No hay registros de asistencia en la base de datos.</div>';
+            return;
+        }
+
+        const todas = snap.val();
+        let agrupacionProgramas = {};
+
+        // Agrupar por mes -> Programa -> Fecha
+        const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+        for (const fecha in todas) {
+            const mesLlave = fecha.substring(0, 7);
+            const [y, m, d] = fecha.split('-');
+            const etiquetaMes = `${nombresMeses[parseInt(m)-1]} ${y}`;
+            
+            if (!agrupacionProgramas[mesLlave]) {
+                agrupacionProgramas[mesLlave] = { etiqueta: etiquetaMes, programas: {} };
+            }
+
+            for (const prog in todas[fecha]) {
+                const cantidadPersonas = Object.keys(todas[fecha][prog]).length;
+                if (!agrupacionProgramas[mesLlave].programas[prog]) {
+                    agrupacionProgramas[mesLlave].programas[prog] = {};
+                }
+                agrupacionProgramas[mesLlave].programas[prog][fecha] = cantidadPersonas;
+            }
+        }
+
+        let html = `
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom border-secondary pb-2">
+                <h4 class="text-white mb-0">📄 Descarga Masiva de Cesiones de Imagen (MegaMedia)</h4>
+            </div>
+            <p class="text-muted mb-4">Selecciona una fecha de un programa para descargar un archivo ZIP con todos los PDFs de las cesiones de derechos de imagen ya llenadas y firmadas.</p>
+            <div class="accordion" id="accCesionesMeses">
+        `;
+
+        let mesIdx = 0;
+        const mesesOrd = Object.keys(agrupacionProgramas).sort().reverse();
+
+        for (const mes of mesesOrd) {
+            mesIdx++;
+            const dataMes = agrupacionProgramas[mes];
+            
+            html += `
+            <div class="accordion-item" style="border: 1px solid #444; margin-bottom: 15px; background: #0a0a0a;">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cesMes_${mesIdx}" style="background: #111; color: #fff; font-size: 1.1em; font-weight: bold;">
+                        📅 ${dataMes.etiqueta.toUpperCase()}
+                    </button>
+                </h2>
+                <div id="cesMes_${mesIdx}" class="accordion-collapse collapse" data-bs-parent="#accCesionesMeses">
+                    <div class="accordion-body" style="background: #1a1a1a;">
+                        <div class="accordion" id="accCesProgs_${mesIdx}">`;
+            
+            let progIdx = 0;
+            const progsOrd = Object.keys(dataMes.programas).sort();
+
+            for (const prog of progsOrd) {
+                progIdx++;
+                const fechasData = dataMes.programas[prog];
+                
+                html += `
+                            <div class="accordion-item" style="border: 1px solid #555; margin-bottom: 10px; background: #222;">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cesProg_${mesIdx}_${progIdx}" style="background: #2a2a2a; color: #d6b3ff;">
+                                        🎬 ${prog.replace(" - ", " / ")}
+                                    </button>
+                                </h2>
+                                <div id="cesProg_${mesIdx}_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accCesProgs_${mesIdx}">
+                                    <div class="accordion-body p-3">
+                                        <ul class="list-group">`;
+                
+                const fechasOrd = Object.keys(fechasData).sort().reverse();
+                for (const fecha of fechasOrd) {
+                    const cant = fechasData[fecha];
+                    const btnId = `btnDescargaCesion_${fecha}_${prog.replace(/[^a-zA-Z0-9]/g, '')}`;
+                    html += `
+                                            <li class="list-group-item d-flex justify-content-between align-items-center bg-dark text-white" style="border-color: #444;">
+                                                <span>📌 Grabación del <strong>${fecha.split('-').reverse().join('-')}</strong> <span class="badge bg-secondary ms-2">${cant} asistentes</span></span>
+                                                <button id="${btnId}" class="btn btn-primary btn-sm fw-bold shadow" onclick="window.descargarZipCesiones('${fecha}', '${prog}', '${btnId}')">
+                                                    📥 Descargar ZIP Cesiones
+                                                </button>
+                                            </li>`;
+                }
+                
+                html += `
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>`;
+            }
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        html += `</div>`;
+        cont.innerHTML = html;
+
+    } catch (e) {
+        cont.innerHTML = `<div class="alert alert-danger text-center">Error al cargar datos.</div>`;
+    }
+});
+
+window.descargarZipCesiones = async function(fechaElegida, programaElegido, btnId) {
+    const btn = document.getElementById(btnId);
+    const textoOriginal = btn.innerText;
+    btn.innerText = "⏳ Generando PDFs...";
+    btn.disabled = true;
+
+    try {
+        const [asisSnap, trabSnap] = await Promise.all([
+            get(child(ref(db), `2_asistencias/${fechaElegida}/${programaElegido}`)),
+            get(ref(db, '1_trabajadores'))
+        ]);
+
+        if (!asisSnap.exists()) {
+            alert("No se encontraron asistencias.");
+            btn.innerText = textoOriginal;
+            btn.disabled = false;
+            return;
+        }
+
+        const asistentes = asisSnap.val();
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+        const { jsPDF } = window.jspdf;
+        const zip = new JSZip();
+        
+        const safeProgName = programaElegido.replace(/[^a-zA-Z0-9\-]/g, "_").replace(/_+/g, "_");
+        const carpetaRaiz = zip.folder(`Cesiones_Mega_${safeProgName}_${fechaElegida}`);
+        let contExito = 0;
+
+        for (const rut in asistentes) {
+            const asis = asistentes[rut];
+            const trab = trabajadores[rut] || { nombres: "Desconocido", apellidos: "" };
+            
+            // Solo si tienen firma
+            if (asis.firma_digital) {
+                const doc = new jsPDF({ format: 'letter' });
+                dibujarCesionEnPDF(doc, rut, trab, asis, fechaElegida, programaElegido);
+                
+                const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
+                const pdfBlob = doc.output('blob');
+                
+                carpetaRaiz.file(`Casino_${nombreCompletoLimpio}.pdf`, pdfBlob);
+                contExito++;
+            }
+        }
+
+        if (contExito === 0) {
+            alert("Ningún asistente de ese día tiene firma guardada.");
+            btn.innerText = textoOriginal;
+            btn.disabled = false;
+            return;
+        }
+
+        btn.innerText = "⏳ Empaquetando ZIP...";
+        const zipContent = await zip.generateAsync({type:"blob"});
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(zipContent);
+        a.download = `Cesiones_Mega_${safeProgName}_${fechaElegida}.zip`;
+        a.click();
+        
+        alert(`✅ ¡Éxito! Se descargó el ZIP con ${contExito} cesiones listas para enviar al canal.`);
+
+    } catch (e) {
+        alert("Ocurrió un error al crear los archivos PDF.");
+        console.error(e);
+    } finally {
+        btn.innerText = textoOriginal;
+        btn.disabled = false;
+    }
+}
+
+// Auto-inyectar la pestaña de Cesiones en la barra de navegación si el usuario es Admin
+setTimeout(() => {
+    const nav = document.querySelector('.nav-tabs');
+    if (nav && !document.getElementById('cesiones-tab')) {
+        const correo = window.localStorage.getItem('correoStaffNat') || "";
+        const isAdmin = CORREOS_ADMINISTRADORES.includes(correo.toLowerCase());
+        
+        if(isAdmin) {
+            const li = document.createElement('li');
+            li.className = 'nav-item';
+            li.innerHTML = `<a class="nav-link text-white fw-bold" id="cesiones-tab" data-bs-toggle="tab" href="#tab-cesiones">📝 Cesiones</a>`;
+            nav.appendChild(li);
+            
+            // Añadir evento al recien creado
+            li.querySelector('a').addEventListener('click', () => {
+                document.getElementById('cesiones-tab')?.click();
+            });
+        }
+    }
+}, 1000);
