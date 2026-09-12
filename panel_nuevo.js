@@ -48,7 +48,7 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-document.getElementById('btnCerrarSesion')?.addEventListener('click', () => { 
+if (document.getElementById('btnCerrarSesion')) document.getElementById('btnCerrarSesion').addEventListener('click', () => { 
     signOut(auth).then(() => { 
         window.localStorage.removeItem('correoStaffNat');
         window.location.href = "login.html"; 
@@ -342,7 +342,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     }
 });
 
-document.getElementById('btnActivarWeb')?.addEventListener('click', async () => {
+if (document.getElementById('btnActivarWeb')) document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
@@ -449,7 +449,7 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
     return { montoBaseNuevo: nuevoMontoBase, bonoExtra: bonoExtra };
 }
 
-document.getElementById('btnEsUnDia')?.addEventListener('click', async () => {
+if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
     const now = new Date();
     const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
@@ -499,7 +499,7 @@ document.getElementById('btnEsUnDia')?.addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnVolverMenu')?.addEventListener('click', salirDeSala);
+if (document.getElementById('btnVolverMenu')) document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
 
 function salirDeSala() {
     claveActual = ""; 
@@ -574,11 +574,11 @@ function activarRadares() {
                 seccionLista.prepend(div);
             }
 
-            document.getElementById('buscadorPuerta')?.addEventListener('input', (e) => {
+            if (document.getElementById('buscadorPuerta')) document.getElementById('buscadorPuerta').addEventListener('input', (e) => {
                 window.termBusquedaPuerta = e.target.value.toLowerCase();
                 window.renderTablaPuerta();
             });
-            document.getElementById('ordenPuerta')?.addEventListener('change', (e) => {
+            if (document.getElementById('ordenPuerta')) document.getElementById('ordenPuerta').addEventListener('change', (e) => {
                 window.criterioOrdenPuerta = e.target.value;
                 window.renderTablaPuerta();
             });
@@ -862,7 +862,7 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     }
 }
 
-document.getElementById('btnIngresoManual')?.addEventListener('click', () => {
+if (document.getElementById('btnIngresoManual')) document.getElementById('btnIngresoManual').addEventListener('click', () => {
     const rutIngresado = document.getElementById('rutManual').value.trim();
     if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
     onScanSuccess(rutIngresado); 
@@ -951,9 +951,9 @@ async function onScanSuccess(decodedText) {
     }
 }
 
-document.getElementById('btnLimpiarFirma')?.addEventListener('click', () => signaturePad.clear());
+if (document.getElementById('btnLimpiarFirma')) document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 
-document.getElementById('btnGuardarIngreso')?.addEventListener('click', async () => {
+if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     
     const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
@@ -1226,7 +1226,7 @@ DUODÉCIMO. El trabajador autoriza expresamente a la productora a reutilizar la 
 // ==========================================
 // CRM Y EDICIÓN
 // ==========================================
-document.getElementById('crm-tab')?.addEventListener('click', async () => {
+if (document.getElementById('crm-tab')) document.getElementById('crm-tab').addEventListener('click', async () => {
     const [trabSnap, blackSnap] = await Promise.all([ 
         get(ref(db, '1_trabajadores')), 
         get(ref(db, '4_blacklist')) 
@@ -1259,7 +1259,7 @@ function renderCRM(datos) {
     }
 }
 
-document.getElementById('buscadorCRM')?.addEventListener('input', (e) => {
+if (document.getElementById('buscadorCRM')) document.getElementById('buscadorCRM').addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     const filtrados = Object.keys(listaGlobalCRM).reduce((acc, rut) => {
         const nombreCompl = `${listaGlobalCRM[rut].nombres} ${listaGlobalCRM[rut].apellidos}`.toLowerCase();
@@ -1420,7 +1420,7 @@ window.forzarIngresoPasado = async function(rut, nombre) {
     }
 }
 
-document.getElementById('btnGuardarEdicion')?.addEventListener('click', async () => {
+if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
             nombres: document.getElementById('editNombres').value, 
@@ -1449,7 +1449,7 @@ document.getElementById('btnGuardarEdicion')?.addEventListener('click', async ()
     }
 });
 
-document.getElementById('btnEliminarTrabajador')?.addEventListener('click', async () => {
+if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; 
@@ -1459,7 +1459,7 @@ document.getElementById('btnEliminarTrabajador')?.addEventListener('click', asyn
     }
 });
 
-document.getElementById('btnBloquear')?.addEventListener('click', async () => {
+if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear').addEventListener('click', async () => {
     const motivo = document.getElementById('motivoBloqueo').value.trim(); 
     if(!motivo) return alert("Debes escribir un motivo.");
     
@@ -1472,7 +1472,7 @@ document.getElementById('btnBloquear')?.addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnDesbloquear')?.addEventListener('click', async () => {
+if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').addEventListener('click', async () => {
     if(confirm("¿Quitar de la lista negra?")) {
         await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); 
         delete blacklistGlobal[rutPerfilActual]; 
@@ -1485,7 +1485,7 @@ document.getElementById('btnDesbloquear')?.addEventListener('click', async () =>
 // ==========================================
 // FINANZAS Y BÓVEDA
 // ==========================================
-document.getElementById('finanzas-tab')?.addEventListener('click', async () => {
+if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); 
     if (!snap.exists()) return;
     
@@ -1529,7 +1529,7 @@ document.getElementById('finanzas-tab')?.addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnLiquidarSemana')?.addEventListener('click', async () => {
+if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) {
         return alert("No hay plata retenida.");
     }
@@ -1569,7 +1569,7 @@ document.getElementById('btnLiquidarSemana')?.addEventListener('click', async ()
 
 let modalPagosInstance;
 
-document.getElementById('btnExcelBanco')?.addEventListener('click', async () => {
+if (document.getElementById('btnExcelBanco')) document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     const btn = document.getElementById('btnExcelBanco');
     btn.innerText = "⏳ Buscando pendientes..."; 
     btn.disabled = true;
@@ -1643,7 +1643,7 @@ document.getElementById('btnExcelBanco')?.addEventListener('click', async () => 
     btn.disabled = false;
 });
 
-document.getElementById('btnGenerarNominaBanco')?.addEventListener('click', async () => {
+if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('btnGenerarNominaBanco').addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.check-pago:checked');
     const seleccionados = Array.from(checkboxes).map(cb => cb.value);
 
@@ -1726,7 +1726,7 @@ let deudaEfectivoActual = null;
 let firmaRecicladaBase64 = null;
 
 // Escuchar clic en la pestaña para cargar la lista
-document.getElementById('efectivo-tab')?.addEventListener('click', cargarListaEfectivo);
+if (document.getElementById('efectivo-tab')) document.getElementById('efectivo-tab').addEventListener('click', cargarListaEfectivo);
 
 async function cargarListaEfectivo() {
     let containerLista = document.getElementById('contenedorListaEfectivo');
@@ -1838,7 +1838,7 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
 }
 
 // Cambiar el comportamiento del botón "Buscar" para que filtre la lista renderizada
-document.getElementById('btnBuscarEfectivo')?.addEventListener('click', () => {
+if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
     const term = document.getElementById('rutEfectivo').value.trim().toLowerCase();
     if(!window.deudasEfectivoGlobal) return;
     
@@ -1955,7 +1955,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
     deudaEfectivoActual = deuda;
 };
 
-document.getElementById('btnConfirmarPagoEfectivo')?.addEventListener('click', async () => {
+if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
     let seleccionados = [];
     document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
         seleccionados.push(deudaEfectivoActual.programasDetalle[chk.value]);
@@ -2010,7 +2010,7 @@ document.getElementById('btnConfirmarPagoEfectivo')?.addEventListener('click', a
 });
 
 // --- PESTAÑA EFECTIVO: GESTIÓN DE RECIBOS EN LOTE ---
-document.getElementById('efectivo-tab')?.addEventListener('click', renderPanelRecibosBatch);
+if (document.getElementById('efectivo-tab')) document.getElementById('efectivo-tab').addEventListener('click', renderPanelRecibosBatch);
 
 async function renderPanelRecibosBatch() {
     let container = document.getElementById('panelRecibosBatch');
@@ -2060,7 +2060,7 @@ async function renderPanelRecibosBatch() {
             </div>
         `;
         
-        document.getElementById('btnDescargarZipEfectivo')?.addEventListener('click', async () => {
+        if (document.getElementById('btnDescargarZipEfectivo')) document.getElementById('btnDescargarZipEfectivo').addEventListener('click', async () => {
             const btn = document.getElementById('btnDescargarZipEfectivo');
             btn.innerText = "⏳ Empaquetando ZIP... (Puede tomar unos segundos)";
             btn.disabled = true;
@@ -2131,7 +2131,7 @@ async function renderPanelRecibosBatch() {
             }
         });
         
-        document.getElementById('btnVaciarRecibos')?.addEventListener('click', async () => {
+        if (document.getElementById('btnVaciarRecibos')) document.getElementById('btnVaciarRecibos').addEventListener('click', async () => {
             if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los recibos están guardados en tu dispositivo?\n\nSi aceptas, todos estos registros se esfumarán de la base de datos para no repetirse el próximo mes.`)) {
                 await remove(ref(db, '7_pagos_efectivo'));
                 alert("✅ La Bóveda de Recibos de Efectivo ha sido vaciada.");
@@ -2147,7 +2147,7 @@ setTimeout(renderPanelRecibosBatch, 2500);
 // ==========================================
 // CONTRATOS DT
 // ==========================================
-document.getElementById('contratos-dt-tab')?.addEventListener('click', () => {
+if (document.getElementById('contratos-dt-tab')) document.getElementById('contratos-dt-tab').addEventListener('click', () => {
     document.getElementById('btnCargarContratosDT').click();
 });
 
@@ -2171,7 +2171,7 @@ function getWeekIdentifier(dateStr) {
     return { label: `Semana del ${monStr} al ${sunStr}`, sortKey: sortKey };
 }
 
-document.getElementById('btnCargarContratosDT')?.addEventListener('click', async () => {
+if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').addEventListener('click', async () => {
     const contenedor = document.getElementById('contenedorContratosDT');
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
@@ -2423,7 +2423,7 @@ window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
     }
 }
 
-document.getElementById('btnArchivarContratosDT')?.addEventListener('click', async () => {
+if (document.getElementById('btnArchivarContratosDT')) document.getElementById('btnArchivarContratosDT').addEventListener('click', async () => {
     if (!window.agrupacionDTGlobal || Object.keys(window.agrupacionDTGlobal).length === 0) return;
     
     let updates = {};
@@ -2659,14 +2659,14 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
     }
 }
 
-document.getElementById('seguridad-tab')?.addEventListener('click', cargarReportesDT);
-document.getElementById('btnRefrescarSeguridad')?.addEventListener('click', cargarReportesDT);
+if (document.getElementById('seguridad-tab')) document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
+if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
 
 
 // ==========================================
 // MANTENIMIENTO 
 // ==========================================
-document.getElementById('btnRespaldoMaestro')?.addEventListener('click', async () => {
+if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); 
         if (!snap.exists()) return alert("No hay datos de asistencias.");
@@ -2714,7 +2714,7 @@ document.getElementById('btnRespaldoMaestro')?.addEventListener('click', async (
     }
 });
 
-document.getElementById('btnRespaldoPDFs')?.addEventListener('click', async () => {
+if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnRespaldoPDFs').addEventListener('click', async () => {
     const btn = document.getElementById('btnRespaldoPDFs');
     try {
         btn.innerText = "⏳ Empaquetando PDFs... (Espera)"; 
@@ -2794,11 +2794,11 @@ function resetBtnZip(btn) {
 const inputConfirmar = document.getElementById('inputConfirmarLimpieza'); 
 const btnEjecutar = document.getElementById('btnEjecutarLimpieza');
 
-inputConfirmar?.addEventListener('input', (e) => { 
+if(inputConfirmar) inputConfirmar.addEventListener('input', (e) => { 
     btnEjecutar.disabled = (e.target.value !== "1812"); 
 });
 
-btnEjecutar?.addEventListener('click', async () => {
+if(btnEjecutar) btnEjecutar.addEventListener('click', async () => {
     try {
         await remove(ref(db, '2_asistencias')); 
         await remove(ref(db, '3_reservas'));
@@ -2818,7 +2818,7 @@ btnEjecutar?.addEventListener('click', async () => {
 // ==========================================
 // SORTEO DALE PLAY 
 // ==========================================
-document.getElementById('sorteo-tab')?.addEventListener('click', async () => {
+if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab').addEventListener('click', async () => {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
     contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
     
@@ -2866,7 +2866,7 @@ document.getElementById('sorteo-tab')?.addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnRealizarSorteo')?.addEventListener('click', async () => {
+if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.check-sorteo:checked');
     const fechasSeleccionadas = Array.from(checkboxes).map(cb => cb.value);
     const totalFechasRequeridas = fechasSeleccionadas.length;
@@ -2954,7 +2954,7 @@ async function renderPanelMenoresBatch() {
     if(!mantTab) return;
     
     // INYECCIÓN DE EMERGENCIA
-    let tabPaneEmergencia = document.getElementById('btnRespaldoMaestro')?.closest('.tab-pane') || document.getElementById('btnRespaldoMaestro')?.parentElement.parentElement.parentElement;
+    let tabPaneEmergencia = (document.getElementById('btnRespaldoMaestro') ? document.getElementById('btnRespaldoMaestro').closest('.tab-pane') : null) || (document.getElementById('btnRespaldoMaestro') ? document.getElementById('btnRespaldoMaestro').parentElement.parentElement.parentElement : null);
     if (tabPaneEmergencia && !document.getElementById('btnRestaurarSueldosError')) {
         let divEmergencia = document.createElement('div');
         divEmergencia.className = "mt-4 p-4 shadow-lg w-100 mb-4";
@@ -3035,7 +3035,7 @@ async function renderPanelMenoresBatch() {
             </div>
         `;
         
-        document.getElementById('btnDescargarZipMenores')?.addEventListener('click', async () => {
+        if (document.getElementById('btnDescargarZipMenores')) document.getElementById('btnDescargarZipMenores').addEventListener('click', async () => {
             const btn = document.getElementById('btnDescargarZipMenores');
             btn.innerText = "⏳ Empaquetando ZIP de Menores...";
             btn.disabled = true;
@@ -3114,7 +3114,7 @@ La presente autorización es válida para el período en curso.`;
             }
         });
         
-        document.getElementById('btnVaciarMenores')?.addEventListener('click', async () => {
+        if (document.getElementById('btnVaciarMenores')) document.getElementById('btnVaciarMenores').addEventListener('click', async () => {
             if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los permisos están guardados?\n\nSi aceptas, estos registros se eliminarán de la base de datos para no mezclarse con los de mañana.`)) {
                 await remove(ref(db, '8_autorizaciones_menores'));
                 alert("✅ Carpeta de permisos de menores ha sido vaciada.");
@@ -3181,7 +3181,7 @@ document.body.addEventListener('click', async (e) => {
 });
 
 // Inicializar
-document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
+if (document.getElementById('mantenimiento-tab')) document.getElementById('mantenimiento-tab').addEventListener('click', renderPanelMenoresBatch);
 setTimeout(renderPanelMenoresBatch, 3000);
 
 
