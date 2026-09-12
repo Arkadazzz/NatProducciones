@@ -6,6 +6,7 @@
     <title>Acreditación | Nat Producciones</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
     <style>
         body { background-color: #0a0a0a; color: #ffffff; font-family: 'Segoe UI', system-ui, sans-serif; padding-bottom: 50px; }
         .card-panel { background: #141414; border-radius: 15px; border: 1px solid #2a2a2a; padding: 25px; margin-top: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -49,6 +50,16 @@
                     <select id="tipoIngreso" class="form-select" required>
                         <option value="Pago">🎟️ Público General (I/P)</option>
                         <option value="Cortesía">⭐ Invitado de Cortesía</option>
+                    </select>
+                </div>
+
+                <!-- CONTENEDOR DE OPCIÓN VEGETARIANO (OCULTO POR DEFECTO) -->
+                <div id="divOpcionVeggie" class="col-12 mb-3 mt-2 d-none p-3 rounded" style="background: rgba(0, 210, 106, 0.1); border: 1px dashed #00d26a;">
+                    <label class="form-label text-success fw-bold">🍱 Menú de Almuerzo</label>
+                    <p class="small text-muted mb-2">Este evento incluye almuerzo. Por favor indícanos tu preferencia:</p>
+                    <select id="opcionVegetariano" class="form-select border-success">
+                        <option value="Normal">Menú Normal (No Vegano/Vegetariano)</option>
+                        <option value="Si">🥬 Menú Vegetariano / Vegano</option>
                     </select>
                 </div>
             </div>
@@ -331,12 +342,23 @@
     function initSignatureApoderado() {
         if(!signaturePadApoderado) {
             const canvasApo = document.getElementById('signature-pad-apoderado');
-            const ratioApo = Math.max(window.devicePixelRatio || 1, 1);
-            canvasApo.width = canvasApo.offsetWidth * ratioApo;
-            canvasApo.height = canvasApo.offsetHeight * ratioApo;
-            canvasApo.getContext("2d").scale(ratioApo, ratioApo);
-            signaturePadApoderado = new SignaturePad(canvasApo, { backgroundColor: 'rgb(255, 255, 255)' });
-            window.signaturePadApoderado = signaturePadApoderado;
+            if(canvasApo) {
+                const ratioApo = Math.max(window.devicePixelRatio || 1, 1);
+                canvasApo.width = canvasApo.offsetWidth * ratioApo;
+                canvasApo.height = canvasApo.offsetHeight * ratioApo;
+                canvasApo.getContext("2d").scale(ratioApo, ratioApo);
+                signaturePadApoderado = new SignaturePad(canvasApo, { backgroundColor: 'rgb(255, 255, 255)' });
+                window.signaturePadApoderado = signaturePadApoderado;
+            }
+        } else {
+            const canvasApo = document.getElementById('signature-pad-apoderado');
+            if(canvasApo) {
+                const ratioApo = Math.max(window.devicePixelRatio || 1, 1);
+                canvasApo.width = canvasApo.offsetWidth * ratioApo;
+                canvasApo.height = canvasApo.offsetHeight * ratioApo;
+                canvasApo.getContext("2d").scale(ratioApo, ratioApo);
+                signaturePadApoderado.clear();
+            }
         }
     }
 
@@ -358,7 +380,7 @@
             esMenorEdad = true;
             secApo.classList.remove('d-none');
             reqFields.forEach(id => document.getElementById(id).required = true);
-            setTimeout(initSignatureApoderado, 200);
+            setTimeout(initSignatureApoderado, 300); // 300ms de retraso para asegurar que el div es visible antes de medir el canvas
         } else {
             esMenorEdad = false;
             secApo.classList.add('d-none');
@@ -378,21 +400,17 @@
         }
 
         if (source) {
-            const margin = 20; // Margen blanco para que el escáner lea rápido
-            const size = 200; // Tamaño del QR
+            const margin = 20; 
+            const size = 200; 
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = size + (margin * 2);
             tempCanvas.height = size + (margin * 2);
             const ctx = tempCanvas.getContext('2d');
 
-            // 1. Forzar un fondo 100% blanco puro
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-
-            // 2. Dibujar el QR encima del fondo blanco
             ctx.drawImage(source, margin, margin, size, size);
 
-            // 3. Descargar como JPG (El formato JPG no soporta transparencia, matando el bug del fondo negro)
             const a = document.createElement('a');
             a.href = tempCanvas.toDataURL("image/jpeg", 1.0);
             a.download = `QR_Acceso_NAT_${rut}.jpg`;
@@ -402,7 +420,7 @@
         }
     };
 
-    // 1. CARGAR PROGRAMAS ACTIVOS CON BOTONES (OPCIONES ABIERTAS)
+    // 1. CARGAR PROGRAMAS ACTIVOS CON BOTONES
     onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
         const container = document.getElementById('programaSelectContainer');
         container.innerHTML = '';
@@ -422,7 +440,6 @@
                 `;
             }
             
-            // Re-vincular la lógica de bloqueo al cambiar de botón
             document.querySelectorAll('input[name="programaRadio"]').forEach(radio => {
                 radio.addEventListener('change', actualizarFormulario);
             });
@@ -439,6 +456,7 @@
     const seccionBancaria = document.getElementById('seccionBancaria');
     const invitadoPorInput = document.getElementById('invitadoPor');
     const pinInput = document.getElementById('pinAcceso');
+    const divOpcionVeggie = document.getElementById('divOpcionVeggie');
     
     const camposBancarios = ['afp', 'salud', 'banco', 'tipoCuenta', 'numeroCuenta'];
 
@@ -446,16 +464,32 @@
         const radioSeleccionado = document.querySelector('input[name="programaRadio"]:checked');
         const progClave = radioSeleccionado ? radioSeleccionado.value : null;
         
-        // Bloquear cortesía si es Dale Play
+        let permiteCortesia = true;
+        let tieneAlmuerzo = false;
+
         if (progClave && programasDisponibles[progClave]) {
-            if (programasDisponibles[progClave].nombre.includes("Dale Play")) {
+            const prog = programasDisponibles[progClave];
+            
+            if (prog.nombre.includes("Dale Play")) {
                 tipoIngreso.value = "Pago";
                 tipoIngreso.options[1].disabled = true;
                 tipoIngreso.options[1].style.display = "none";
+                permiteCortesia = false;
             } else {
                 tipoIngreso.options[1].disabled = false;
                 tipoIngreso.options[1].style.display = "";
             }
+
+            if (prog.incluye_almuerzo === true) {
+                tieneAlmuerzo = true;
+            }
+        }
+        
+        if(tieneAlmuerzo) {
+            divOpcionVeggie.classList.remove('d-none');
+        } else {
+            divOpcionVeggie.classList.add('d-none');
+            document.getElementById('opcionVegetariano').value = "Normal"; 
         }
         
         const tipo = tipoIngreso.value;
@@ -506,6 +540,10 @@
                     document.getElementById('apellidoPaterno').value = apellidosArr[0] || '';
                     document.getElementById('apellidoMaterno').value = apellidosArr.slice(1).join(' ') || '';
                     document.getElementById('fechaNac').value = d.fechaNacimiento || '';
+                    
+                    // Trigger manual change for age calc
+                    document.getElementById('fechaNac').dispatchEvent(new Event('change'));
+
                     document.getElementById('telefono').value = d.telefono || '';
                     document.getElementById('email').value = d.email || '';
                     
@@ -564,7 +602,7 @@
             const tipo = tipoIngreso.value;
 
             if (esMenorEdad && (!signaturePadApoderado || signaturePadApoderado.isEmpty())) {
-                alert("❌ El apoderado o tutor legal debe firmar la autorización notarial de trabajo.");
+                alert("❌ El apoderado o tutor legal debe firmar la autorización notarial de trabajo en el recuadro blanco.");
                 throw new Error("Falta firma apoderado");
             }
             if (tipo === "Pago" && prog.pin) {
@@ -637,10 +675,12 @@
                 });
             }
             
+            let esVegano = document.getElementById('opcionVegetariano').value;
             await set(ref(db, `3_reservas/${prog.fecha}/${prog.nombre}/${rut}`), {
                 rut: rut,
                 tipo: tipo,
-                invitado_por: tipo === "Cortesía" ? invitadoPorInput.value : ""
+                invitado_por: tipo === "Cortesía" ? invitadoPorInput.value : "",
+                vegetariano: prog.incluye_almuerzo ? esVegano : false
             });
 
             document.getElementById('form-container').classList.add('d-none');
