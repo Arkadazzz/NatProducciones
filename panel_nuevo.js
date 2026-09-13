@@ -445,13 +445,7 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
     const now = new Date();
     const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬
-
-¿Cerrar la jornada y dar por terminado el evento?
-
-El sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.
-
-¿Proceder?`)) return;
+    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
 
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
@@ -1297,9 +1291,7 @@ window.verPerfil = function(rut) {
 
 
 window.forzarIngresoPasado = async function(rut, nombre) {
-    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.
-
-Ingresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
+    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.\n\nIngresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
     if(!fec) return;
     
     let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Detrás del Muro):", "Detrás del Muro");
@@ -1339,8 +1331,7 @@ Ingresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[
             ingreso_administrativo: true
         });
         
-        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.
-Si vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
+        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.\nSi vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
         
     } catch(e) {
         alert("Error al inyectar: " + e.message);
@@ -1377,8 +1368,7 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
 });
 
 if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
-    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨
-Esto borrará a la persona de la base de datos para siempre.")) {
+    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; 
         renderCRM(listaGlobalCRM); 
@@ -1464,9 +1454,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
         return alert("No hay plata retenida.");
     }
     
-    if (!confirm(`🚨 ATENCIÓN 🚨
-
-¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
+    if (!confirm(`🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
     
     const fechaHoy = new Date().toISOString().split('T')[0];
     let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
@@ -3055,11 +3043,7 @@ La presente autorización es válida para el período en curso.`;
         });
         
         if (document.getElementById('btnVaciarMenores')) document.getElementById('btnVaciarMenores').addEventListener('click', async () => {
-            if(confirm(`⚠️ ALERTA DE BORRADO ⚠️
-
-¿Confirmas que abriste el archivo ZIP y los permisos están guardados?
-
-Si aceptas, estos registros se eliminarán de la base de datos para no mezclarse con los de mañana.`)) {
+            if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los permisos están guardados?\n\nSi aceptas, estos registros se eliminarán de la base de datos para no mezclarse con los de mañana.`)) {
                 await remove(ref(db, '8_autorizaciones_menores'));
                 alert("✅ Carpeta de permisos de menores ha sido vaciada.");
                 renderPanelMenoresBatch();
