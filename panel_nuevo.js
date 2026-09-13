@@ -104,11 +104,7 @@ function poblarSelectoresHora() {
 }
 poblarSelectoresHora();
 
-get(ref(db, '1_trabajadores')).then(snap => { 
-    if (snap.exists()) {
-        listaGlobalCRM = snap.val(); 
-    }
-});
+
 
 // ==========================================
 // CIERRE CONTABLE MENSUAL (CONTADOR)
@@ -268,8 +264,7 @@ if (btnDescargarMesElegido) {
                 }
             }
             
-            let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico
-";
+            let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
             
             const trabSnap = await get(ref(db, '1_trabajadores'));
             const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
@@ -290,8 +285,7 @@ if (btnDescargarMesElegido) {
                 const strIng = `${String(fIng.getDate()).padStart(2,'0')}-${String(fIng.getMonth()+1).padStart(2,'0')}-${fIng.getFullYear()}`;
                 const strSal = `${String(fSal.getDate()).padStart(2,'0')}-${String(fSal.getMonth()+1).padStart(2,'0')}-${fSal.getFullYear()}`;
                 
-                csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}
-`;
+                csv += `${r};${parts[0]};${parts[1]||''};${tr.nombres} ${tr.apellidos};${aps[0]};${aps.slice(1).join(' ')};${tr.nombres};${d?d+'-'+m+'-'+y:''};${strIng};${strSal};${tr.sexo||''};extra publico (televisión);;${tr.direccion||''};;Santiago;Pesos;${tot[r].monto};${tr.afp||''};${tr.salud||''};${tr.telefono||''};${tr.email||''}\n`;
             }
             
             const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -1475,8 +1469,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
 ¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
     
     const fechaHoy = new Date().toISOString().split('T')[0];
-    let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario
-";
+    let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
     let actualizacionesFirebase = {};
     
     const trabSnap = await get(ref(db, '1_trabajadores')); 
@@ -1488,8 +1481,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
-            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT
-`; 
+            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${deuda.monto};;${tr.email || ''};;Pago Acumulado;PAGO NAT\n`; 
         }
         for (const ruta of deuda.rutas_bd) { 
             actualizacionesFirebase[`${ruta}/estado_pago`] = "Pagado"; 
@@ -1623,8 +1615,7 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
             }
         });
 
-        let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario
-";
+        let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
 
         for (const rut in agrupacionPagos) {
             const datosPago = agrupacionPagos[rut]; 
@@ -1632,8 +1623,7 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
             const rutSin = rut.replace(/[^0-9kK]/g, ''); 
             const glosaProg = datosPago.programas.join(', ').substring(0, 40);
             
-            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${datosPago.montoTotal};;${tr.email || ''};;${glosaProg};PAGO NAT
-`;
+            csv += `96225970;CLP;${tr.numeroCuenta || ''};CLP;${mapaBancos[tr.banco] || ''};${rutSin};${tr.nombres} ${tr.apellidos};${datosPago.montoTotal};;${tr.email || ''};;${glosaProg};PAGO NAT\n`;
             
             datosPago.rutasFirebase.forEach(ruta => { 
                 actualizacionesFirebase[ruta] = "Pagado"; 
@@ -3204,7 +3194,7 @@ async function cargarPanelCesiones() {
                                     <strong class="text-white fs-5">${fecha.split('-').reverse().join('-')}</strong><br>
                                     <span class="badge bg-secondary">${cantidad} personas registradas</span>
                                 </div>
-                                <button class="btn btn-warning fw-bold text-dark shadow-sm" onclick="window.descargarZIPCpciones('${prog}', '${fecha}')">
+                                <button class="btn btn-warning fw-bold text-dark shadow-sm" onclick="window.descargarZIPCpciones(event, '${prog}', '${fecha}')">
                                     📥 Descargar ZIP de Cesiones
                                 </button>
                             </li>`;
@@ -3223,7 +3213,7 @@ async function cargarPanelCesiones() {
     }
 }
 
-window.descargarZIPCpciones = async function(prog, fecha) {
+window.descargarZIPCpciones = async function(event, prog, fecha) {
     const btnId = event.target;
     const textoOriginal = btnId.innerText;
     btnId.innerText = "⏳ Generando PDFs...";
@@ -3347,4 +3337,3 @@ if (tabMant) {
     tabMant.addEventListener('click', renderPanelMenoresBatch);
 }
 setTimeout(renderPanelMenoresBatch, 3000);
-
