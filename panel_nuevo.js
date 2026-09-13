@@ -7,7 +7,7 @@ import { getDatabase, ref, get, set, remove, child, onValue, update } from "http
 // FIRMA LEGAL DE PRODUCCIÓN (CAMILA FEVRE)
 // ==========================================
 // Pega aquí adentro de las comillas tu código Base64 de la firma de Camila.
-const FIRMA_CAMILA_BASE64 = "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";
+const FIRMA_CAMILA_BASE64 = "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";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
@@ -528,8 +528,8 @@ function activarRadares() {
         reservasGlobales = snapshot.exists() ? snapshot.val() : {};
         totalEsperados = Object.keys(reservasGlobales).length; 
         
-        totalIP = 0;
-        totalCortesia = 0;
+        let totalIP = 0;
+        let totalCortesia = 0;
         for (const r in reservasGlobales) {
             if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
             else totalIP++;
@@ -677,7 +677,9 @@ function actualizarTablero() {
         let faltanIP = 0;
         let faltanCortesia = 0;
         let htmlFaltantes = "";
-        let esDalePlay = nombrePrograma.includes("Dale Play");
+        
+        // Coliseo también se comporta sin cortesías en el tablero principal
+        let esDalePlay = nombrePrograma.includes("Dale Play") || nombrePrograma.includes("Coliseo");
 
         for (const rut in reservasGlobales) {
             if (!asistenciasGlobales[rut]) {
@@ -888,7 +890,13 @@ async function onScanSuccess(decodedText) {
             document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
             
-            const esCortesia = reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía";
+            let esCortesia = reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía";
+            
+            // FORZAR I/P Y CONTRATO SI ES COLISEO
+            if (nombrePrograma.includes("Coliseo")) {
+                esCortesia = false; 
+            }
+
             infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
 
             const opcionesDiv = document.getElementById('opcionesFirmaAdmin');
@@ -912,12 +920,16 @@ async function onScanSuccess(decodedText) {
                     </select>
                 `;
             } else {
+                let isColiseo = nombrePrograma.includes("Coliseo");
+                let disabledAttr = isColiseo ? "disabled" : "";
+                let extraText = isColiseo ? "<small class='text-warning fw-bold'>Bloqueado: Contrato obligatorio para Coliseo.</small>" : "<small class='text-muted'>Si lo apagas, solo firmará Cesión de Imagen.</small>";
+
                 opcionesDiv.innerHTML = `
                     <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="checkAplicaContrato" checked style="transform: scale(1.3); margin-right: 10px;">
+                        <input class="form-check-input" type="checkbox" id="checkAplicaContrato" checked ${disabledAttr} style="transform: scale(1.3); margin-right: 10px;">
                         <label class="form-check-label text-white fw-bold" for="checkAplicaContrato">Generar Contrato Laboral DT</label>
                     </div>
-                    <small class="text-muted">Si lo apagas, solo firmará Cesión de Imagen.</small>
+                    ${extraText}
                 `;
             }
 
@@ -967,6 +979,10 @@ document.getElementById('btnGuardarIngreso').addEventListener('click', async () 
         aplicaContrato = false; 
     } else {
         aplicaContrato = document.getElementById('checkAplicaContrato') ? document.getElementById('checkAplicaContrato').checked : true;
+    }
+
+    if (nombrePrograma.includes("Coliseo")) {
+        aplicaContrato = true;
     }
 
     try {
@@ -1445,7 +1461,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        const tr = listaGlobalCRM[rut] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
+        const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
@@ -1626,7 +1642,8 @@ let deudaEfectivoActual = null;
 let firmaRecicladaBase64 = null;
 
 // Escuchar clic en la pestaña para cargar la lista
-document.getElementById('efectivo-tab')?.addEventListener('click', cargarListaEfectivo);
+const tabEfectivo = document.getElementById('efectivo-tab');
+if (tabEfectivo) tabEfectivo.addEventListener('click', cargarListaEfectivo);
 
 async function cargarListaEfectivo() {
     let containerLista = document.getElementById('contenedorListaEfectivo');
@@ -1828,7 +1845,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
                 <span class="fw-bold fs-5 text-warning">⚠️ Sin Firma Previa</span><br>
                 <small class="text-white">Esta persona no firmó en la puerta. <br><b>Por favor, que firme ahora en el recuadro blanco para entregarle su dinero.</b></small>
             </div>`;
-        if(signaturePadEfectivo) {
+        if(typeof signaturePadEfectivo !== "undefined") {
             signaturePadEfectivo.clear();
             setTimeout(() => {
                 const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
@@ -1838,12 +1855,6 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
                 signaturePadEfectivo.clear();
             }, 300);
         }
-    } else {
-        msgDiv.innerHTML = `
-            <div class="alert alert-danger mt-2 p-3 text-center">
-                <span class="fw-bold fs-5">⚠️ Sin Firma Digital</span><br>
-                <small>La persona no firmó al entrar. El comprobante de dinero se guardará sin firma.</small>
-            </div>`;
     }
 
     document.getElementById('panelPagoEfectivo').classList.remove('d-none');
@@ -1882,7 +1893,7 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
             rut: rutEfectivoActual,
             monto: deudaEfectivoActual.montoCalculado,
             fecha: nowIso,
-            firma: firmaRecicladaBase64 || signaturePadEfectivo.toDataURL("image/jpeg"),
+            firma: firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" ? signaturePadEfectivo.toDataURL("image/jpeg") : ""),
             programas: nombresProgramas
         });
         
@@ -1910,7 +1921,7 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
 });
 
 // --- PESTAÑA EFECTIVO: GESTIÓN DE RECIBOS EN LOTE ---
-document.getElementById('efectivo-tab')?.addEventListener('click', renderPanelRecibosBatch);
+if (tabEfectivo) tabEfectivo.addEventListener('click', renderPanelRecibosBatch);
 
 async function renderPanelRecibosBatch() {
     let container = document.getElementById('panelRecibosBatch');
@@ -2736,7 +2747,7 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
         
         for (const fecha in todas) {
             for (const prog in todas[fecha]) {
-                if (prog.includes("Dale Play")) {
+                if (prog.includes("Dale Play") || prog.includes("Coliseo")) {
                     if (!fechasUsadas[fecha] && !fechasDalePlay.includes(fecha)) {
                         fechasDalePlay.push(fecha);
                     }
@@ -2754,7 +2765,7 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
             <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px; width: 100%; max-width: 260px;">
                 <input class="form-check-input check-sorteo" type="checkbox" value="${fecha}" id="chk_${fecha}" checked style="transform: scale(1.4); margin-top: 8px; cursor: pointer;">
                 <label class="form-check-label fw-bold ms-2 text-white" for="chk_${fecha}" style="cursor: pointer; width: 100%;">
-                    🎬 Dale Play<br><small class="text-warning">${fecha}</small>
+                    🎬 Dale Play / Coliseo<br><small class="text-warning">${fecha}</small>
                 </label>
             </div>`;
         });
@@ -2796,7 +2807,7 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
             fechasSeleccionadas.forEach(fecha => {
                 let asistioEnEstaFecha = false;
                 for (const prog in todas[fecha]) {
-                    if (prog.includes("Dale Play") && todas[fecha][prog][rut]) {
+                    if ((prog.includes("Dale Play") || prog.includes("Coliseo")) && todas[fecha][prog][rut]) {
                         asistioEnEstaFecha = true;
                     }
                 }
@@ -2854,7 +2865,13 @@ async function renderPanelMenoresBatch() {
     if(!mantTab) return;
     
     // INYECCIÓN DE EMERGENCIA
-    let tabPaneEmergencia = document.getElementById('btnRespaldoMaestro')?.closest('.tab-pane') || document.getElementById('btnRespaldoMaestro')?.parentElement.parentElement.parentElement;
+    let tabPaneEmergencia = document.getElementById('btnRespaldoMaestro') ? document.getElementById('btnRespaldoMaestro').closest('.tab-pane') : null;
+    if (!tabPaneEmergencia) {
+        try {
+            tabPaneEmergencia = document.getElementById('btnRespaldoMaestro').parentElement.parentElement.parentElement;
+        } catch(e){}
+    }
+    
     if (tabPaneEmergencia && !document.getElementById('btnRestaurarSueldosError')) {
         let divEmergencia = document.createElement('div');
         divEmergencia.className = "mt-4 p-4 shadow-lg w-100 mb-4";
@@ -2873,11 +2890,10 @@ async function renderPanelMenoresBatch() {
 
     let container = document.getElementById('panelMenoresBatch');
     if (!container) {
-        // Buscar el contenedor padre real de la pestaña Mantenimiento (normalmente el tab-pane)
         let baseEl = document.getElementById('btnRespaldoMaestro');
         if (baseEl) {
-            // Subimos hasta encontrar el row principal o el tab-pane para que ocupe todo el ancho
-            let tabPane = baseEl.closest('.tab-pane') || baseEl.parentElement.parentElement.parentElement;
+            let tabPane = baseEl.closest('.tab-pane');
+            if(!tabPane) tabPane = baseEl.parentElement.parentElement.parentElement;
             container = document.createElement('div');
             container.id = 'panelMenoresBatch';
             container.className = 'card bg-dark border-warning mt-5 p-4 shadow-lg w-100';
@@ -3081,5 +3097,8 @@ document.body.addEventListener('click', async (e) => {
 });
 
 // Inicializar
-document.getElementById('mantenimiento-tab')?.addEventListener('click', renderPanelMenoresBatch);
+const tabMant = document.getElementById('mantenimiento-tab');
+if (tabMant) {
+    tabMant.addEventListener('click', renderPanelMenoresBatch);
+}
 setTimeout(renderPanelMenoresBatch, 3000);
