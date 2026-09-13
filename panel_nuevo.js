@@ -104,9 +104,15 @@ function poblarSelectoresHora() {
 }
 poblarSelectoresHora();
 
-get(ref(db, '1_trabajadores')).then(snap => { 
-    if (snap.exists()) {
-        listaGlobalCRM = snap.val(); 
+// CORRECCIÓN 1: Cargar CRM y Blacklist al iniciar la página para que la tabla no quede en negro
+Promise.all([ 
+    get(ref(db, '1_trabajadores')), 
+    get(ref(db, '4_blacklist')) 
+]).then(([trabSnap, blackSnap]) => {
+    listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; 
+    blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
+    if (typeof renderCRM === "function" && document.getElementById('tablaCRM')) {
+        renderCRM(listaGlobalCRM);
     }
 });
 
@@ -268,7 +274,7 @@ if (btnDescargarMesElegido) {
                 }
             }
             
-            let csv = "\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+            let csv = `\uFEFFRUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n`;
             
             const trabSnap = await get(ref(db, '1_trabajadores'));
             const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
@@ -786,7 +792,7 @@ window.descargarListaCanal = function() {
     if (!reservasGlobales || Object.keys(reservasGlobales).length === 0) {
         return alert("No hay personas inscritas en el formulario todavía.");
     }
-    let csv = "\uFEFFESTADO;RUT;NOMBRES;APELLIDOS;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n";
+    let csv = `\uFEFFESTADO;RUT;NOMBRES;APELLIDOS;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n`;
     
     for (const rut in reservasGlobales) {
         const res = reservasGlobales[rut];
@@ -1002,7 +1008,7 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
             estado_dt: "Pendiente" 
         });
         
-        document.getElementById('seccionFirma').classList.add('d-none'); 
+        if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.add('d-none'); 
         signaturePad.clear(); 
         try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
         rutActual = "";
@@ -1022,7 +1028,7 @@ window.anularAsistencia = async function(rut) {
 // ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
-    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
+    const asisSnap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     
@@ -1073,7 +1079,7 @@ TERCERO. Se deja expresa constancia de que la participación es voluntaria y no 
         titulo = "Contrato de Trabajo Extras Público (Televisión)";
         textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por don/a Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${nombreCompleto}, de nacionalidad chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '___________________________'}, domiciliado/a en ${direccion}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
 
-PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, entre el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
+PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la production "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, entre el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
 SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
@@ -1238,6 +1244,7 @@ window.verPerfil = function(rut) {
                     <option value="COLMENA" ${p.salud==='COLMENA'?'selected':''}>Colmena</option>
                     <option value="CONSALUD" ${p.salud==='CONSALUD'?'selected':''}>Consalud</option>
                     <option value="CRUZBLANCA" ${p.salud==='CRUZBLANCA'?'selected':''}>Cruz Blanca</option>
+                    <option value="ESENCIAL" ${p.salud==='ESENCIAL'?'selected':''}>Esencial</option>
                     <option value="NUEVAMASVIDA" ${p.salud==='NUEVAMASVIDA'?'selected':''}>Nueva Masvida</option>
                     <option value="VIDATRES" ${p.salud==='VIDATRES'?'selected':''}>Vida Tres</option>
                 </select>
@@ -1459,7 +1466,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     if (!confirm(`🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
     
     const fechaHoy = new Date().toISOString().split('T')[0];
-    let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
+    let csv = `\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n`;
     let actualizacionesFirebase = {};
     
     const trabSnap = await get(ref(db, '1_trabajadores')); 
@@ -1605,7 +1612,7 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
             }
         });
 
-        let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
+        let csv = `\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n`;
 
         for (const rut in agrupacionPagos) {
             const datosPago = agrupacionPagos[rut]; 
@@ -1646,6 +1653,18 @@ function descargarCSV(c, n) {
 let rutEfectivoActual = "";
 let deudaEfectivoActual = null;
 let firmaRecicladaBase64 = null;
+
+let signaturePadEfectivo = null;
+setTimeout(() => {
+    const canvasEfe = document.getElementById('signature-pad-efectivo');
+    if (canvasEfe) {
+        const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
+        canvasEfe.width = canvasEfe.offsetWidth * ratioEfe;
+        canvasEfe.height = canvasEfe.offsetHeight * ratioEfe;
+        canvasEfe.getContext("2d").scale(ratioEfe, ratioEfe);
+        signaturePadEfectivo = new SignaturePad(canvasEfe, { backgroundColor: 'rgb(255, 255, 255)' });
+    }
+}, 1500);
 
 // Escuchar clic en la pestaña para cargar la lista
 const tabEfectivo = document.getElementById('efectivo-tab');
@@ -1853,7 +1872,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
                 <span class="fw-bold fs-5 text-warning">⚠️ Sin Firma Previa</span><br>
                 <small class="text-white">Esta persona no firmó en la puerta. <br><b>Por favor, que firme ahora en el recuadro blanco para entregarle su dinero.</b></small>
             </div>`;
-        if(typeof signaturePadEfectivo !== "undefined") {
+        if(typeof signaturePadEfectivo !== "undefined" && signaturePadEfectivo) {
             signaturePadEfectivo.clear();
             setTimeout(() => {
                 if (canvasElement) {
@@ -1862,7 +1881,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
                     canvasElement.height = canvasElement.offsetHeight * ratioEfe;
                     canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
                 }
-                signaturePadEfectivo.clear();
+                if (signaturePadEfectivo) signaturePadEfectivo.clear();
             }, 300);
         }
     }
@@ -1903,7 +1922,7 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
             rut: rutEfectivoActual,
             monto: deudaEfectivoActual.montoCalculado,
             fecha: nowIso,
-            firma: firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" ? signaturePadEfectivo.toDataURL("image/jpeg") : ""),
+            firma: firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" && signaturePadEfectivo ? signaturePadEfectivo.toDataURL("image/jpeg") : ""),
             programas: nombresProgramas
         });
         
@@ -3054,7 +3073,7 @@ La presente autorización es válida para el período en curso.`;
         
     } catch(e) {
         console.error("Error cargando menores:", e);
-        container.innerHTML = `<div class="text-danger text-center fw-bold">❌ Error al cargar permisos.<br><small class="text-muted">${e.message}</small></div>`;
+        if (container) container.innerHTML = `<div class="text-danger text-center fw-bold">❌ Error al cargar permisos.<br><small class="text-muted">${e.message}</small></div>`;
     }
 }
 
@@ -3072,13 +3091,17 @@ document.body.addEventListener('click', async (e) => {
         
         try {
             const btn = document.getElementById('btnRestaurarSueldosError');
-            btn.innerText = "⏳ Restaurando...";
-            btn.disabled = true;
+            if(btn) {
+                btn.innerText = "⏳ Restaurando...";
+                btn.disabled = true;
+            }
             
             const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
             if (!snap.exists()) {
-                btn.innerText = "💰 Restaurar Sueldos a $10.000";
-                btn.disabled = false;
+                if(btn) {
+                    btn.innerText = "💰 Restaurar Sueldos a $10.000";
+                    btn.disabled = false;
+                }
                 return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos (ej: 'Detrás del Muro').");
             }
             
@@ -3099,13 +3122,17 @@ document.body.addEventListener('click', async (e) => {
             } else {
                 alert("No habían personas de pago en esa sala.");
             }
-            btn.innerText = "💰 Restaurar Sueldos a $10.000";
-            btn.disabled = false;
+            if(btn) {
+                btn.innerText = "💰 Restaurar Sueldos a $10.000";
+                btn.disabled = false;
+            }
         } catch(err) {
             alert("Error: " + err.message);
             const btn = document.getElementById('btnRestaurarSueldosError');
-            btn.innerText = "💰 Restaurar Sueldos a $10.000";
-            btn.disabled = false;
+            if(btn) {
+                btn.innerText = "💰 Restaurar Sueldos a $10.000";
+                btn.disabled = false;
+            }
         }
     }
 });
