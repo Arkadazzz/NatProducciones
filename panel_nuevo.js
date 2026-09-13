@@ -2,7 +2,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebas
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getDatabase, ref, get, set, remove, child, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 
-
 // ==========================================
 // FIRMA LEGAL DE PRODUCCIÓN (CAMILA FEVRE)
 // ==========================================
@@ -316,6 +315,7 @@ if (tabFinanzas) {
 // ==========================================
 onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     const container = document.getElementById('contenedorProgramasActivos'); 
+    if(!container) return;
     container.innerHTML = "";
     
     if (snapshot.exists()) {
@@ -449,13 +449,7 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
     const now = new Date();
     const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬
-
-¿Cerrar la jornada y dar por terminado el evento?
-
-El sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.
-
-¿Proceder?`)) return;
+    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
 
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
@@ -489,8 +483,7 @@ El sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extra
 
             if (Object.keys(actualizacionesFirebase).length > 0) {
                 await update(ref(db), actualizacionesFirebase);
-                alert(`✅ Checkout Masivo Exitoso.
-Se calculó la salida y el pago a ${procesados} personas.`);
+                alert(`✅ Checkout Masivo Exitoso.\nSe calculó la salida y el pago a ${procesados} personas.`);
             }
         }
         await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
@@ -667,14 +660,14 @@ function activarRadares() {
         window.siguienteTicketAutomatico = maxNumero + 1;
         
         if (nombrePrograma.includes("Detrás del Muro")) {
-            document.getElementById('seccionConteoInvitados').classList.remove('d-none');
+            if (document.getElementById('seccionConteoInvitados')) document.getElementById('seccionConteoInvitados').classList.remove('d-none');
             let htmlConteo = "";
             for(const staff in conteoStaff) {
                 htmlConteo += `<span class="badge bg-dark border border-warning fs-6 text-white">${staff}: <b class="text-warning fs-5 ms-1">${conteoStaff[staff]}</b></span>`;
             }
-            document.getElementById('listaConteoInvitados').innerHTML = htmlConteo || "<small style='color: #aaaaaa;'>Nadie ha llegado.</small>";
+            if (document.getElementById('listaConteoInvitados')) document.getElementById('listaConteoInvitados').innerHTML = htmlConteo || "<small style='color: #aaaaaa;'>Nadie ha llegado.</small>";
         } else { 
-            document.getElementById('seccionConteoInvitados').classList.add('d-none'); 
+            if (document.getElementById('seccionConteoInvitados')) document.getElementById('seccionConteoInvitados').classList.add('d-none'); 
         }
     };
 }
@@ -714,11 +707,11 @@ function actualizarTablero() {
         }
 
         if (esDalePlay) {
-            document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
-            document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
+            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
+            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
         } else {
-            document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
-            document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
+            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
+            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
         }
         
         let faltan = totalEsperados - totalFirmados; 
@@ -731,7 +724,7 @@ function actualizarTablero() {
             textoFaltan += `<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:2px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:1px;">¡EN CAMINO!</span>`;
         }
         
-        document.getElementById('contFaltan').innerHTML = textoFaltan;
+        if (document.getElementById('contFaltan')) document.getElementById('contFaltan').innerHTML = textoFaltan;
 
         let divFaltantes = document.getElementById('listaFaltantesPanel');
         if(!divFaltantes) {
@@ -740,15 +733,15 @@ function actualizarTablero() {
             divFaltantes.className = 'mt-3 mb-4';
             
             const seccionLista = document.getElementById('seccionLista');
-            const tableResp = seccionLista.querySelector('.table-responsive');
+            const tableResp = seccionLista ? seccionLista.querySelector('.table-responsive') : null;
             if(tableResp) {
                 seccionLista.insertBefore(divFaltantes, tableResp);
-            } else {
+            } else if (seccionLista) {
                 seccionLista.prepend(divFaltantes);
             }
         }
 
-        if (!divFaltantes.innerHTML.includes('accFaltantes')) {
+        if (divFaltantes && !divFaltantes.innerHTML.includes('accFaltantes')) {
             divFaltantes.innerHTML = `
                 <div class="accordion shadow-sm" id="accFaltantes">
                   <div class="accordion-item" style="background: #1a0a0a; border: 1px solid #ff3333;">
@@ -894,7 +887,7 @@ async function onScanSuccess(decodedText) {
         if (snapshot.exists()) {
             const datos = snapshot.val(); 
             listaGlobalCRM[rutActual] = datos; 
-            document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
+            if (document.getElementById('nombreAsistenteDisplay')) document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
             
             let esCortesia = reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía";
@@ -904,14 +897,14 @@ async function onScanSuccess(decodedText) {
                 esCortesia = false; 
             }
 
-            infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
+            if (infoInvitado) infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
 
             const opcionesDiv = document.getElementById('opcionesFirmaAdmin');
-            opcionesDiv.classList.remove('d-none');
+            if (opcionesDiv) opcionesDiv.classList.remove('d-none');
             
             if (esCortesia) {
                 const nombreActual = reservaSnap.exists() ? reservaSnap.val().invitado_por : "";
-                opcionesDiv.innerHTML = `
+                if (opcionesDiv) opcionesDiv.innerHTML = `
                     <label class="form-label text-warning mb-1">Corregir "Invitado Por":</label>
                     <select id="editInvitadoPor" class="form-select bg-dark text-white border-warning">
                         <option value="Luis Jorquera" ${nombreActual==="Luis Jorquera"?'selected':''}>Luis Jorquera</option>
@@ -931,7 +924,7 @@ async function onScanSuccess(decodedText) {
                 let disabledAttr = isColiseo ? "disabled" : "";
                 let extraText = isColiseo ? "<small class='text-warning fw-bold'>Bloqueado: Contrato obligatorio para Coliseo.</small>" : "<small class='text-muted'>Si lo apagas, solo firmará Cesión de Imagen.</small>";
 
-                opcionesDiv.innerHTML = `
+                if (opcionesDiv) opcionesDiv.innerHTML = `
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="checkAplicaContrato" checked ${disabledAttr} style="transform: scale(1.3); margin-right: 10px;">
                         <label class="form-check-label text-white fw-bold" for="checkAplicaContrato">Generar Contrato Laboral DT</label>
@@ -940,19 +933,21 @@ async function onScanSuccess(decodedText) {
                 `;
             }
 
-            document.getElementById('seccionFirma').classList.remove('d-none'); 
-            document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
+            if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.remove('d-none'); 
+            if (document.getElementById('numeroAsignado')) document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
             
             const canvasAdmin = document.getElementById('signature-pad');
-            const ratioAdmin = Math.max(window.devicePixelRatio || 1, 1);
-            canvasAdmin.width = canvasAdmin.offsetWidth * ratioAdmin;
-            canvasAdmin.height = canvasAdmin.offsetHeight * ratioAdmin;
-            canvasAdmin.getContext("2d").scale(ratioAdmin, ratioAdmin);
+            if (canvasAdmin) {
+                const ratioAdmin = Math.max(window.devicePixelRatio || 1, 1);
+                canvasAdmin.width = canvasAdmin.offsetWidth * ratioAdmin;
+                canvasAdmin.height = canvasAdmin.offsetHeight * ratioAdmin;
+                canvasAdmin.getContext("2d").scale(ratioAdmin, ratioAdmin);
 
-            if(!signaturePad) {
-                signaturePad = new SignaturePad(canvasAdmin, { backgroundColor: 'rgb(255, 255, 255)' }); 
+                if(!signaturePad) {
+                    signaturePad = new SignaturePad(canvasAdmin, { backgroundColor: 'rgb(255, 255, 255)' }); 
+                }
+                signaturePad.clear(); 
             }
-            signaturePad.clear(); 
             if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none');
             
         } else { 
@@ -1080,7 +1075,7 @@ TERCERO. Se deja expresa constancia de que la participación es voluntaria y no 
 
 PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, entre el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
-SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los services, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
+SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
 TERCERO. El trabajador/a cumplirá una jornada ordinaria de trabajo que estará establecida en la citación a la jornada, que será entregado al trabajador/a con un mínimo anticipación 24 horas. La jornada diaria no excederá de 10 horas. Lo anterior, sin perjuicio de lo establecido en el Párrafo 2°, del Capítulo IV, del Título I, del Libro I, del Código del Trabajo, relativo a horas extraordinarias.
 
@@ -1202,7 +1197,8 @@ window.verPerfil = function(rut) {
     rutPerfilActual = rut; 
     const p = listaGlobalCRM[rut];
     
-    document.getElementById('contenidoFicha').innerHTML = `
+    const contenido = document.getElementById('contenidoFicha');
+    if (contenido) contenido.innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos}"></div>
@@ -1272,7 +1268,7 @@ window.verPerfil = function(rut) {
             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                 <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
                 <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
-                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/'/g, "\'")}')">
+                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/'/g, "\\'")}')">
                     ➕ Añadir a Jornada Pasada
                 </button>
             </div>
@@ -1297,9 +1293,7 @@ window.verPerfil = function(rut) {
 
 
 window.forzarIngresoPasado = async function(rut, nombre) {
-    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.
-
-Ingresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
+    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.\n\nIngresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
     if(!fec) return;
     
     let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Detrás del Muro):", "Detrás del Muro");
@@ -1339,8 +1333,7 @@ Ingresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[
             ingreso_administrativo: true
         });
         
-        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.
-Si vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
+        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.\nSi vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
         
     } catch(e) {
         alert("Error al inyectar: " + e.message);
@@ -1377,8 +1370,7 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
 });
 
 if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
-    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨
-Esto borrará a la persona de la base de datos para siempre.")) {
+    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; 
         renderCRM(listaGlobalCRM); 
@@ -1464,9 +1456,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
         return alert("No hay plata retenida.");
     }
     
-    if (!confirm(`🚨 ATENCIÓN 🚨
-
-¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
+    if (!confirm(`🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
     
     const fechaHoy = new Date().toISOString().split('T')[0];
     let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
@@ -1762,7 +1752,7 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
             <td>${nombreLimpio}</td>
             <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
             <td>
-                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\'")}')">💸 Pagar</button>
+                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\\'")}')">💸 Pagar</button>
             </td>
         </tr>
         `;
@@ -1803,7 +1793,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
     const deuda = window.deudasEfectivoGlobal[rut];
     if(!deuda) return;
     
-    document.getElementById('nombreEfectivo').innerText = nombrePersona;
+    if (document.getElementById('nombreEfectivo')) document.getElementById('nombreEfectivo').innerText = nombrePersona;
     
     let htmlCheckboxes = '<p class="text-warning mt-3 mb-2 fw-bold" style="font-size: 0.9em;">Selecciona qué programas liquidarás en efectivo ahora:</p>';
     deuda.programasDetalle.forEach((item, idx) => {
@@ -1817,14 +1807,14 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
         </div>`;
     });
     
-    document.getElementById('detalleProgramasEfectivo').innerHTML = htmlCheckboxes;
+    if (document.getElementById('detalleProgramasEfectivo')) document.getElementById('detalleProgramasEfectivo').innerHTML = htmlCheckboxes;
     
     const recalcularTotal = () => {
         let suma = 0;
         document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
             suma += deuda.programasDetalle[chk.value].monto;
         });
-        document.getElementById('montoEfectivo').innerText = `$${suma.toLocaleString('es-CL')}`;
+        if (document.getElementById('montoEfectivo')) document.getElementById('montoEfectivo').innerText = `$${suma.toLocaleString('es-CL')}`;
         deuda.montoCalculado = suma;
     };
 
@@ -2811,7 +2801,7 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
     const btnSorteo = document.getElementById('btnRealizarSorteo');
     btnSorteo.innerText = "🎰 Filtrando asistencia perfecta y girando ruleta...";
     btnSorteo.disabled = true;
-    document.getElementById('resultadoSorteo').classList.add('d-none');
+    if (document.getElementById('resultadoSorteo')) document.getElementById('resultadoSorteo').classList.add('d-none');
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
@@ -2845,11 +2835,11 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
         
         if (candidatosPerfectos.length === 0) {
             setTimeout(() => {
-                document.getElementById('ganadorNombre').innerText = "SIN GANADOR 😔";
-                document.getElementById('ganadorRut').innerText = "";
-                document.getElementById('ganadorFechas').innerText = "Ninguna persona cumplió con el requisito de asistir a TODAS las fechas seleccionadas.";
+                if (document.getElementById('ganadorNombre')) document.getElementById('ganadorNombre').innerText = "SIN GANADOR 😔";
+                if (document.getElementById('ganadorRut')) document.getElementById('ganadorRut').innerText = "";
+                if (document.getElementById('ganadorFechas')) document.getElementById('ganadorFechas').innerText = "Ninguna persona cumplió con el requisito de asistir a TODAS las fechas seleccionadas.";
                 
-                document.getElementById('resultadoSorteo').classList.remove('d-none');
+                if (document.getElementById('resultadoSorteo')) document.getElementById('resultadoSorteo').classList.remove('d-none');
                 btnSorteo.innerText = "🔄 Intentar con otras fechas";
                 btnSorteo.disabled = false;
             }, 1000);
@@ -2865,11 +2855,11 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
         await update(ref(db), updatesSorteo);
 
         setTimeout(() => {
-            document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
-            document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
-            document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
+            if (document.getElementById('ganadorNombre')) document.getElementById('ganadorNombre').innerText = `${trabGanador.nombres.toUpperCase()} ${trabGanador.apellidos.toUpperCase()}`;
+            if (document.getElementById('ganadorRut')) document.getElementById('ganadorRut').innerText = `RUT Acreditado: ${rutGanador}`;
+            if (document.getElementById('ganadorFechas')) document.getElementById('ganadorFechas').innerText = `🏅 ASISTENCIA PERFECTA: Asistió a las ${totalFechasRequeridas} fechas requeridas (Total de personas en la tómbola: ${candidatosPerfectos.length}).`;
             
-            document.getElementById('resultadoSorteo').classList.remove('d-none');
+            if (document.getElementById('resultadoSorteo')) document.getElementById('resultadoSorteo').classList.remove('d-none');
             btnSorteo.innerText = "🔄 Realizar otro Sorteo";
             btnSorteo.disabled = false;
         }, 2000);
@@ -3045,7 +3035,7 @@ La presente autorización es válida para el período en curso.`;
                 a.click();
                 
                 btn.innerText = "✅ ZIP Descargado Exitosamente";
-                document.getElementById('zonaEliminarMenores').classList.remove('d-none');
+                if (document.getElementById('zonaEliminarMenores')) document.getElementById('zonaEliminarMenores').classList.remove('d-none');
                 
             } catch(e) {
                 alert("Error armando el ZIP: " + e.message);
