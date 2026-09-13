@@ -3261,8 +3261,8 @@ Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representa
                 doc.text(`Fecha: ${fecha.split('-').reverse().join('-')}`, 20, yFinalText); yFinalText += 6;
                 doc.text(`Nombre: ${nombreCompleto}`, 20, yFinalText); yFinalText += 6;
                 doc.text(`RUT: ${rut}`, 20, yFinalText); yFinalText += 6;
-                doc.text(`Empresa (si aplica): Nat Producciones`, 20, yFinalText); yFinalText += 6;
-                doc.text(`RUT (si aplica): 76.932.592-1`, 20, yFinalText); yFinalText += 6;
+                doc.text(`Empresa (si aplica): `, 20, yFinalText); yFinalText += 6;
+                doc.text(`RUT (si aplica): `, 20, yFinalText); yFinalText += 6;
                 doc.text(`Teléfono: ${trab.telefono || '-'}`, 20, yFinalText); yFinalText += 15;
                 
                 if (yFinalText > 300) {
