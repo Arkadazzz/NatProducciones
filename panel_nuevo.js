@@ -63,6 +63,7 @@ let horaTerminoGeneral = "";
 let horaCitacionGeneral = ""; 
 let pinActivo = "";
 let valorHoraExtraGlobal = 0;
+    window.almuerzoActivo = false;
 
 let html5QrcodeScanner = null; 
 let signaturePad; 
@@ -327,7 +328,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                         <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'} | H.Extra: $${p.valor_hora_extra || 0}</small>
                     </div>
                     <div>
-                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}', '${p.hora_citacion || ''}')">🚪 Entrar</button>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}', '${p.hora_citacion || ''}', ${p.incluye_almuerzo || false})">🚪 Entrar</button>
                         <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
                     </div>
                 </div>`;
@@ -364,13 +365,15 @@ if (document.getElementById('btnActivarWeb')) document.getElementById('btnActiva
         pin: pinGenerado, 
         hora_termino: horaSal, 
         valor_hora_extra: valorHE, 
-        hora_citacion: horaCitacion 
+        hora_citacion: horaCitacion,
+        incluye_almuerzo: document.getElementById('checkAlmuerzo') ? document.getElementById('checkAlmuerzo').checked : false
     });
     
-    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion);
+    window.unirseASala(claveSegura, nom, fec, mon, pinGenerado, horaSal, valorHE, horaCitacion, document.getElementById('checkAlmuerzo') ? document.getElementById('checkAlmuerzo').checked : false);
 });
 
-window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaCit) {
+window.unirseASala = function(clave, nom, fec, mon, pin, horaSal, valorHE, horaCit, incluyeAlm) {
+    window.almuerzoActivo = incluyeAlm || false;
     claveActual = clave; 
     nombrePrograma = nom; 
     fechaPrograma = fec; 
@@ -502,6 +505,7 @@ function salirDeSala() {
     horaTerminoGeneral = ""; 
     horaCitacionGeneral = ""; 
     valorHoraExtraGlobal = 0;
+    window.almuerzoActivo = false;
     
     document.getElementById('seccionConfiguracion').classList.remove('d-none');
     document.getElementById('seccionEscaner').classList.add('d-none');
@@ -699,9 +703,51 @@ function actualizarTablero() {
             }
         }
 
+        
         if (htmlFaltantes === "") {
             htmlFaltantes = "<p class='text-success p-3 fw-bold mb-0 text-center'>✅ ¡Todos los inscritos ya están adentro!</p>";
         }
+        
+        let htmlContadorComida = "";
+        if (window.almuerzoActivo) {
+            let adentroVeggies = 0;
+            let adentroNormales = 0;
+            for (const rut in asistenciasGlobales) {
+                const tr = listaGlobalCRM[rut] || {};
+                if (tr.esVegetariano === 'Sí') {
+                    adentroVeggies++;
+                } else {
+                    adentroNormales++;
+                }
+            }
+            htmlContadorComida = `
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="p-3 rounded d-flex justify-content-around align-items-center shadow-sm" style="background: #0a1a0a; border: 1px solid #00d26a;">
+                            <span class="text-success fw-bold fs-5">🍽️ Almuerzos en sala:</span>
+                            <span class="badge bg-dark border border-success fs-5 text-white">🥩 Normal: <b class="text-success">${adentroNormales}</b></span>
+                            <span class="badge bg-dark border border-success fs-5 text-white">🥗 Veggie: <b class="text-success">${adentroVeggies}</b></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        if (document.getElementById('contenedorAlmuerzosTablero')) {
+            document.getElementById('contenedorAlmuerzosTablero').innerHTML = htmlContadorComida;
+        } else if(htmlContadorComida) {
+            let divAlm = document.createElement('div');
+            divAlm.id = 'contenedorAlmuerzosTablero';
+            divAlm.innerHTML = htmlContadorComida;
+            let secLista = document.getElementById('seccionLista');
+            let metricBoxesRow = secLista.querySelector('.row.mb-4');
+            if(metricBoxesRow) {
+                metricBoxesRow.parentNode.insertBefore(divAlm, metricBoxesRow.nextSibling);
+            }
+        } else if (!window.almuerzoActivo && document.getElementById('contenedorAlmuerzosTablero')) {
+            document.getElementById('contenedorAlmuerzosTablero').innerHTML = "";
+        }
+
 
         if (esDalePlay) {
             if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
@@ -1090,7 +1136,9 @@ NOVENO. Se deja constancia que el trabajador ingresó al servicio del empleador,
 
 DÉCIMO. El presente contrato se firma en dos ejemplares del mismo tenor y fecha.
 
-UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple validada en plataforma.`;
+UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y Firma Electrónica, el presente contrato se suscribe mediante Firma Electrónica Simple validada en plataforma.
+
+DUODÉCIMO. El trabajador autoriza expresamente a la Productora para que la firma electrónica estampada en el presente instrumento sea almacenada y reutilizada para firmar el respectivo comprobante o recibo de pago de honorarios, sirviendo este como prueba plena de la recepción conforme de los dineros pactados.`;
     }
 
     doc.text(titulo, 105, y, null, null, "center"); 
@@ -1208,6 +1256,12 @@ window.verPerfil = function(rut) {
             <div class="col-6 mb-2"><label class="text-muted small text-warning">Tel. de Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaTelefono" value="${p.emergenciaTelefono || ''}" placeholder="Número"></div>
             <div class="col-12 mb-3"><label class="text-muted small text-danger">Enfermedades Base / Alergias</label><input type="text" class="form-control bg-dark text-white border-danger" id="editEnfermedades" value="${p.enfermedades || ''}" placeholder="Indicar patologías o 'Ninguna'"></div>
             
+            <div class="col-6 mb-2"><label class="text-muted small text-success fw-bold">Menú Almuerzo</label>
+                <select class="form-select bg-dark text-white border-success" id="editEsVegetariano">
+                    <option value="No" ${p.esVegetariano==='No'?'selected':''}>Normal</option>
+                    <option value="Sí" ${p.esVegetariano==='Sí'?'selected':''}>Vegetariano</option>
+                </select>
+            </div>
             <div class="col-6 mb-2"><label class="text-muted small">Sexo</label>
                 <select class="form-select bg-dark text-white" id="editSexo">
                     <option value="M" ${p.sexo==='M'?'selected':''}>Masculino</option>
@@ -1350,6 +1404,7 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
             emergenciaNombre: document.getElementById('editEmergenciaNombre').value,
             emergenciaTelefono: document.getElementById('editEmergenciaTelefono').value,
             enfermedades: document.getElementById('editEnfermedades').value,
+            esVegetariano: document.getElementById('editEsVegetariano') ? document.getElementById('editEsVegetariano').value : 'No',
             sexo: document.getElementById('editSexo').value,
             afp: document.getElementById('editAfp').value, 
             salud: document.getElementById('editSalud').value,
