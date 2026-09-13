@@ -48,7 +48,7 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-document.getElementById('btnCerrarSesion').addEventListener('click', () => { 
+if (document.getElementById('btnCerrarSesion')) document.getElementById('btnCerrarSesion').addEventListener('click', () => { 
     signOut(auth).then(() => { 
         window.localStorage.removeItem('correoStaffNat');
         window.location.href = "login.html"; 
@@ -342,7 +342,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
     }
 });
 
-document.getElementById('btnActivarWeb').addEventListener('click', async () => {
+if (document.getElementById('btnActivarWeb')) document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
     const fec = document.getElementById('fechaPrograma').value;
     const mon = document.getElementById('montoPago').value;
@@ -444,12 +444,18 @@ function calcularPagoYBonos(horaCitacion, horaTermino, horaSalidaReal, montoBase
     return { montoBaseNuevo: nuevoMontoBase, bonoExtra: bonoExtra };
 }
 
-document.getElementById('btnEsUnDia').addEventListener('click', async () => {
+if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     if (!claveActual) return;
     const now = new Date();
     const horaSalidaMasiva = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
 
-    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
+    if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬
+
+¿Cerrar la jornada y dar por terminado el evento?
+
+El sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.
+
+¿Proceder?`)) return;
 
     try {
         const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
@@ -483,7 +489,8 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
 
             if (Object.keys(actualizacionesFirebase).length > 0) {
                 await update(ref(db), actualizacionesFirebase);
-                alert(`✅ Checkout Masivo Exitoso.\nSe calculó la salida y el pago a ${procesados} personas.`);
+                alert(`✅ Checkout Masivo Exitoso.
+Se calculó la salida y el pago a ${procesados} personas.`);
             }
         }
         await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
@@ -494,7 +501,7 @@ document.getElementById('btnEsUnDia').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
+if (document.getElementById('btnVolverMenu')) document.getElementById('btnVolverMenu').addEventListener('click', salirDeSala);
 
 function salirDeSala() {
     claveActual = ""; 
@@ -569,11 +576,11 @@ function activarRadares() {
                 seccionLista.prepend(div);
             }
 
-            document.getElementById('buscadorPuerta').addEventListener('input', (e) => {
+            if (document.getElementById('buscadorPuerta')) document.getElementById('buscadorPuerta').addEventListener('input', (e) => {
                 window.termBusquedaPuerta = e.target.value.toLowerCase();
                 window.renderTablaPuerta();
             });
-            document.getElementById('ordenPuerta').addEventListener('change', (e) => {
+            if (document.getElementById('ordenPuerta')) document.getElementById('ordenPuerta').addEventListener('change', (e) => {
                 window.criterioOrdenPuerta = e.target.value;
                 window.renderTablaPuerta();
             });
@@ -859,7 +866,7 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     }
 }
 
-document.getElementById('btnIngresoManual').addEventListener('click', () => {
+if (document.getElementById('btnIngresoManual')) document.getElementById('btnIngresoManual').addEventListener('click', () => {
     const rutIngresado = document.getElementById('rutManual').value.trim();
     if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
     onScanSuccess(rutIngresado); 
@@ -869,7 +876,7 @@ document.getElementById('btnIngresoManual').addEventListener('click', () => {
 async function onScanSuccess(decodedText) {
     try { if(html5QrcodeScanner) html5QrcodeScanner.pause(); } catch(e) {} 
     
-    document.getElementById('mensajeEscaneo').classList.remove('d-none'); 
+    if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.remove('d-none'); 
     rutActual = decodedText; 
     
     try {
@@ -877,7 +884,7 @@ async function onScanSuccess(decodedText) {
         if (blacklistSnap.exists()) { 
             alert(`⛔ ACCESO DENEGADO ⛔\nLa persona no tiene permitido el ingreso.`); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+            if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none'); 
             return; 
         }
         
@@ -946,21 +953,21 @@ async function onScanSuccess(decodedText) {
                 signaturePad = new SignaturePad(canvasAdmin, { backgroundColor: 'rgb(255, 255, 255)' }); 
             }
             signaturePad.clear(); 
-            document.getElementById('mensajeEscaneo').classList.add('d-none');
+            if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none');
             
         } else { 
             alert("RUT no encontrado en la base de datos."); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
-            document.getElementById('mensajeEscaneo').classList.add('d-none'); 
+            if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none'); 
         }
     } catch (error) { 
         try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
     }
 }
 
-document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
+if (document.getElementById('btnLimpiarFirma')) document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 
-document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
+if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     
     const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
@@ -1073,7 +1080,7 @@ TERCERO. Se deja expresa constancia de que la participación es voluntaria y no 
 
 PRIMERO. El trabajador se compromete a desempeñar los servicios de Público para la producción "${nombreProg}", en adelante “La Producción”, que el empleador grabará en Canal de televisión Mega Media ubicado en Vicuña Mackenna 1348, Santiago, entre el ${fechaTexto}. Las funciones que comprende el rol de trabajador son las siguientes: Participar activamente en las etapas de realización del proyecto para el que fue contratado/a, lo que comprende ensayos y repeticiones u otras labores que deban desempeñarse acorde al rol.
 
-SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los servicios, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
+SEGUNDO. El empleador podrá establecer el recinto donde deben prestarse los services, con la limitación que el nuevo sitio quede dentro de la misma ciudad o localidad donde se celebró el contrato y no ocasione un menoscabo al trabajador. Por su parte “el empleador” deberá costear el traslado, alimentación y alojamiento del trabajador, en condiciones adecuadas de higiene y seguridad, cuando las labores de preparación y/o las grabaciones deban realizarse en una ciudad distinta a la señalada en el presente contrato de trabajo como domicilio del trabajador.
 
 TERCERO. El trabajador/a cumplirá una jornada ordinaria de trabajo que estará establecida en la citación a la jornada, que será entregado al trabajador/a con un mínimo anticipación 24 horas. La jornada diaria no excederá de 10 horas. Lo anterior, sin perjuicio de lo establecido en el Párrafo 2°, del Capítulo IV, del Título I, del Libro I, del Código del Trabajo, relativo a horas extraordinarias.
 
@@ -1142,7 +1149,7 @@ UNDÉCIMO. De conformidad a la Ley N° 19.799 sobre Documentos Electrónicos y F
 // ==========================================
 // CRM Y EDICIÓN
 // ==========================================
-document.getElementById('crm-tab').addEventListener('click', async () => {
+if (document.getElementById('crm-tab')) document.getElementById('crm-tab').addEventListener('click', async () => {
     const [trabSnap, blackSnap] = await Promise.all([ 
         get(ref(db, '1_trabajadores')), 
         get(ref(db, '4_blacklist')) 
@@ -1156,6 +1163,7 @@ document.getElementById('crm-tab').addEventListener('click', async () => {
 
 function renderCRM(datos) {
     const tbody = document.getElementById('tablaCRM'); 
+    if(!tbody) return;
     tbody.innerHTML = "";
     
     for (const rut in datos) {
@@ -1175,7 +1183,7 @@ function renderCRM(datos) {
     }
 }
 
-document.getElementById('buscadorCRM').addEventListener('input', (e) => {
+if (document.getElementById('buscadorCRM')) document.getElementById('buscadorCRM').addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
     const filtrados = Object.keys(listaGlobalCRM).reduce((acc, rut) => {
         const nombreCompl = `${listaGlobalCRM[rut].nombres} ${listaGlobalCRM[rut].apellidos}`.toLowerCase();
@@ -1264,21 +1272,21 @@ window.verPerfil = function(rut) {
             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                 <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
                 <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
-                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/'/g, "\\'")}')">
+                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/'/g, "\'")}')">
                     ➕ Añadir a Jornada Pasada
                 </button>
             </div>
         </div>`;
     
     if (blacklistGlobal[rut]) {
-        document.getElementById('motivoBloqueo').classList.add('d-none'); 
-        document.getElementById('btnBloquear').classList.add('d-none'); 
-        document.getElementById('btnDesbloquear').classList.remove('d-none');
+        if (document.getElementById('motivoBloqueo')) document.getElementById('motivoBloqueo').classList.add('d-none'); 
+        if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear').classList.add('d-none'); 
+        if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').classList.remove('d-none');
     } else {
-        document.getElementById('motivoBloqueo').classList.remove('d-none'); 
-        document.getElementById('motivoBloqueo').value = ""; 
-        document.getElementById('btnBloquear').classList.remove('d-none'); 
-        document.getElementById('btnDesbloquear').classList.add('d-none');
+        if (document.getElementById('motivoBloqueo')) document.getElementById('motivoBloqueo').classList.remove('d-none'); 
+        if (document.getElementById('motivoBloqueo')) document.getElementById('motivoBloqueo').value = ""; 
+        if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear').classList.remove('d-none'); 
+        if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').classList.add('d-none');
     }
     
     if(!modalFichaInstance) {
@@ -1289,7 +1297,9 @@ window.verPerfil = function(rut) {
 
 
 window.forzarIngresoPasado = async function(rut, nombre) {
-    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.\n\nIngresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
+    let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.
+
+Ingresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
     if(!fec) return;
     
     let prog = prompt("Ingresa el NOMBRE EXACTO del programa (Ej: Detrás del Muro):", "Detrás del Muro");
@@ -1329,14 +1339,15 @@ window.forzarIngresoPasado = async function(rut, nombre) {
             ingreso_administrativo: true
         });
         
-        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.\nSi vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
+        alert(`✅ ¡Éxito! ${nombre} fue agregado a la jornada del ${fec}.
+Si vas a Finanzas o Efectivo, ya le aparecerá la deuda para pagar.`);
         
     } catch(e) {
         alert("Error al inyectar: " + e.message);
     }
 }
 
-document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
+if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
             nombres: document.getElementById('editNombres').value, 
@@ -1365,8 +1376,9 @@ document.getElementById('btnGuardarEdicion').addEventListener('click', async () 
     }
 });
 
-document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
-    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
+if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
+    if(confirm("🚨 ¿ESTÁS SEGURO? 🚨
+Esto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
         delete listaGlobalCRM[rutPerfilActual]; 
         renderCRM(listaGlobalCRM); 
@@ -1375,7 +1387,7 @@ document.getElementById('btnEliminarTrabajador').addEventListener('click', async
     }
 });
 
-document.getElementById('btnBloquear').addEventListener('click', async () => {
+if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear').addEventListener('click', async () => {
     const motivo = document.getElementById('motivoBloqueo').value.trim(); 
     if(!motivo) return alert("Debes escribir un motivo.");
     
@@ -1388,7 +1400,7 @@ document.getElementById('btnBloquear').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnDesbloquear').addEventListener('click', async () => {
+if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').addEventListener('click', async () => {
     if(confirm("¿Quitar de la lista negra?")) {
         await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); 
         delete blacklistGlobal[rutPerfilActual]; 
@@ -1401,7 +1413,7 @@ document.getElementById('btnDesbloquear').addEventListener('click', async () => 
 // ==========================================
 // FINANZAS Y BÓVEDA
 // ==========================================
-document.getElementById('finanzas-tab').addEventListener('click', async () => {
+if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-tab').addEventListener('click', async () => {
     const snap = await get(ref(db, '2_asistencias')); 
     if (!snap.exists()) return;
     
@@ -1430,27 +1442,31 @@ document.getElementById('finanzas-tab').addEventListener('click', async () => {
     
     window.deudasGlobales = deudas; 
     const tbody = document.getElementById('tablaDeudas'); 
-    tbody.innerHTML = "";
-    
-    for (const r in deudas) {
-        const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
-        const fila = document.createElement('tr');
-        fila.innerHTML = `
-            <td>${r}</td>
-            <td>${tr.nombres} ${tr.apellidos}</td>
-            <td><span class="badge bg-secondary">${deudas[r].dias} días</span></td>
-            <td class="text-success fw-bold fs-5">$${deudas[r].monto}</td>
-        `; 
-        tbody.appendChild(fila);
+    if(tbody) {
+        tbody.innerHTML = "";
+        
+        for (const r in deudas) {
+            const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
+            const fila = document.createElement('tr');
+            fila.innerHTML = `
+                <td>${r}</td>
+                <td>${tr.nombres} ${tr.apellidos}</td>
+                <td><span class="badge bg-secondary">${deudas[r].dias} días</span></td>
+                <td class="text-success fw-bold fs-5">$${deudas[r].monto}</td>
+            `; 
+            tbody.appendChild(fila);
+        }
     }
 });
 
-document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
+if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLiquidarSemana').addEventListener('click', async () => {
     if (!window.deudasGlobales || Object.keys(window.deudasGlobales).length === 0) {
         return alert("No hay plata retenida.");
     }
     
-    if (!confirm(`🚨 ATENCIÓN 🚨\n\n¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
+    if (!confirm(`🚨 ATENCIÓN 🚨
+
+¿Liquidar TODOS los pagos pendientes en la bóveda y descargar el archivo del banco?`)) return;
     
     const fechaHoy = new Date().toISOString().split('T')[0];
     let csv = "\uFEFFCuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
@@ -1476,7 +1492,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
         await update(ref(db), actualizacionesFirebase); 
         descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`); 
         alert("¡Liquidación exitosa!"); 
-        document.getElementById('tablaDeudas').innerHTML = ""; 
+        if (document.getElementById('tablaDeudas')) document.getElementById('tablaDeudas').innerHTML = ""; 
         window.deudasGlobales = {}; 
     } catch (error) { 
         alert("Error al liquidar."); 
@@ -1485,7 +1501,7 @@ document.getElementById('btnLiquidarSemana').addEventListener('click', async () 
 
 let modalPagosInstance;
 
-document.getElementById('btnExcelBanco').addEventListener('click', async () => {
+if (document.getElementById('btnExcelBanco')) document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     const btn = document.getElementById('btnExcelBanco');
     btn.innerText = "⏳ Buscando pendientes..."; 
     btn.disabled = true;
@@ -1528,9 +1544,9 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
         const contenedor = document.getElementById('listaProgramasPendientes');
         if (Object.keys(programasPendientes).length === 0) {
             contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay pagos pendientes en el sistema. Todo está al día.</div>";
-            document.getElementById('btnGenerarNominaBanco').classList.add('d-none');
+            if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('btnGenerarNominaBanco').classList.add('d-none');
         } else {
-            document.getElementById('btnGenerarNominaBanco').classList.remove('d-none');
+            if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('btnGenerarNominaBanco').classList.remove('d-none');
             let html = "";
             Object.keys(programasPendientes).sort().reverse().forEach(key => {
                 const p = programasPendientes[key];
@@ -1559,7 +1575,7 @@ document.getElementById('btnExcelBanco').addEventListener('click', async () => {
     btn.disabled = false;
 });
 
-document.getElementById('btnGenerarNominaBanco').addEventListener('click', async () => {
+if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('btnGenerarNominaBanco').addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.check-pago:checked');
     const seleccionados = Array.from(checkboxes).map(cb => cb.value);
 
@@ -1619,7 +1635,7 @@ document.getElementById('btnGenerarNominaBanco').addEventListener('click', async
         
         alert("¡Nómina generada con éxito! Revisa tus descargas.");
         modalPagosInstance.hide(); 
-        document.getElementById('finanzas-tab').click();
+        if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-tab').click();
         
     } catch (e) { 
         alert("Error al procesar y descargar los pagos."); 
@@ -1717,6 +1733,8 @@ async function cargarListaEfectivo() {
 
 function renderTablaDeudasEfectivo(deudasObj, trabObj) {
     const containerLista = document.getElementById('contenedorListaEfectivo');
+    if(!containerLista) return;
+    
     const ruts = Object.keys(deudasObj);
     
     if (ruts.length === 0) {
@@ -1755,7 +1773,7 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
 }
 
 // Cambiar el comportamiento del botón "Buscar" para que filtre la lista renderizada
-document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
+if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
     const term = document.getElementById('rutEfectivo').value.trim().toLowerCase();
     if(!window.deudasEfectivoGlobal) return;
     
@@ -1826,13 +1844,13 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
     if (!msgDiv) {
         msgDiv = document.createElement('div');
         msgDiv.id = 'msgFirmaReciclada';
-        canvasElement.parentElement.insertBefore(msgDiv, canvasElement);
+        if (canvasElement) canvasElement.parentElement.insertBefore(msgDiv, canvasElement);
     }
     
     if (firmaRecicladaBase64) {
         if (canvasElement) canvasElement.classList.add('d-none'); 
         if (btnLimpiar) btnLimpiar.classList.add('d-none'); 
-        msgDiv.innerHTML = `
+        if (msgDiv) msgDiv.innerHTML = `
             <div class="alert alert-success mt-2 p-3 text-center" style="border: 2px solid #00d26a;">
                 <span class="fw-bold fs-5">✅ Firma Encontrada</span><br>
                 <small>Se reciclará automáticamente la firma digital que la persona realizó en la puerta.</small>
@@ -1840,7 +1858,7 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
     } else {
         if (canvasElement) canvasElement.classList.remove('d-none'); 
         if (btnLimpiar) btnLimpiar.classList.remove('d-none'); 
-        msgDiv.innerHTML = `
+        if (msgDiv) msgDiv.innerHTML = `
             <div class="alert alert-warning mt-2 p-3 text-center" style="border: 2px dashed #ffcc00;">
                 <span class="fw-bold fs-5 text-warning">⚠️ Sin Firma Previa</span><br>
                 <small class="text-white">Esta persona no firmó en la puerta. <br><b>Por favor, que firme ahora en el recuadro blanco para entregarle su dinero.</b></small>
@@ -1848,25 +1866,27 @@ window.abrirPagoEfectivo = function(rut, nombrePersona) {
         if(typeof signaturePadEfectivo !== "undefined") {
             signaturePadEfectivo.clear();
             setTimeout(() => {
-                const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
-                canvasElement.width = canvasElement.offsetWidth * ratioEfe;
-                canvasElement.height = canvasElement.offsetHeight * ratioEfe;
-                canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
+                if (canvasElement) {
+                    const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
+                    canvasElement.width = canvasElement.offsetWidth * ratioEfe;
+                    canvasElement.height = canvasElement.offsetHeight * ratioEfe;
+                    canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
+                }
                 signaturePadEfectivo.clear();
             }, 300);
         }
     }
 
-    document.getElementById('panelPagoEfectivo').classList.remove('d-none');
+    if (document.getElementById('panelPagoEfectivo')) document.getElementById('panelPagoEfectivo').classList.remove('d-none');
     
     // Mover el scroll al panel para mayor fluidez
-    document.getElementById('panelPagoEfectivo').scrollIntoView({ behavior: 'smooth' });
+    if (document.getElementById('panelPagoEfectivo')) document.getElementById('panelPagoEfectivo').scrollIntoView({ behavior: 'smooth' });
 
     rutEfectivoActual = rut;
     deudaEfectivoActual = deuda;
 };
 
-document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
+if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', async () => {
     let seleccionados = [];
     document.querySelectorAll('.check-pago-parcial:checked').forEach(chk => {
         seleccionados.push(deudaEfectivoActual.programasDetalle[chk.value]);
@@ -1903,8 +1923,8 @@ document.getElementById('btnConfirmarPagoEfectivo').addEventListener('click', as
 
         alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda.");
         
-        document.getElementById('panelPagoEfectivo').classList.add('d-none');
-        document.getElementById('rutEfectivo').value = "";
+        if (document.getElementById('panelPagoEfectivo')) document.getElementById('panelPagoEfectivo').classList.add('d-none');
+        if (document.getElementById('rutEfectivo')) document.getElementById('rutEfectivo').value = "";
         
         // Recargar la lista para que la persona desaparezca mágicamente
         cargarListaEfectivo();
@@ -1971,7 +1991,7 @@ async function renderPanelRecibosBatch() {
             </div>
         `;
         
-        document.getElementById('btnDescargarZipEfectivo').addEventListener('click', async () => {
+        if (document.getElementById('btnDescargarZipEfectivo')) document.getElementById('btnDescargarZipEfectivo').addEventListener('click', async () => {
             const btn = document.getElementById('btnDescargarZipEfectivo');
             btn.innerText = "⏳ Empaquetando ZIP... (Puede tomar unos segundos)";
             btn.disabled = true;
@@ -2033,7 +2053,7 @@ async function renderPanelRecibosBatch() {
                 a.click();
                 
                 btn.innerText = "✅ ZIP Descargado Exitosamente";
-                document.getElementById('zonaEliminarRecibos').classList.remove('d-none');
+                if (document.getElementById('zonaEliminarRecibos')) document.getElementById('zonaEliminarRecibos').classList.remove('d-none');
                 
             } catch(e) {
                 alert("Error armando el ZIP: " + e.message);
@@ -2042,7 +2062,7 @@ async function renderPanelRecibosBatch() {
             }
         });
         
-        document.getElementById('btnVaciarRecibos').addEventListener('click', async () => {
+        if (document.getElementById('btnVaciarRecibos')) document.getElementById('btnVaciarRecibos').addEventListener('click', async () => {
             if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los recibos están guardados en tu dispositivo?\n\nSi aceptas, todos estos registros se esfumarán de la base de datos para no repetirse el próximo mes.`)) {
                 await remove(ref(db, '7_pagos_efectivo'));
                 alert("✅ La Bóveda de Recibos de Efectivo ha sido vaciada.");
@@ -2058,8 +2078,8 @@ setTimeout(renderPanelRecibosBatch, 2500);
 // ==========================================
 // CONTRATOS DT
 // ==========================================
-document.getElementById('contratos-dt-tab').addEventListener('click', () => {
-    document.getElementById('btnCargarContratosDT').click();
+if (document.getElementById('contratos-dt-tab')) document.getElementById('contratos-dt-tab').addEventListener('click', () => {
+    if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click();
 });
 
 window.agrupacionDTGlobal = {};
@@ -2082,7 +2102,7 @@ function getWeekIdentifier(dateStr) {
     return { label: `Semana del ${monStr} al ${sunStr}`, sortKey: sortKey };
 }
 
-document.getElementById('btnCargarContratosDT').addEventListener('click', async () => {
+if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').addEventListener('click', async () => {
     const contenedor = document.getElementById('contenedorContratosDT');
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
@@ -2328,13 +2348,13 @@ window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
     try {
         await update(ref(db), updates);
         alert("Contrato anulado correctamente por retiro.");
-        document.getElementById('btnCargarContratosDT').click(); 
+        if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click(); 
     } catch(e) {
         alert("Error al anular contrato.");
     }
 }
 
-document.getElementById('btnArchivarContratosDT').addEventListener('click', async () => {
+if (document.getElementById('btnArchivarContratosDT')) document.getElementById('btnArchivarContratosDT').addEventListener('click', async () => {
     if (!window.agrupacionDTGlobal || Object.keys(window.agrupacionDTGlobal).length === 0) return;
     
     let updates = {};
@@ -2373,7 +2393,7 @@ document.getElementById('btnArchivarContratosDT').addEventListener('click', asyn
     try {
         await update(ref(db), updates);
         alert(`✅ ¡Éxito! Se archivaron ${rutsArchivados} contratos de los programas:\n${Array.from(resumenProgramas).join(', ')}`);
-        document.getElementById('btnCargarContratosDT').click();
+        if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click();
     } catch (e) {
         alert("Error al archivar en Firebase.");
     }
@@ -2387,19 +2407,23 @@ async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarSeguridad');
     
-    btnRefresh.innerText = "⏳ Cargando..."; 
-    btnRefresh.disabled = true;
+    if(btnRefresh) {
+        btnRefresh.innerText = "⏳ Cargando..."; 
+        btnRefresh.disabled = true;
+    }
     
     const [asisSnap, trabSnap] = await Promise.all([ 
         get(ref(db, '2_asistencias')), 
         get(ref(db, '1_trabajadores')) 
     ]);
     
-    btnRefresh.innerText = "🔄 Actualizar Lista en Vivo"; 
-    btnRefresh.disabled = false;
+    if(btnRefresh) {
+        btnRefresh.innerText = "🔄 Actualizar Lista en Vivo"; 
+        btnRefresh.disabled = false;
+    }
 
     if (!asisSnap.exists()) { 
-        contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros de asistencia.</p>"; 
+        if(contenedor) contenedor.innerHTML = "<p class='text-center text-warning'>No hay registros de asistencia.</p>"; 
         return; 
     }
     
@@ -2541,7 +2565,7 @@ async function cargarReportesDT() {
     }
     
     htmlAcordeon += '</div>';
-    contenedor.innerHTML = htmlAcordeon;
+    if(contenedor) contenedor.innerHTML = htmlAcordeon;
 }
 
 window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
@@ -2570,14 +2594,14 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
     }
 }
 
-document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
-document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
+if (document.getElementById('seguridad-tab')) document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
+if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
 
 
 // ==========================================
 // MANTENIMIENTO 
 // ==========================================
-document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
+if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
         const snap = await get(ref(db, '2_asistencias')); 
         if (!snap.exists()) return alert("No hay datos de asistencias.");
@@ -2625,7 +2649,7 @@ document.getElementById('btnRespaldoMaestro').addEventListener('click', async ()
     }
 });
 
-document.getElementById('btnRespaldoPDFs').addEventListener('click', async () => {
+if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnRespaldoPDFs').addEventListener('click', async () => {
     const btn = document.getElementById('btnRespaldoPDFs');
     try {
         btn.innerText = "⏳ Empaquetando PDFs... (Espera)"; 
@@ -2705,11 +2729,11 @@ function resetBtnZip(btn) {
 const inputConfirmar = document.getElementById('inputConfirmarLimpieza'); 
 const btnEjecutar = document.getElementById('btnEjecutarLimpieza');
 
-inputConfirmar.addEventListener('input', (e) => { 
+if(inputConfirmar) inputConfirmar.addEventListener('input', (e) => { 
     btnEjecutar.disabled = (e.target.value !== "1812"); 
 });
 
-btnEjecutar.addEventListener('click', async () => {
+if(btnEjecutar) btnEjecutar.addEventListener('click', async () => {
     try {
         await remove(ref(db, '2_asistencias')); 
         await remove(ref(db, '3_reservas'));
@@ -2729,7 +2753,7 @@ btnEjecutar.addEventListener('click', async () => {
 // ==========================================
 // SORTEO DALE PLAY 
 // ==========================================
-document.getElementById('sorteo-tab').addEventListener('click', async () => {
+if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab').addEventListener('click', async () => {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
     contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
     
@@ -2747,7 +2771,7 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
         
         for (const fecha in todas) {
             for (const prog in todas[fecha]) {
-                if (prog.includes("Dale Play") || prog.includes("Coliseo")) {
+                if (prog.includes("Dale Play")) { // Mantenemos Solo Dale Play
                     if (!fechasUsadas[fecha] && !fechasDalePlay.includes(fecha)) {
                         fechasDalePlay.push(fecha);
                     }
@@ -2765,7 +2789,7 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
             <div class="form-check" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #444; border-radius: 8px; width: 100%; max-width: 260px;">
                 <input class="form-check-input check-sorteo" type="checkbox" value="${fecha}" id="chk_${fecha}" checked style="transform: scale(1.4); margin-top: 8px; cursor: pointer;">
                 <label class="form-check-label fw-bold ms-2 text-white" for="chk_${fecha}" style="cursor: pointer; width: 100%;">
-                    🎬 Dale Play / Coliseo<br><small class="text-warning">${fecha}</small>
+                    🎬 Dale Play<br><small class="text-warning">${fecha}</small>
                 </label>
             </div>`;
         });
@@ -2777,7 +2801,7 @@ document.getElementById('sorteo-tab').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
+if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.check-sorteo:checked');
     const fechasSeleccionadas = Array.from(checkboxes).map(cb => cb.value);
     const totalFechasRequeridas = fechasSeleccionadas.length;
@@ -2807,7 +2831,7 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
             fechasSeleccionadas.forEach(fecha => {
                 let asistioEnEstaFecha = false;
                 for (const prog in todas[fecha]) {
-                    if ((prog.includes("Dale Play") || prog.includes("Coliseo")) && todas[fecha][prog][rut]) {
+                    if (prog.includes("Dale Play") && todas[fecha][prog][rut]) {
                         asistioEnEstaFecha = true;
                     }
                 }
@@ -2852,8 +2876,8 @@ document.getElementById('btnRealizarSorteo').addEventListener('click', async () 
         
     } catch (e) {
         alert("Error al realizar el sorteo.");
-        btnSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
-        btnSorteo.disabled = false;
+        if(btnSorteo) btnSorteo.innerText = "🎁 ¡Girar la Ruleta Mágica!";
+        if(btnSorteo) btnSorteo.disabled = false;
     }
 });
 
@@ -2951,7 +2975,7 @@ async function renderPanelMenoresBatch() {
             </div>
         `;
         
-        document.getElementById('btnDescargarZipMenores').addEventListener('click', async () => {
+        if(document.getElementById('btnDescargarZipMenores')) document.getElementById('btnDescargarZipMenores').addEventListener('click', async () => {
             const btn = document.getElementById('btnDescargarZipMenores');
             btn.innerText = "⏳ Empaquetando ZIP de Menores...";
             btn.disabled = true;
@@ -3030,7 +3054,7 @@ La presente autorización es válida para el período en curso.`;
             }
         });
         
-        document.getElementById('btnVaciarMenores').addEventListener('click', async () => {
+        if (document.getElementById('btnVaciarMenores')) document.getElementById('btnVaciarMenores').addEventListener('click', async () => {
             if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los permisos están guardados?\n\nSi aceptas, estos registros se eliminarán de la base de datos para no mezclarse con los de mañana.`)) {
                 await remove(ref(db, '8_autorizaciones_menores'));
                 alert("✅ Carpeta de permisos de menores ha sido vaciada.");
