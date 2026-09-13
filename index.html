@@ -75,6 +75,15 @@
                 <input type="number" id="pinAcceso" class="form-control border-info text-center fs-4 fw-bold" placeholder="****">
             </div>
 
+            <div id="divVegetariano" class="mb-3 d-none p-3 rounded" style="background: #0a1a0a; border: 1px solid #00d26a;">
+                <label class="form-label text-success fw-bold">🥗 Opción de Almuerzo</label>
+                <p class="text-muted small mb-2">Este evento incluye colación. Por favor indica tu preferencia para el conteo de producción.</p>
+                <select id="esVegetariano" class="form-select bg-dark text-white border-success">
+                    <option value="No">Menú Normal (Carnes/Pollo/Mixto)</option>
+                    <option value="Sí">Menú Vegetariano / Vegano</option>
+                </select>
+            </div>
+
             <div class="separator"></div>
 
             <!-- SECCIÓN 2: DATOS PERSONALES -->
@@ -392,6 +401,12 @@
             seccionBancaria.classList.remove('d-none');
             camposBancarios.forEach(id => document.getElementById(id).required = true);
             
+            if (progClave && programasDisponibles[progClave] && programasDisponibles[progClave].incluye_almuerzo) {
+                document.getElementById('divVegetariano').classList.remove('d-none');
+            } else {
+                document.getElementById('divVegetariano').classList.add('d-none');
+            }
+            
             if (progClave && programasDisponibles[progClave] && programasDisponibles[progClave].pin) {
                 divPin.classList.remove('d-none');
                 pinInput.required = true;
@@ -433,6 +448,7 @@
                         document.getElementById('calle').value = d.direccion || '';
                     }
 
+                    if (d.esVegetariano) document.getElementById('esVegetariano').value = d.esVegetariano;
                     document.getElementById('emergenciaNombre').value = d.emergenciaNombre || '';
                     document.getElementById('emergenciaTelefono').value = d.emergenciaTelefono || '';
                     document.getElementById('enfermedades').value = d.enfermedades || '';
@@ -515,6 +531,7 @@
                 nacionalidad: document.getElementById('nacionalidad').value,
                 emergenciaNombre: document.getElementById('emergenciaNombre').value,
                 emergenciaTelefono: document.getElementById('emergenciaTelefono').value,
+                esVegetariano: document.getElementById('esVegetariano').value,
                 enfermedades: document.getElementById('enfermedades').value
             };
 
