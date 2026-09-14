@@ -105,6 +105,17 @@ function poblarSelectoresHora() {
 }
 poblarSelectoresHora();
 
+// Carga de la base de datos de trabajadores al iniciar para que la puerta muestre los nombres
+get(ref(db, '1_trabajadores')).then(snap => { 
+    if (snap.exists()) {
+        listaGlobalCRM = snap.val();
+        // Si la sala ya cargó antes que los nombres, forzamos un refresco visual:
+        if (typeof actualizarTablero === "function") actualizarTablero();
+        if (typeof window.renderTablaPuerta === "function") window.renderTablaPuerta();
+    }
+});
+
+
 
 
 // ==========================================
