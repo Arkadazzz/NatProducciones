@@ -69,14 +69,14 @@ let html5QrcodeScanner = null;
 let signaturePad; 
 let rutActual = ""; 
 let claveActual = "";
-let listaGlobalCRM = {}; 
-let blacklistGlobal = {}; 
+window.listaGlobalCRM = {}; 
+window.blacklistGlobal = {}; 
 let modalFichaInstance;
 
-let totalEsperados = 0; 
-let totalFirmados = 0; 
-let reservasGlobales = {};
-let asistenciasGlobales = {};
+window.totalEsperados = 0; 
+window.totalFirmados = 0; 
+window.reservasGlobales = {};
+window.asistenciasGlobales = {};
 window.siguienteTicketAutomatico = 1;
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; 
@@ -108,7 +108,7 @@ poblarSelectoresHora();
 // Carga de la base de datos de trabajadores al iniciar para que la puerta muestre los nombres
 get(ref(db, '1_trabajadores')).then(snap => { 
     if (snap.exists()) {
-        listaGlobalCRM = snap.val();
+        window.listaGlobalCRM = snap.val();
         // Si la sala ya cargó antes que los nombres, forzamos un refresco visual:
         if (typeof actualizarTablero === "function") actualizarTablero();
         if (typeof window.renderTablaPuerta === "function") window.renderTablaPuerta();
@@ -537,21 +537,21 @@ function activarRadares() {
     if (unsubscribeAsistencias) unsubscribeAsistencias();
     
     unsubscribeReservas = onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
-        reservasGlobales = snapshot.exists() ? snapshot.val() : {};
-        totalEsperados = Object.keys(reservasGlobales).length; 
+        window.reservasGlobales = snapshot.exists() ? snapshot.val() : {};
+        window.totalEsperados = Object.keys(window.reservasGlobales).length; 
         
         let totalIP = 0;
         let totalCortesia = 0;
-        for (const r in reservasGlobales) {
-            if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
+        for (const r in window.reservasGlobales) {
+            if (window.reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
             else totalIP++;
         }
         actualizarTablero();
     });
 
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
-        asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
-        totalFirmados = Object.keys(asistenciasGlobales).length; 
+        window.asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
+        window.totalFirmados = Object.keys(window.asistenciasGlobales).length; 
         actualizarTablero();
         
         // Inyectar barra de búsqueda y orden
@@ -605,9 +605,9 @@ function activarRadares() {
         
         let arrAsistentes = [];
         
-        for (const rut in asistenciasGlobales) {
-            const asis = asistenciasGlobales[rut]; 
-            const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
+        for (const rut in window.asistenciasGlobales) {
+            const asis = window.asistenciasGlobales[rut]; 
+            const trab = window.listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
             const num = parseInt(asis.numero_asignado) || 0; 
             
             if (num > maxNumero) { maxNumero = num; }
@@ -693,10 +693,10 @@ function actualizarTablero() {
         // Coliseo también se comporta sin cortesías en el tablero principal
         let esDalePlay = nombrePrograma.includes("Dale Play") || nombrePrograma.includes("Coliseo");
 
-        for (const rut in reservasGlobales) {
-            if (!asistenciasGlobales[rut]) {
-                const res = reservasGlobales[rut];
-                const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
+        for (const rut in window.reservasGlobales) {
+            if (!window.asistenciasGlobales[rut]) {
+                const res = window.reservasGlobales[rut];
+                const tr = window.listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
                 
                 const badge = esDalePlay ? '' : (res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`);
 
@@ -723,8 +723,8 @@ function actualizarTablero() {
         if (window.almuerzoActivo) {
             let adentroVeggies = 0;
             let adentroNormales = 0;
-            for (const rut in asistenciasGlobales) {
-                const tr = listaGlobalCRM[rut] || {};
+            for (const rut in window.asistenciasGlobales) {
+                const tr = window.listaGlobalCRM[rut] || {};
                 if (tr.esVegetariano === 'Sí') {
                     adentroVeggies++;
                 } else {
@@ -761,14 +761,14 @@ function actualizarTablero() {
 
 
         if (esDalePlay) {
-            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
-            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
+            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${window.totalEsperados}`;
+            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${window.totalFirmados}`;
         } else {
-            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
-            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
+            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${window.totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
+            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${window.totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
         }
         
-        let faltan = totalEsperados - totalFirmados; 
+        let faltan = window.totalEsperados - window.totalFirmados; 
         let textoFaltan = faltan < 0 ? 0 : faltan;
         
         if (faltan > 0) {
@@ -837,16 +837,16 @@ function actualizarTablero() {
 }
 
 window.descargarListaCanal = function() {
-    if (!reservasGlobales || Object.keys(reservasGlobales).length === 0) {
+    if (!window.reservasGlobales || Object.keys(window.reservasGlobales).length === 0) {
         return alert("No hay personas inscritas en el formulario todavía.");
     }
     let csv = "\uFEFFESTADO;RUT;NOMBRES;APELLIDOS;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n";
     
-    for (const rut in reservasGlobales) {
-        const res = reservasGlobales[rut];
-        const tr = listaGlobalCRM[rut] || { nombres: "No registrado", apellidos: "" };
+    for (const rut in window.reservasGlobales) {
+        const res = window.reservasGlobales[rut];
+        const tr = window.listaGlobalCRM[rut] || { nombres: "No registrado", apellidos: "" };
         const cond = res.tipo === "Cortesía" ? `Cortesía (${res.invitado_por || ''})` : "I/P";
-        const estado = asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
+        const estado = window.asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
         
         csv += `${estado};${rut};${tr.nombres || ''};${tr.apellidos || ''};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${tr.enfermedades || 'No indica'}\n`;
     }
@@ -940,7 +940,7 @@ async function onScanSuccess(decodedText) {
         
         if (snapshot.exists()) {
             const datos = snapshot.val(); 
-            listaGlobalCRM[rutActual] = datos; 
+            window.listaGlobalCRM[rutActual] = datos; 
             if (document.getElementById('nombreAsistenteDisplay')) document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
             
@@ -1075,7 +1075,7 @@ window.anularAsistencia = async function(rut) {
 // CONTRATOS PDF 
 // ==========================================
 window.generarContratoPDF = async function(rut) {
-    const trab = listaGlobalCRM[rut]; 
+    const trab = window.listaGlobalCRM[rut]; 
     const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
@@ -1206,10 +1206,10 @@ if (document.getElementById('crm-tab')) document.getElementById('crm-tab').addEv
         get(ref(db, '4_blacklist')) 
     ]);
     
-    listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; 
-    blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
+    window.listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; 
+    window.blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
     
-    renderCRM(listaGlobalCRM);
+    renderCRM(window.listaGlobalCRM);
 });
 
 function renderCRM(datos) {
@@ -1219,7 +1219,7 @@ function renderCRM(datos) {
     
     for (const rut in datos) {
         const p = datos[rut]; 
-        const bloqueado = blacklistGlobal[rut] ? true : false;
+        const bloqueado = window.blacklistGlobal[rut] ? true : false;
         const estadoBadge = bloqueado ? '<span class="badge bg-danger">Bloqueado</span>' : '<span class="badge bg-success">Activo</span>';
         
         const tr = document.createElement('tr');
@@ -1236,10 +1236,10 @@ function renderCRM(datos) {
 
 if (document.getElementById('buscadorCRM')) document.getElementById('buscadorCRM').addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
-    const filtrados = Object.keys(listaGlobalCRM).reduce((acc, rut) => {
-        const nombreCompl = `${listaGlobalCRM[rut].nombres} ${listaGlobalCRM[rut].apellidos}`.toLowerCase();
+    const filtrados = Object.keys(window.listaGlobalCRM).reduce((acc, rut) => {
+        const nombreCompl = `${window.listaGlobalCRM[rut].nombres} ${window.listaGlobalCRM[rut].apellidos}`.toLowerCase();
         if (rut.toLowerCase().includes(term) || nombreCompl.includes(term)) {
-            acc[rut] = listaGlobalCRM[rut]; 
+            acc[rut] = window.listaGlobalCRM[rut]; 
         }
         return acc;
     }, {}); 
@@ -1251,7 +1251,7 @@ let rutPerfilActual = "";
 
 window.verPerfil = function(rut) {
     rutPerfilActual = rut; 
-    const p = listaGlobalCRM[rut];
+    const p = window.listaGlobalCRM[rut];
     
     const contenido = document.getElementById('contenidoFicha');
     if (contenido) contenido.innerHTML = `
@@ -1337,7 +1337,7 @@ window.verPerfil = function(rut) {
             </div>
         </div>`;
     
-    if (blacklistGlobal[rut]) {
+    if (window.blacklistGlobal[rut]) {
         if (document.getElementById('motivoBloqueo')) document.getElementById('motivoBloqueo').classList.add('d-none'); 
         if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear').classList.add('d-none'); 
         if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').classList.remove('d-none');
@@ -1425,8 +1425,8 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
         });
         
         alert("Datos actualizados correctamente."); 
-        listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
-        renderCRM(listaGlobalCRM); 
+        window.listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
+        renderCRM(window.listaGlobalCRM); 
         modalFichaInstance.hide();
     } catch (e) { 
         alert("Error al guardar."); 
@@ -1436,8 +1436,8 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
 if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
-        delete listaGlobalCRM[rutPerfilActual]; 
-        renderCRM(listaGlobalCRM); 
+        delete window.listaGlobalCRM[rutPerfilActual]; 
+        renderCRM(window.listaGlobalCRM); 
         modalFichaInstance.hide(); 
         alert("Trabajador eliminado.");
     }
@@ -1449,9 +1449,9 @@ if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear
     
     if(confirm("¿Bloquear permanentemente a este usuario?")) {
         await set(ref(db, `4_blacklist/${rutPerfilActual}`), { fecha: new Date().toISOString(), motivo: motivo });
-        blacklistGlobal[rutPerfilActual] = { motivo: motivo }; 
+        window.blacklistGlobal[rutPerfilActual] = { motivo: motivo }; 
         modalFichaInstance.hide(); 
-        renderCRM(listaGlobalCRM); 
+        renderCRM(window.listaGlobalCRM); 
         alert("Usuario bloqueado.");
     }
 });
@@ -1459,9 +1459,9 @@ if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear
 if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').addEventListener('click', async () => {
     if(confirm("¿Quitar de la lista negra?")) {
         await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); 
-        delete blacklistGlobal[rutPerfilActual]; 
+        delete window.blacklistGlobal[rutPerfilActual]; 
         modalFichaInstance.hide(); 
-        renderCRM(listaGlobalCRM); 
+        renderCRM(window.listaGlobalCRM); 
         alert("Usuario desbloqueado.");
     }
 });
@@ -1474,7 +1474,7 @@ if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-t
     if (!snap.exists()) return;
     
     const trabSnap = await get(ref(db, '1_trabajadores')); 
-    if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
+    if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val();
     
     let deudas = {}; 
     const todas = snap.val();
@@ -1502,7 +1502,7 @@ if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-t
         tbody.innerHTML = "";
         
         for (const r in deudas) {
-            const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
+            const tr = window.listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
             const fila = document.createElement('tr');
             fila.innerHTML = `
                 <td>${r}</td>
@@ -1527,11 +1527,11 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     let actualizacionesFirebase = {};
     
     const trabSnap = await get(ref(db, '1_trabajadores')); 
-    if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
+    if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val();
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
+        const tr = window.listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
@@ -2681,7 +2681,7 @@ if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnR
         if (!snap.exists()) return alert("No hay datos de asistencias.");
         
         const trabSnap = await get(ref(db, '1_trabajadores')); 
-        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
+        if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val(); 
         
         let agrupado = {};
         const todas = snap.val();
@@ -2708,7 +2708,7 @@ if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnR
         let csv = "\uFEFFRUT;Nombres;Apellidos;Total Dias Asistidos;Monto Total Historico;Programas y Fechas\n";
         
         for (const r in agrupado) {
-            const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+            const trab = window.listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
             const asisData = agrupado[r];
             
             const programasStr = asisData.programas.join(" | ");
@@ -2737,7 +2737,7 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
         }
         
         const trabSnap = await get(ref(db, '1_trabajadores')); 
-        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
+        if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val(); 
         
         const todas = snap.val(); 
         const zip = new JSZip(); 
@@ -2750,7 +2750,7 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
                 
                 for (const r in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][r]; 
-                    const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+                    const trab = window.listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
                     
                     if (asis.firma_digital) {
                         const doc = new jsPDF({ format: 'legal' }); 
