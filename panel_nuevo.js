@@ -1265,7 +1265,12 @@ window.verPerfil = function(rut) {
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">RUT</label><input type="text" class="form-control bg-secondary text-white" value="${p.rut}" readonly></div>
+            <div class="col-6 mb-2"><label class="text-muted small">RUT</label>
+            <div class="input-group">
+                <input type="text" class="form-control bg-secondary text-white" value="${p.rut}" readonly>
+                <button class="btn btn-warning px-2" type="button" onclick="window.cambiarRutPersona('${rut}')" title="Corregir RUT (Mueve asistencias y perfil)">✏️</button>
+            </div>
+        </div>
             <div class="col-6 mb-2"><label class="text-muted small">Fecha Nacimiento</label><input type="date" class="form-control bg-dark text-white" id="editNacimiento" value="${p.fechaNacimiento || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
@@ -1361,6 +1366,91 @@ window.verPerfil = function(rut) {
     modalFichaInstance.show();
 }
 
+
+
+window.cambiarRutPersona = async function(rutAntiguo) {
+    const nuevoRut = prompt(`ATENCIÓN: Vas a cambiar el RUT de esta persona en todo el sistema.\n\nRUT Actual (Malo): ${rutAntiguo}\n\nIngresa el NUEVO RUT (con guion, ej: 12345678-9):`);
+    
+    if (!nuevoRut || nuevoRut === rutAntiguo) return;
+    
+    if (!confirm(`🚨 ¿Estás 100% seguro de cambiar ${rutAntiguo} por ${nuevoRut}?\n\nEsto moverá su perfil, firmas, asistencias y pagos al nuevo RUT para que no pierda nada.`)) return;
+
+    try {
+        // 1. Mover en 1_trabajadores
+        const trabSnap = await get(child(ref(db), `1_trabajadores/${rutAntiguo}`));
+        if (trabSnap.exists()) {
+            let dataTrab = trabSnap.val();
+            dataTrab.rut = nuevoRut;
+            await set(ref(db, `1_trabajadores/${nuevoRut}`), dataTrab);
+        }
+
+        // 2. Mover en 2_asistencias
+        const asisSnap = await get(ref(db, '2_asistencias'));
+        if (asisSnap.exists()) {
+            const todasAsis = asisSnap.val();
+            let asisUpdates = {};
+            for (const fec in todasAsis) {
+                for (const prog in todasAsis[fec]) {
+                    if (todasAsis[fec][prog][rutAntiguo]) {
+                        let asisData = todasAsis[fec][prog][rutAntiguo];
+                        asisData.rut = nuevoRut;
+                        asisUpdates[`2_asistencias/${fec}/${prog}/${nuevoRut}`] = asisData;
+                        asisUpdates[`2_asistencias/${fec}/${prog}/${rutAntiguo}`] = null;
+                    }
+                }
+            }
+            if (Object.keys(asisUpdates).length > 0) await update(ref(db), asisUpdates);
+        }
+
+        // 3. Mover en 3_reservas
+        const resSnap = await get(ref(db, '3_reservas'));
+        if (resSnap.exists()) {
+            const todasRes = resSnap.val();
+            let resUpdates = {};
+            for (const fec in todasRes) {
+                for (const prog in todasRes[fec]) {
+                    if (todasRes[fec][prog][rutAntiguo]) {
+                        let resData = todasRes[fec][prog][rutAntiguo];
+                        resUpdates[`3_reservas/${fec}/${prog}/${nuevoRut}`] = resData;
+                        resUpdates[`3_reservas/${fec}/${prog}/${rutAntiguo}`] = null;
+                    }
+                }
+            }
+            if (Object.keys(resUpdates).length > 0) await update(ref(db), resUpdates);
+        }
+
+        // 4. Mover en 7_pagos_efectivo
+        const efeSnap = await get(ref(db, '7_pagos_efectivo'));
+        if (efeSnap.exists()) {
+            const todosEfe = efeSnap.val();
+            let efeUpdates = {};
+            for (const id in todosEfe) {
+                if (todosEfe[id].rut === rutAntiguo) {
+                    efeUpdates[`7_pagos_efectivo/${id}/rut`] = nuevoRut;
+                }
+            }
+            if (Object.keys(efeUpdates).length > 0) await update(ref(db), efeUpdates);
+        }
+        
+        // 5. Mover en 4_blacklist
+        if (window.blacklistGlobal && window.blacklistGlobal[rutAntiguo]) {
+            const blackData = (await get(child(ref(db), `4_blacklist/${rutAntiguo}`))).val();
+            await set(ref(db, `4_blacklist/${nuevoRut}`), blackData);
+            await remove(ref(db, `4_blacklist/${rutAntiguo}`));
+        }
+
+        // 6. Eliminar el RUT antiguo de trabajadores
+        await remove(ref(db, `1_trabajadores/${rutAntiguo}`));
+
+        alert(`✅ RUT corregido con éxito.\nSe movieron todos los registros de ${rutAntiguo} a ${nuevoRut}.`);
+        
+        modalFichaInstance.hide();
+        document.getElementById('crm-tab').click(); 
+        
+    } catch (e) {
+        alert("Error al intentar cambiar el RUT: " + e.message);
+    }
+}
 
 window.forzarIngresoPasado = async function(rut, nombre) {
     let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.\n\nIngresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
