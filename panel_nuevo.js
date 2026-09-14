@@ -538,14 +538,7 @@ function activarRadares() {
     
     unsubscribeReservas = onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         window.reservasGlobales = snapshot.exists() ? snapshot.val() : {};
-        window.totalEsperados = Object.keys(window.reservasGlobales).length; 
-        
-        let totalIP = 0;
-        let totalCortesia = 0;
-        for (const r in window.reservasGlobales) {
-            if (window.reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
-            else totalIP++;
-        }
+        window.totalEsperados = Object.keys(window.reservasGlobales).length;
         actualizarTablero();
     });
 
@@ -686,6 +679,20 @@ function activarRadares() {
 
 function actualizarTablero() {
     try {
+        let totalIP = 0;
+        let totalCortesia = 0;
+        for (const r in window.reservasGlobales) {
+            if (window.reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
+            else totalIP++;
+        }
+        
+        let adentroIP = 0;
+        let adentroCortesia = 0;
+        for (const r in window.asistenciasGlobales) {
+            if (window.asistenciasGlobales[r].tipo_ingreso === "Cortesía") adentroCortesia++;
+            else adentroIP++;
+        }
+        
         let faltanIP = 0;
         let faltanCortesia = 0;
         let htmlFaltantes = "";
@@ -765,7 +772,7 @@ function actualizarTablero() {
             if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${window.totalFirmados}`;
         } else {
             if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${window.totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
-            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${window.totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
+            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${window.totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${adentroIP || 0} | CORT: ${adentroCortesia || 0}</span>`;
         }
         
         let faltan = window.totalEsperados - window.totalFirmados; 
