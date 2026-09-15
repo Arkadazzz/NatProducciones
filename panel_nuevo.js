@@ -1373,6 +1373,27 @@ window.cambiarRutPersona = async function(rutAntiguo) {
     
     if (!nuevoRut || nuevoRut === rutAntiguo) return;
     
+    // --- VALIDACIÓN MATEMÁTICA DEL RUT CHILENO ---
+    if (!/^[0-9]+-[0-9kK]{1}$/.test(nuevoRut)) {
+        return alert("❌ Formato incorrecto. Debes ingresarlo sin puntos y con guion (Ej: 12345678-9).");
+    }
+    let tmp = nuevoRut.split('-');
+    let rutN = tmp[0];
+    let digv = tmp[1].toLowerCase();
+    let suma = 0;
+    let multiplo = 2;
+    for (let i = 1; i <= rutN.length; i++) {
+        suma += multiplo * rutN.charAt(rutN.length - i);
+        multiplo = multiplo < 7 ? multiplo + 1 : 2;
+    }
+    let dvEsperado = 11 - (suma % 11);
+    let dv = (dvEsperado === 10) ? 'k' : (dvEsperado === 11) ? '0' : dvEsperado.toString();
+    
+    if (dv !== digv) {
+        return alert("❌ EL RUT INGRESADO NO ES VÁLIDO.\nEl dígito verificador no coincide con la fórmula del Registro Civil Chileno. Revisa que esté bien escrito.");
+    }
+    // ---------------------------------------------
+    
     if (!confirm(`🚨 ¿Estás 100% seguro de cambiar ${rutAntiguo} por ${nuevoRut}?\n\nEsto moverá su perfil, firmas, asistencias y pagos al nuevo RUT para que no pierda nada.`)) return;
 
     try {
