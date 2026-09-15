@@ -367,7 +367,7 @@ if (document.getElementById('btnActivarWeb')) document.getElementById('btnActiva
         pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     }
     
-    const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
+    const claveSegura = nom.replace(/[.#$\[\]]/g, "_") + "_" + fec;
     
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
         nombre: nom, 
