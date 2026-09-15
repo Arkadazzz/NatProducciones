@@ -291,6 +291,27 @@
 
     let programasDisponibles = {};
 
+    function validarRutChileno(rutCompleto) {
+        if (!/^[0-9]+-[0-9kK]{1}$/.test(rutCompleto)) return false;
+        
+        let tmp = rutCompleto.split('-');
+        let digv = tmp[1].toLowerCase();
+        let rut = tmp[0];
+        let suma = 0;
+        let multiplo = 2;
+        
+        for (let i = 1; i <= rut.length; i++) {
+            suma = suma + multiplo * rut.charAt(rut.length - i);
+            if (multiplo < 7) { multiplo = multiplo + 1; } else { multiplo = 2; }
+        }
+        
+        let dvEsperado = 11 - (suma % 11);
+        let dv = (dvEsperado === 10) ? 'k' : (dvEsperado === 11) ? '0' : dvEsperado.toString();
+        
+        return dv === digv;
+    }
+
+
     // DESCARGAR QR CON FONDO BLANCO GARANTIZADO
     window.descargarQR = function() {
         const rut = document.getElementById('displayRut').innerText;
@@ -481,6 +502,12 @@
     // 4. ENVIAR FORMULARIO
     document.getElementById('registroForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+        
+        const rutIngresadoForm = document.getElementById('rut').value.trim();
+        if (!validarRutChileno(rutIngresadoForm)) {
+            alert("❌ EL RUT NO EXISTE O ESTÁ MAL ESCRITO.\n\nPor favor, ingresa tu RUT real sin puntos y con guion (Ej: 12345678-9). Si te equivocas, no podremos gestionar tus contratos ni pagos.");
+            return;
+        }
         
         const btn = document.getElementById('btnEnviar');
         btn.disabled = true;
