@@ -27,7 +27,6 @@ const CORREOS_ADMINISTRADORES = [
     "natalyseguel.va@gmail.com",
     "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
-    "matijesus.pz@gmail.com",
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -70,14 +69,14 @@ let html5QrcodeScanner = null;
 let signaturePad; 
 let rutActual = ""; 
 let claveActual = "";
-window.listaGlobalCRM = {}; 
-window.blacklistGlobal = {}; 
+let listaGlobalCRM = {}; 
+let blacklistGlobal = {}; 
 let modalFichaInstance;
 
-window.totalEsperados = 0; 
-window.totalFirmados = 0; 
-window.reservasGlobales = {};
-window.asistenciasGlobales = {};
+let totalEsperados = 0; 
+let totalFirmados = 0; 
+let reservasGlobales = {};
+let asistenciasGlobales = {};
 window.siguienteTicketAutomatico = 1;
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; 
@@ -109,7 +108,7 @@ poblarSelectoresHora();
 // Carga de la base de datos de trabajadores al iniciar para que la puerta muestre los nombres
 get(ref(db, '1_trabajadores')).then(snap => { 
     if (snap.exists()) {
-        window.listaGlobalCRM = snap.val();
+        listaGlobalCRM = snap.val();
         // Si la sala ya cargó antes que los nombres, forzamos un refresco visual:
         if (typeof actualizarTablero === "function") actualizarTablero();
         if (typeof window.renderTablaPuerta === "function") window.renderTablaPuerta();
@@ -368,7 +367,7 @@ if (document.getElementById('btnActivarWeb')) document.getElementById('btnActiva
         pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
     }
     
-    const claveSegura = nom.replace(/[.#$\[\]]/g, "_") + "_" + fec;
+    const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
     
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
         nombre: nom, 
@@ -538,14 +537,21 @@ function activarRadares() {
     if (unsubscribeAsistencias) unsubscribeAsistencias();
     
     unsubscribeReservas = onValue(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
-        window.reservasGlobales = snapshot.exists() ? snapshot.val() : {};
-        window.totalEsperados = Object.keys(window.reservasGlobales).length;
+        reservasGlobales = snapshot.exists() ? snapshot.val() : {};
+        totalEsperados = Object.keys(reservasGlobales).length; 
+        
+        let totalIP = 0;
+        let totalCortesia = 0;
+        for (const r in reservasGlobales) {
+            if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
+            else totalIP++;
+        }
         actualizarTablero();
     });
 
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
-        window.asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
-        window.totalFirmados = Object.keys(window.asistenciasGlobales).length; 
+        asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
+        totalFirmados = Object.keys(asistenciasGlobales).length; 
         actualizarTablero();
         
         // Inyectar barra de búsqueda y orden
@@ -599,9 +605,9 @@ function activarRadares() {
         
         let arrAsistentes = [];
         
-        for (const rut in window.asistenciasGlobales) {
-            const asis = window.asistenciasGlobales[rut]; 
-            const trab = window.listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
+        for (const rut in asistenciasGlobales) {
+            const asis = asistenciasGlobales[rut]; 
+            const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
             const num = parseInt(asis.numero_asignado) || 0; 
             
             if (num > maxNumero) { maxNumero = num; }
@@ -651,7 +657,7 @@ function activarRadares() {
                 btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
             }
             
-            const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}', ${asis.monto}, '${trab.nombres}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
+            const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}', ${asis.monto}, '${trab.nombres.replace(/['\"\`]/g, '')}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td>
@@ -680,20 +686,6 @@ function activarRadares() {
 
 function actualizarTablero() {
     try {
-        let totalIP = 0;
-        let totalCortesia = 0;
-        for (const r in window.reservasGlobales) {
-            if (window.reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
-            else totalIP++;
-        }
-        
-        let adentroIP = 0;
-        let adentroCortesia = 0;
-        for (const r in window.asistenciasGlobales) {
-            if (window.asistenciasGlobales[r].tipo_ingreso === "Cortesía") adentroCortesia++;
-            else adentroIP++;
-        }
-        
         let faltanIP = 0;
         let faltanCortesia = 0;
         let htmlFaltantes = "";
@@ -701,10 +693,10 @@ function actualizarTablero() {
         // Coliseo también se comporta sin cortesías en el tablero principal
         let esDalePlay = nombrePrograma.includes("Dale Play") || nombrePrograma.includes("Coliseo");
 
-        for (const rut in window.reservasGlobales) {
-            if (!window.asistenciasGlobales[rut]) {
-                const res = window.reservasGlobales[rut];
-                const tr = window.listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
+        for (const rut in reservasGlobales) {
+            if (!asistenciasGlobales[rut]) {
+                const res = reservasGlobales[rut];
+                const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
                 
                 const badge = esDalePlay ? '' : (res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`);
 
@@ -731,8 +723,8 @@ function actualizarTablero() {
         if (window.almuerzoActivo) {
             let adentroVeggies = 0;
             let adentroNormales = 0;
-            for (const rut in window.asistenciasGlobales) {
-                const tr = window.listaGlobalCRM[rut] || {};
+            for (const rut in asistenciasGlobales) {
+                const tr = listaGlobalCRM[rut] || {};
                 if (tr.esVegetariano === 'Sí') {
                     adentroVeggies++;
                 } else {
@@ -769,14 +761,14 @@ function actualizarTablero() {
 
 
         if (esDalePlay) {
-            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${window.totalEsperados}`;
-            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${window.totalFirmados}`;
+            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
+            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
         } else {
-            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${window.totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
-            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${window.totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${adentroIP || 0} | CORT: ${adentroCortesia || 0}</span>`;
+            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
+            if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
         }
         
-        let faltan = window.totalEsperados - window.totalFirmados; 
+        let faltan = totalEsperados - totalFirmados; 
         let textoFaltan = faltan < 0 ? 0 : faltan;
         
         if (faltan > 0) {
@@ -845,16 +837,16 @@ function actualizarTablero() {
 }
 
 window.descargarListaCanal = function() {
-    if (!window.reservasGlobales || Object.keys(window.reservasGlobales).length === 0) {
+    if (!reservasGlobales || Object.keys(reservasGlobales).length === 0) {
         return alert("No hay personas inscritas en el formulario todavía.");
     }
     let csv = "\uFEFFESTADO;RUT;NOMBRES;APELLIDOS;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n";
     
-    for (const rut in window.reservasGlobales) {
-        const res = window.reservasGlobales[rut];
-        const tr = window.listaGlobalCRM[rut] || { nombres: "No registrado", apellidos: "" };
+    for (const rut in reservasGlobales) {
+        const res = reservasGlobales[rut];
+        const tr = listaGlobalCRM[rut] || { nombres: "No registrado", apellidos: "" };
         const cond = res.tipo === "Cortesía" ? `Cortesía (${res.invitado_por || ''})` : "I/P";
-        const estado = window.asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
+        const estado = asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
         
         csv += `${estado};${rut};${tr.nombres || ''};${tr.apellidos || ''};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${tr.enfermedades || 'No indica'}\n`;
     }
@@ -948,7 +940,7 @@ async function onScanSuccess(decodedText) {
         
         if (snapshot.exists()) {
             const datos = snapshot.val(); 
-            window.listaGlobalCRM[rutActual] = datos; 
+            listaGlobalCRM[rutActual] = datos; 
             if (document.getElementById('nombreAsistenteDisplay')) document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             const infoInvitado = document.getElementById('infoInvitado');
             
@@ -1083,7 +1075,7 @@ window.anularAsistencia = async function(rut) {
 // CONTRATOS PDF 
 // ==========================================
 window.generarContratoPDF = async function(rut) {
-    const trab = window.listaGlobalCRM[rut]; 
+    const trab = listaGlobalCRM[rut]; 
     const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
@@ -1214,10 +1206,10 @@ if (document.getElementById('crm-tab')) document.getElementById('crm-tab').addEv
         get(ref(db, '4_blacklist')) 
     ]);
     
-    window.listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; 
-    window.blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
+    listaGlobalCRM = trabSnap.exists() ? trabSnap.val() : {}; 
+    blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
     
-    renderCRM(window.listaGlobalCRM);
+    renderCRM(listaGlobalCRM);
 });
 
 function renderCRM(datos) {
@@ -1227,7 +1219,7 @@ function renderCRM(datos) {
     
     for (const rut in datos) {
         const p = datos[rut]; 
-        const bloqueado = window.blacklistGlobal[rut] ? true : false;
+        const bloqueado = blacklistGlobal[rut] ? true : false;
         const estadoBadge = bloqueado ? '<span class="badge bg-danger">Bloqueado</span>' : '<span class="badge bg-success">Activo</span>';
         
         const tr = document.createElement('tr');
@@ -1244,10 +1236,10 @@ function renderCRM(datos) {
 
 if (document.getElementById('buscadorCRM')) document.getElementById('buscadorCRM').addEventListener('input', (e) => {
     const term = e.target.value.toLowerCase();
-    const filtrados = Object.keys(window.listaGlobalCRM).reduce((acc, rut) => {
-        const nombreCompl = `${window.listaGlobalCRM[rut].nombres} ${window.listaGlobalCRM[rut].apellidos}`.toLowerCase();
+    const filtrados = Object.keys(listaGlobalCRM).reduce((acc, rut) => {
+        const nombreCompl = `${listaGlobalCRM[rut].nombres} ${listaGlobalCRM[rut].apellidos}`.toLowerCase();
         if (rut.toLowerCase().includes(term) || nombreCompl.includes(term)) {
-            acc[rut] = window.listaGlobalCRM[rut]; 
+            acc[rut] = listaGlobalCRM[rut]; 
         }
         return acc;
     }, {}); 
@@ -1259,19 +1251,14 @@ let rutPerfilActual = "";
 
 window.verPerfil = function(rut) {
     rutPerfilActual = rut; 
-    const p = window.listaGlobalCRM[rut];
+    const p = listaGlobalCRM[rut];
     
     const contenido = document.getElementById('contenidoFicha');
     if (contenido) contenido.innerHTML = `
         <div class="row">
             <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">RUT</label>
-            <div class="input-group">
-                <input type="text" class="form-control bg-secondary text-white" value="${p.rut}" readonly>
-                <button class="btn btn-warning px-2" type="button" onclick="window.cambiarRutPersona('${rut}')" title="Corregir RUT (Mueve asistencias y perfil)">✏️</button>
-            </div>
-        </div>
+            <div class="col-6 mb-2"><label class="text-muted small">RUT</label><input type="text" class="form-control bg-secondary text-white" value="${p.rut}" readonly></div>
             <div class="col-6 mb-2"><label class="text-muted small">Fecha Nacimiento</label><input type="date" class="form-control bg-dark text-white" id="editNacimiento" value="${p.fechaNacimiento || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
@@ -1344,13 +1331,13 @@ window.verPerfil = function(rut) {
             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                 <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
                 <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
-                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/'/g, "\'")}')">
+                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/['\"\`]/g, '')}')">
                     ➕ Añadir a Jornada Pasada
                 </button>
             </div>
         </div>`;
     
-    if (window.blacklistGlobal[rut]) {
+    if (blacklistGlobal[rut]) {
         if (document.getElementById('motivoBloqueo')) document.getElementById('motivoBloqueo').classList.add('d-none'); 
         if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear').classList.add('d-none'); 
         if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').classList.remove('d-none');
@@ -1367,112 +1354,6 @@ window.verPerfil = function(rut) {
     modalFichaInstance.show();
 }
 
-
-
-window.cambiarRutPersona = async function(rutAntiguo) {
-    const nuevoRut = prompt(`ATENCIÓN: Vas a cambiar el RUT de esta persona en todo el sistema.\n\nRUT Actual (Malo): ${rutAntiguo}\n\nIngresa el NUEVO RUT (con guion, ej: 12345678-9):`);
-    
-    if (!nuevoRut || nuevoRut === rutAntiguo) return;
-    
-    // --- VALIDACIÓN MATEMÁTICA DEL RUT CHILENO ---
-    if (!/^[0-9]+-[0-9kK]{1}$/.test(nuevoRut)) {
-        return alert("❌ Formato incorrecto. Debes ingresarlo sin puntos y con guion (Ej: 12345678-9).");
-    }
-    let tmp = nuevoRut.split('-');
-    let rutN = tmp[0];
-    let digv = tmp[1].toLowerCase();
-    let suma = 0;
-    let multiplo = 2;
-    for (let i = 1; i <= rutN.length; i++) {
-        suma += multiplo * rutN.charAt(rutN.length - i);
-        multiplo = multiplo < 7 ? multiplo + 1 : 2;
-    }
-    let dvEsperado = 11 - (suma % 11);
-    let dv = (dvEsperado === 10) ? 'k' : (dvEsperado === 11) ? '0' : dvEsperado.toString();
-    
-    if (dv !== digv) {
-        return alert("❌ EL RUT INGRESADO NO ES VÁLIDO.\nEl dígito verificador no coincide con la fórmula del Registro Civil Chileno. Revisa que esté bien escrito.");
-    }
-    // ---------------------------------------------
-    
-    if (!confirm(`🚨 ¿Estás 100% seguro de cambiar ${rutAntiguo} por ${nuevoRut}?\n\nEsto moverá su perfil, firmas, asistencias y pagos al nuevo RUT para que no pierda nada.`)) return;
-
-    try {
-        // 1. Mover en 1_trabajadores
-        const trabSnap = await get(child(ref(db), `1_trabajadores/${rutAntiguo}`));
-        if (trabSnap.exists()) {
-            let dataTrab = trabSnap.val();
-            dataTrab.rut = nuevoRut;
-            await set(ref(db, `1_trabajadores/${nuevoRut}`), dataTrab);
-        }
-
-        // 2. Mover en 2_asistencias
-        const asisSnap = await get(ref(db, '2_asistencias'));
-        if (asisSnap.exists()) {
-            const todasAsis = asisSnap.val();
-            let asisUpdates = {};
-            for (const fec in todasAsis) {
-                for (const prog in todasAsis[fec]) {
-                    if (todasAsis[fec][prog][rutAntiguo]) {
-                        let asisData = todasAsis[fec][prog][rutAntiguo];
-                        asisData.rut = nuevoRut;
-                        asisUpdates[`2_asistencias/${fec}/${prog}/${nuevoRut}`] = asisData;
-                        asisUpdates[`2_asistencias/${fec}/${prog}/${rutAntiguo}`] = null;
-                    }
-                }
-            }
-            if (Object.keys(asisUpdates).length > 0) await update(ref(db), asisUpdates);
-        }
-
-        // 3. Mover en 3_reservas
-        const resSnap = await get(ref(db, '3_reservas'));
-        if (resSnap.exists()) {
-            const todasRes = resSnap.val();
-            let resUpdates = {};
-            for (const fec in todasRes) {
-                for (const prog in todasRes[fec]) {
-                    if (todasRes[fec][prog][rutAntiguo]) {
-                        let resData = todasRes[fec][prog][rutAntiguo];
-                        resUpdates[`3_reservas/${fec}/${prog}/${nuevoRut}`] = resData;
-                        resUpdates[`3_reservas/${fec}/${prog}/${rutAntiguo}`] = null;
-                    }
-                }
-            }
-            if (Object.keys(resUpdates).length > 0) await update(ref(db), resUpdates);
-        }
-
-        // 4. Mover en 7_pagos_efectivo
-        const efeSnap = await get(ref(db, '7_pagos_efectivo'));
-        if (efeSnap.exists()) {
-            const todosEfe = efeSnap.val();
-            let efeUpdates = {};
-            for (const id in todosEfe) {
-                if (todosEfe[id].rut === rutAntiguo) {
-                    efeUpdates[`7_pagos_efectivo/${id}/rut`] = nuevoRut;
-                }
-            }
-            if (Object.keys(efeUpdates).length > 0) await update(ref(db), efeUpdates);
-        }
-        
-        // 5. Mover en 4_blacklist
-        if (window.blacklistGlobal && window.blacklistGlobal[rutAntiguo]) {
-            const blackData = (await get(child(ref(db), `4_blacklist/${rutAntiguo}`))).val();
-            await set(ref(db, `4_blacklist/${nuevoRut}`), blackData);
-            await remove(ref(db, `4_blacklist/${rutAntiguo}`));
-        }
-
-        // 6. Eliminar el RUT antiguo de trabajadores
-        await remove(ref(db, `1_trabajadores/${rutAntiguo}`));
-
-        alert(`✅ RUT corregido con éxito.\nSe movieron todos los registros de ${rutAntiguo} a ${nuevoRut}.`);
-        
-        modalFichaInstance.hide();
-        document.getElementById('crm-tab').click(); 
-        
-    } catch (e) {
-        alert("Error al intentar cambiar el RUT: " + e.message);
-    }
-}
 
 window.forzarIngresoPasado = async function(rut, nombre) {
     let fec = prompt(`Vas a ingresar a ${nombre} a una jornada pasada.\n\nIngresa la FECHA EXACTA (Ej: 2026-09-10):`, new Date().toISOString().split('T')[0]);
@@ -1544,8 +1425,8 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
         });
         
         alert("Datos actualizados correctamente."); 
-        window.listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
-        renderCRM(window.listaGlobalCRM); 
+        listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
+        renderCRM(listaGlobalCRM); 
         modalFichaInstance.hide();
     } catch (e) { 
         alert("Error al guardar."); 
@@ -1555,8 +1436,8 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
 if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
-        delete window.listaGlobalCRM[rutPerfilActual]; 
-        renderCRM(window.listaGlobalCRM); 
+        delete listaGlobalCRM[rutPerfilActual]; 
+        renderCRM(listaGlobalCRM); 
         modalFichaInstance.hide(); 
         alert("Trabajador eliminado.");
     }
@@ -1568,9 +1449,9 @@ if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear
     
     if(confirm("¿Bloquear permanentemente a este usuario?")) {
         await set(ref(db, `4_blacklist/${rutPerfilActual}`), { fecha: new Date().toISOString(), motivo: motivo });
-        window.blacklistGlobal[rutPerfilActual] = { motivo: motivo }; 
+        blacklistGlobal[rutPerfilActual] = { motivo: motivo }; 
         modalFichaInstance.hide(); 
-        renderCRM(window.listaGlobalCRM); 
+        renderCRM(listaGlobalCRM); 
         alert("Usuario bloqueado.");
     }
 });
@@ -1578,9 +1459,9 @@ if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear
 if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').addEventListener('click', async () => {
     if(confirm("¿Quitar de la lista negra?")) {
         await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); 
-        delete window.blacklistGlobal[rutPerfilActual]; 
+        delete blacklistGlobal[rutPerfilActual]; 
         modalFichaInstance.hide(); 
-        renderCRM(window.listaGlobalCRM); 
+        renderCRM(listaGlobalCRM); 
         alert("Usuario desbloqueado.");
     }
 });
@@ -1593,7 +1474,7 @@ if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-t
     if (!snap.exists()) return;
     
     const trabSnap = await get(ref(db, '1_trabajadores')); 
-    if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val();
+    if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     let deudas = {}; 
     const todas = snap.val();
@@ -1621,7 +1502,7 @@ if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-t
         tbody.innerHTML = "";
         
         for (const r in deudas) {
-            const tr = window.listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
+            const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" }; 
             const fila = document.createElement('tr');
             fila.innerHTML = `
                 <td>${r}</td>
@@ -1646,11 +1527,11 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     let actualizacionesFirebase = {};
     
     const trabSnap = await get(ref(db, '1_trabajadores')); 
-    if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val();
+    if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        const tr = window.listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
+        const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
@@ -1935,7 +1816,7 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
             <td>${nombreLimpio}</td>
             <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
             <td>
-                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/'/g, "\'")}')">💸 Pagar</button>
+                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/['\"\`]/g, '')}')">💸 Pagar</button>
             </td>
         </tr>
         `;
@@ -2411,20 +2292,8 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                                         </thead>
                                         <tbody>`;
                     
-                    // --- NUEVA LÓGICA DE ORDENAMIENTO POR DÍAS ASISTIDOS ---
-                    // 1. Convertimos el objeto de RUTs en un arreglo para poder ordenarlo
-                    const arrayRuts = Object.keys(weekData.ruts).map(rut => {
-                        return { rut: rut, data: weekData.ruts[rut] };
-                    });
-
-                    // 2. Ordenamos el arreglo de mayor a menor cantidad de fechas asistidas
-                    arrayRuts.sort((a, b) => b.data.fechas.length - a.data.fechas.length);
-
-                    // 3. Iteramos sobre el arreglo ya ordenado para construir las filas
-                    for (const item of arrayRuts) {
-                        const rut = item.rut;
-                        const asisData = item.data;
-                        
+                    for (const rut in weekData.ruts) {
+                        const asisData = weekData.ruts[rut];
                         const rowClass = asisData.todoLiquidado ? 'table-success' : '';
                         const textColor = asisData.todoLiquidado ? 'text-dark' : 'text-white';
                         const btnClass = asisData.todoLiquidado ? 'btn-success text-dark' : 'btn-outline-success';
@@ -2434,23 +2303,15 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                         const trId = `tr_${progIdx}_${wkIdx}_${rut}`;
                         const btnId = `btn_${progIdx}_${wkIdx}_${rut}`;
 
-                        // Calculamos la cantidad de días asistidos para mostrar en el badge
-                        const cantidadDias = asisData.fechas.length;
-                        const textoDias = cantidadDias === 1 ? '1 Día' : `${cantidadDias} Días`;
-
                         html += `
                                             <tr class="${rowClass}" style="transition: 0.3s;" id="${trId}">
-                                                <td class="fw-bold text-warning dt-text-element">
-                                                    <span class="badge bg-info text-dark me-2" style="font-size: 0.9em;">${textoDias}</span>
-                                                    <br class="d-md-none">
-                                                    ${asisData.tickets.join(', ')}
-                                                </td>
+                                                <td class="fw-bold text-warning dt-text-element">${asisData.tickets.join(', ')}</td>
                                                 <td class="fw-bold ${textColor} dt-text-element">${rut}</td>
                                                 <td class="${textColor} dt-text-element">${asisData.nombres}</td>
                                                 <td class="${textColor} dt-text-element">${asisData.email}</td>
                                                 <td class="${textColor} dt-text-element">${asisData.telefono}</td>
                                                 <td class="${textColor} dt-text-element">${asisData.direccion}</td>
-                                                <td><span class="badge bg-secondary text-light">${asisData.fechas.join(', ')}</span></td>
+                                                <td><span class="badge bg-info text-dark">${asisData.fechas.join(', ')}</span></td>
                                                 <td class="${textColor} dt-text-element">Base: $${asisData.montoSuma} <br><b class="text-warning">DT (+25%): $${montoImpuestos}</b></td>
                                                 <td>
                                                     <div class="d-flex justify-content-center gap-1">
@@ -2800,7 +2661,7 @@ if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnR
         if (!snap.exists()) return alert("No hay datos de asistencias.");
         
         const trabSnap = await get(ref(db, '1_trabajadores')); 
-        if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val(); 
+        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         let agrupado = {};
         const todas = snap.val();
@@ -2827,7 +2688,7 @@ if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnR
         let csv = "\uFEFFRUT;Nombres;Apellidos;Total Dias Asistidos;Monto Total Historico;Programas y Fechas\n";
         
         for (const r in agrupado) {
-            const trab = window.listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+            const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
             const asisData = agrupado[r];
             
             const programasStr = asisData.programas.join(" | ");
@@ -2856,7 +2717,7 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
         }
         
         const trabSnap = await get(ref(db, '1_trabajadores')); 
-        if (trabSnap.exists()) window.listaGlobalCRM = trabSnap.val(); 
+        if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         const todas = snap.val(); 
         const zip = new JSZip(); 
@@ -2869,7 +2730,7 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
                 
                 for (const r in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][r]; 
-                    const trab = window.listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+                    const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
                     
                     if (asis.firma_digital) {
                         const doc = new jsPDF({ format: 'legal' }); 
