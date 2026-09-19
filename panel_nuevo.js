@@ -2960,7 +2960,7 @@ async function renderPanelMenoresBatch() {
             <h5 class="text-warning fw-bold text-center mb-2">🩹 Herramienta de Emergencia (Sueldos)</h5>
             <p class="text-white text-center mb-3" style="font-size: 0.9em;">Si cerraste un día y el sistema descontó la plata por error, usa este botón para restaurar el valor original a toda la sala de un golpe.</p>
             <button class="btn btn-warning fw-bold w-100 py-3 fs-4 text-dark shadow-sm" id="btnRestaurarSueldosError" style="border-radius: 8px;">
-                💰 Restaurar Sueldos a $10.000
+                💰 Restaurar Sueldos de la Jornada
             </button>
         `;
         tabPaneEmergencia.appendChild(divEmergencia);
@@ -3144,7 +3144,7 @@ document.body.addEventListener('click', async (e) => {
             const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
             if (!snap.exists()) {
                 if(btn) {
-                    btn.innerText = "💰 Restaurar Sueldos a $10.000";
+                    btn.innerText = "💰 Restaurar Sueldos de la Jornada";
                     btn.disabled = false;
                 }
                 return alert("❌ No se encontró ese programa en esa fecha. Revisa que el nombre y fecha sean exactos (ej: 'Detrás del Muro').");
@@ -3168,14 +3168,14 @@ document.body.addEventListener('click', async (e) => {
                 alert("No habían personas de pago en esa sala.");
             }
             if(btn) {
-                btn.innerText = "💰 Restaurar Sueldos a $10.000";
+                btn.innerText = "💰 Restaurar Sueldos de la Jornada";
                 btn.disabled = false;
             }
         } catch(err) {
             alert("Error: " + err.message);
             const btn = document.getElementById('btnRestaurarSueldosError');
             if(btn) {
-                btn.innerText = "💰 Restaurar Sueldos a $10.000";
+                btn.innerText = "💰 Restaurar Sueldos de la Jornada";
                 btn.disabled = false;
             }
         }
