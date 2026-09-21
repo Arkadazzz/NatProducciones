@@ -3102,7 +3102,7 @@ async function renderPanelMenoresBatch() {
                 flatPermisos.forEach(auto => {
                     const doc = new jsPDF();
                     doc.setFont("helvetica", "bold"); doc.setFontSize(14);
-                    doc.text("AUTORIZACIÓN PARA TRABAJO DE MENOR DE EDAD", 105, 20, null, null, "center");
+                    doc.text("AUTORIZACIÓN PARA SER PÚBLICO", 105, 20, null, null, "center");
                     
                     doc.setFont("helvetica", "normal"); doc.setFontSize(11);
                     
@@ -3112,39 +3112,37 @@ async function renderPanelMenoresBatch() {
                     const mes = meses[parseInt(partesFecha[1]) - 1];
                     const anio = partesFecha[0];
 
-                    const texto = `En Santiago de Chile a ${dia} de ${mes} de ${anio}, yo ${auto.nombre_apoderado}, nacionalidad ${auto.nacionalidad_apoderado}, profesión/oficio ${auto.profesion_apoderado}, Cédula de Identidad N° ${auto.rut_apoderado}, con domicilio en ${auto.domicilio_apoderado}, en mi calidad de ${auto.relacion_apoderado} del menor ${auto.nombre_menor}, Cédula de Identidad N° ${auto.rut_menor}, de ${auto.edad_menor} años de edad, vengo en otorgar mi autorización expresa para que mi hijo(a)/pupilo(a) pueda desempeñarse laboralmente con la empresa:
+                    const texto = `En Santiago de Chile a ${dia} de ${mes} de ${anio}, yo ${auto.nombre_apoderado}, de nacionalidad ${auto.nacionalidad_apoderado}, profesión/oficio ${auto.profesion_apoderado}, con domicilio en ${auto.domicilio_apoderado}, Cédula de Identidad (del adulto) N° ${auto.rut_apoderado}, en mi calidad de ${auto.relacion_apoderado} del menor ${auto.nombre_menor}, Cédula de Identidad N° ${auto.rut_menor}, de ${auto.edad_menor} años de edad, vengo en otorgar mi autorización expresa para que mi hijo(a)/pupilo(a) pueda desempeñarse como público invitado con la empresa RAZÓN SOCIAL: Camila Alejandra Fevre Seguel E.I.R.L. Producción. NOMBRE DE FANTASÍA: Nat Producciones
 
-RAZÓN SOCIAL: Camila Alejandra Fevre Seguel E.I.R.L. Producción. NOMBRE DE FANTASÍA: Nat Producciones
-
-1. Objeto de la Prestación de Servicios
+1. Objeto de la Autorización
 El menor queda autorizado para participar en las siguientes actividades:
-• Desempeñarse como extra en series y películas.
 • Participar como público en programas de televisión del canal Mega. (Dale Play)
 
 2. Condiciones de Seguridad y Bienestar
-Declaro haber sido informado(a) de que la productora garantiza las condiciones de seguridad y dignidad para el menor durante la ejecución de sus labores, contando con:
+Declaro haber sido informado(a) de que la productora garantiza las condiciones de seguridad y dignidad para el menor durante la jornada:
 • Presencia de un Prevencionista de Riesgos en terreno.
 • Acceso a servicio de Enfermería y primeros auxilios.
 • Suministro de agua potable, servicios higiénicos y cobertura de necesidades básicas.
 
 3. Declaración de Cumplimiento Legal
-Esta autorización se otorga conforme a lo establecido en el Código del Trabajo de Chile, asegurando que las labores no interrumpirán los estudios del menor ni perjudicarán su salud o desarrollo físico y moral.
+Las labores no interrumpirán los estudios del menor ni perjudicarán su salud o desarrollo físico y moral.
 
-La presente autorización es válida para el período en curso.`;
+La presente autorización es válida para la temporada de primavera-verano 2026-2027. (Septiembre a Marzo).`;
                     
                     const lineas = doc.splitTextToSize(texto, 170);
                     doc.text(lineas, 20, 40);
                     
                     if (auto.firma_apoderado) {
-                        try { doc.addImage(auto.firma_apoderado, 'JPEG', 65, 150, 80, 25); } catch(e) {}
+                        try { doc.addImage(auto.firma_apoderado, 'JPEG', 65, 140, 80, 25); } catch(e) {}
                     }
                     
                     doc.setFont("helvetica", "bold");
-                    doc.text("_________________________________", 105, 180, null, null, "center");
-                    doc.text("Firma Apoderado / Tutor Legal", 105, 185, null, null, "center");
+                    doc.text("_________________________________", 105, 170, null, null, "center");
+                    doc.text("Firma del apoderado", 105, 175, null, null, "center");
                     doc.setFont("helvetica", "normal");
-                    doc.text(auto.nombre_apoderado, 105, 190, null, null, "center");
-                    doc.text(auto.rut_apoderado, 105, 195, null, null, "center");
+                    doc.text("Nombre completo del apoderado: " + auto.nombre_apoderado, 105, 185, null, null, "center");
+                    doc.text("RUN/Cédula de Identidad: " + auto.rut_apoderado, 105, 190, null, null, "center");
+                    doc.text("Fecha: " + dia + "/" + partesFecha[1] + "/" + anio, 105, 195, null, null, "center");
                     
                     const pdfBlob = doc.output('blob');
                     const safeMenor = auto.nombre_menor.replace(/[^a-zA-Z0-9]/g, "_");
