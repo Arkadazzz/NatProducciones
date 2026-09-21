@@ -640,9 +640,21 @@ function activarRadares() {
         arrAsistentes.forEach(item => {
             const { rut, asis, trab, num } = item;
             
+            let esMenorLista = false;
+            if (trab.fechaNacimiento) {
+                const [y, m, d] = trab.fechaNacimiento.split('-');
+                const hoy = new Date();
+                const cumple = new Date(y, m - 1, d);
+                let edad = hoy.getFullYear() - cumple.getFullYear();
+                if (hoy.getMonth() - cumple.getMonth() < 0 || (hoy.getMonth() - cumple.getMonth() === 0 && hoy.getDate() < cumple.getDate())) { edad--; }
+                if (edad < 18) esMenorLista = true;
+            }
+
             let badgeDT = "";
             if (asis.tipo_ingreso === "Pago" && asis.aplica_contrato) {
                 badgeDT = `<span class="badge bg-dark text-secondary border border-secondary" style="font-size: 0.75em;">Aplica</span>`;
+            } else if (esMenorLista) {
+                badgeDT = `<span class="badge bg-danger text-white border border-danger" style="font-size: 0.75em;">Menor</span>`;
             } else {
                 badgeDT = `<span class="text-muted" style="font-size: 0.8em;">N/A</span>`;
             }
@@ -951,12 +963,35 @@ async function onScanSuccess(decodedText) {
                 esCortesia = false; 
             }
 
-            if (infoInvitado) infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
+            let esMenorCalculado = false;
+            if (datos.fechaNacimiento) {
+                const [y, m, d] = datos.fechaNacimiento.split('-');
+                const hoy = new Date();
+                const cumple = new Date(y, m - 1, d);
+                let edad = hoy.getFullYear() - cumple.getFullYear();
+                if (hoy.getMonth() - cumple.getMonth() < 0 || (hoy.getMonth() - cumple.getMonth() === 0 && hoy.getDate() < cumple.getDate())) { edad--; }
+                if (edad < 18) esMenorCalculado = true;
+            }
+
+            if (infoInvitado) {
+                if (esMenorCalculado) {
+                    infoInvitado.innerHTML = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por}) <span class="badge bg-danger ms-2">👶 MENOR DE EDAD</span>` : `✅ EXTRA CON PAGO ($${montoPago}) <span class="badge bg-danger ms-2">👶 MENOR DE EDAD</span>`;
+                } else {
+                    infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
+                }
+            }
 
             const opcionesDiv = document.getElementById('opcionesFirmaAdmin');
             if (opcionesDiv) opcionesDiv.classList.remove('d-none');
             
-            if (esCortesia) {
+            if (esMenorCalculado) {
+                if (opcionesDiv) opcionesDiv.innerHTML = `
+                    <div class="alert alert-danger p-2 mb-0" style="background: #330000; border: 1px solid #ff3333;">
+                        <strong class="text-white">👶 MENOR DE EDAD DETECTADO</strong><br>
+                        <small class="text-white">Por ley, no se le generará contrato laboral (DT). El sistema lo contará en la capacidad pero solo se emitirá Cesión de Imagen.</small>
+                    </div>
+                `;
+            } else if (esCortesia) {
                 const nombreActual = reservaSnap.exists() ? reservaSnap.val().invitado_por : "";
                 if (opcionesDiv) opcionesDiv.innerHTML = `
                     <label class="form-label text-warning mb-1">Corregir "Invitado Por":</label>
@@ -1029,15 +1064,30 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
     
     let invitadoPor = "";
     let aplicaContrato = false;
+    
+    let esMenor = false;
+    const trabData = listaGlobalCRM[rutActual];
+    if (trabData && trabData.fechaNacimiento) {
+        const [y, m, d] = trabData.fechaNacimiento.split('-');
+        const hoy = new Date();
+        const cumple = new Date(y, m - 1, d);
+        let edad = hoy.getFullYear() - cumple.getFullYear();
+        if (hoy.getMonth() - cumple.getMonth() < 0 || (hoy.getMonth() - cumple.getMonth() === 0 && hoy.getDate() < cumple.getDate())) { edad--; }
+        if (edad < 18) esMenor = true;
+    }
 
     if (tipo === "Cortesía") {
         invitadoPor = document.getElementById('editInvitadoPor') ? document.getElementById('editInvitadoPor').value : "";
         aplicaContrato = false; 
     } else {
-        aplicaContrato = document.getElementById('checkAplicaContrato') ? document.getElementById('checkAplicaContrato').checked : true;
+        if (esMenor) {
+            aplicaContrato = false;
+        } else {
+            aplicaContrato = document.getElementById('checkAplicaContrato') ? document.getElementById('checkAplicaContrato').checked : true;
+        }
     }
 
-    if (nombrePrograma.includes("Coliseo")) {
+    if (nombrePrograma.includes("Coliseo") && !esMenor) {
         aplicaContrato = true;
     }
 
@@ -1367,6 +1417,17 @@ window.forzarIngresoPasado = async function(rut, nombre) {
     
     if(!confirm(`¿Seguro que deseas inyectar a ${nombre} en el programa ${prog} del día ${fec} por $${monto}?`)) return;
     
+    let esMenor = false;
+    const pInfo = listaGlobalCRM[rut];
+    if (pInfo && pInfo.fechaNacimiento) {
+        const [y, m, d] = pInfo.fechaNacimiento.split('-');
+        const hoy = new Date();
+        const cumple = new Date(y, m - 1, d);
+        let edad = hoy.getFullYear() - cumple.getFullYear();
+        if (hoy.getMonth() - cumple.getMonth() < 0 || (hoy.getMonth() - cumple.getMonth() === 0 && hoy.getDate() < cumple.getDate())) { edad--; }
+        if (edad < 18) esMenor = true;
+    }
+
     try {
         const snap = await get(ref(db, `2_asistencias/${fec}/${prog}`));
         let numReal = 0;
@@ -1391,7 +1452,7 @@ window.forzarIngresoPasado = async function(rut, nombre) {
             estado_pago: "Pendiente",
             numero_asignado: numeroFinal,
             invitado_por: "Administración",
-            aplica_contrato: true,
+            aplica_contrato: !esMenor,
             estado_dt: "Pendiente",
             ingreso_administrativo: true
         });
