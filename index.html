@@ -246,7 +246,6 @@
                 </div>
             </div>
 
-            
             <!-- ESCUDO LEGAL LEY 19.628 -->
             <div class="form-check mb-4" style="background: #1a0a0a; padding: 15px 15px 15px 40px; border-left: 3px solid #ff3333; border-radius: 5px;">
                 <input class="form-check-input" type="checkbox" id="consentimientoSalud" required style="transform: scale(1.3); margin-top: 5px; cursor: pointer;">
@@ -255,14 +254,15 @@
                 </label>
             </div>
 
-            <div class="separator"></div>
-
             <!-- SECCIÓN 5: MENORES DE EDAD -->
-            <h5 class="section-title text-info">🚸 Permiso para Menores de Edad</h5>
-            <div class="form-check form-switch mb-3 p-3 rounded" style="background: #1a1a1a; border: 1px solid #17a2b8;">
-                <input class="form-check-input ms-1" type="checkbox" id="esMenorEdad" style="transform: scale(1.3); cursor: pointer;">
-                <label class="form-check-label ms-3 text-info fw-bold" for="esMenorEdad" style="cursor: pointer;">Soy menor de edad (Requiere permiso firmado por apoderado)</label>
+            <div id="contenedorMenorVisual" class="d-none">
+                <div class="separator"></div>
+                <h5 class="section-title text-danger">🚸 Autorización de Menor de Edad</h5>
+                <div class="alert p-3 mb-3 shadow-sm" style="background: #330000; border: 1px solid #ff3333;">
+                    <strong class="text-white">Detección Automática:</strong> <span class="text-white small">El sistema ha detectado por tu fecha de nacimiento que eres menor de 18 años. Es <b>obligatorio</b> que tu apoderado o tutor legal complete los datos y firme en el recuadro blanco para poder ingresar.</span>
+                </div>
             </div>
+            <input type="checkbox" id="esMenorEdad" class="d-none">
 
             <div id="seccionMenores" class="d-none p-3 rounded mb-4" style="background: #0d1b2a; border: 1px solid #17a2b8;">
                 <h6 class="text-info fw-bold mb-3">Datos del Apoderado / Tutor Legal</h6>
@@ -309,7 +309,6 @@
                 </div>
             </div>
 
-
             <button type="submit" class="btn btn-custom" id="btnEnviar">ENVIAR REGISTRO 🚀</button>
         </form>
     </div>
@@ -347,24 +346,41 @@
     const db = getDatabase(app);
 
     let programasDisponibles = {};
-
     const esMenorCheck = document.getElementById('esMenorEdad');
     const seccionMenores = document.getElementById('seccionMenores');
+    const contenedorMenorVisual = document.getElementById('contenedorMenorVisual');
     let signaturePadApoderado = null;
 
-    esMenorCheck.addEventListener('change', function() {
-        if (this.checked) {
-            seccionMenores.classList.remove('d-none');
-            if (!signaturePadApoderado) {
-                const canvasAp = document.getElementById('signature-pad-apoderado');
-                const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                canvasAp.width = canvasAp.offsetWidth * ratio;
-                canvasAp.height = canvasAp.offsetHeight * ratio;
-                canvasAp.getContext("2d").scale(ratio, ratio);
-                signaturePadApoderado = new SignaturePad(canvasAp, { backgroundColor: 'rgb(255, 255, 255)' });
+    document.getElementById('fechaNac').addEventListener('change', function() {
+        const fecha = this.value;
+        if (fecha) {
+            const [y, m, d] = fecha.split('-');
+            const hoy = new Date();
+            const cumple = new Date(y, m - 1, d);
+            let edad = hoy.getFullYear() - cumple.getFullYear();
+            if (hoy.getMonth() - cumple.getMonth() < 0 || (hoy.getMonth() - cumple.getMonth() === 0 && hoy.getDate() < cumple.getDate())) { edad--; }
+
+            if (edad < 18) {
+                esMenorCheck.checked = true;
+                contenedorMenorVisual.classList.remove('d-none');
+                seccionMenores.classList.remove('d-none');
+                
+                if (!signaturePadApoderado) {
+                    // Small delay to ensure the element is visible before calculating dimensions
+                    setTimeout(() => {
+                        const canvasAp = document.getElementById('signature-pad-apoderado');
+                        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                        canvasAp.width = canvasAp.offsetWidth * ratio;
+                        canvasAp.height = canvasAp.offsetHeight * ratio;
+                        canvasAp.getContext("2d").scale(ratio, ratio);
+                        signaturePadApoderado = new SignaturePad(canvasAp, { backgroundColor: 'rgb(255, 255, 255)' });
+                    }, 100);
+                }
+            } else {
+                esMenorCheck.checked = false;
+                contenedorMenorVisual.classList.add('d-none');
+                seccionMenores.classList.add('d-none');
             }
-        } else {
-            seccionMenores.classList.add('d-none');
         }
     });
 
@@ -519,6 +535,7 @@
                     document.getElementById('apellidoPaterno').value = apellidosArr[0] || '';
                     document.getElementById('apellidoMaterno').value = apellidosArr.slice(1).join(' ') || '';
                     document.getElementById('fechaNac').value = d.fechaNacimiento || '';
+                    document.getElementById('fechaNac').dispatchEvent(new Event('change'));
                     document.getElementById('telefono').value = d.telefono || '';
                     document.getElementById('email').value = d.email || '';
                     
@@ -585,7 +602,6 @@
                 }
             }
 
-            
             const esMenor = document.getElementById('esMenorEdad').checked;
             if (esMenor) {
                 if (!signaturePadApoderado || signaturePadApoderado.isEmpty()) {
@@ -645,7 +661,6 @@
 
             await set(ref(db, `1_trabajadores/${rut}`), datosTrabajador);
 
-            
             await set(ref(db, `3_reservas/${prog.fecha}/${prog.nombre}/${rut}`), {
                 rut: rut,
                 tipo: tipo,
@@ -670,7 +685,6 @@
                 };
                 await set(ref(db, `8_autorizaciones_menores/${prog.fecha}/${prog.nombre}/${rut}`), datosMenor);
             }
-
 
             document.getElementById('form-container').classList.add('d-none');
             document.getElementById('success-container').classList.remove('d-none');
