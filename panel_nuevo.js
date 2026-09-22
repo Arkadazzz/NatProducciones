@@ -1051,6 +1051,14 @@ async function onScanSuccess(decodedText) {
 
 if (document.getElementById('btnLimpiarFirma')) document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 
+if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnCancelarEscaneo').addEventListener('click', () => {
+    if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.add('d-none');
+    if (typeof signaturePad !== 'undefined' && signaturePad) signaturePad.clear();
+    rutActual = "";
+    try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {}
+    if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none');
+});
+
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     
@@ -1126,7 +1134,7 @@ window.anularAsistencia = async function(rut) {
 // ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
-    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
+    const asisSnap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     
@@ -3330,7 +3338,7 @@ window.descargarZIPCpciones = async function(event, prog, fecha) {
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            get(child(ref(db), `2_asistencias/${fecha}/${prog}`)), 
+            get(child(ref(db, `2_asistencias/${fecha}/${prog}`))), 
             get(ref(db, '1_trabajadores')) 
         ]);
         
