@@ -116,8 +116,6 @@ get(ref(db, '1_trabajadores')).then(snap => {
 });
 
 
-
-
 // ==========================================
 // CIERRE CONTABLE MENSUAL (CONTADOR)
 // ==========================================
@@ -462,7 +460,7 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
     if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
 
     try {
-        const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
+        const snap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
         if (snap.exists()) {
             const asistencias = snap.val();
             let actualizacionesFirebase = {};
@@ -1059,7 +1057,6 @@ if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnC
     if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none');
 });
 
-
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     
@@ -1135,7 +1132,7 @@ window.anularAsistencia = async function(rut) {
 // ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
-    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
+    const asisSnap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     
@@ -2379,9 +2376,14 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                                         </thead>
                                         <tbody>`;
                     
-                    // ORDENAR POR CANTIDAD DE TICKETS (DESCENDENTE)
+                    // ORDENAR POR CANTIDAD DE TICKETS (DESCENDENTE) Y LUEGO ALFABÉTICAMENTE
                     const rutsOrdenados = Object.keys(weekData.ruts).sort((a, b) => {
-                        return weekData.ruts[b].fechas.length - weekData.ruts[a].fechas.length;
+                        const cantidadA = weekData.ruts[a].tickets.length;
+                        const cantidadB = weekData.ruts[b].tickets.length;
+                        if (cantidadA !== cantidadB) {
+                            return cantidadB - cantidadA; // Mayor cantidad primero
+                        }
+                        return weekData.ruts[a].nombres.localeCompare(weekData.ruts[b].nombres); // Desempate por nombre
                     });
                     
                     for (const rut of rutsOrdenados) {
@@ -3361,7 +3363,7 @@ window.descargarZIPCpciones = async function(event, prog, fecha) {
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            get(child(ref(db), `2_asistencias/${fecha}/${prog}`)), 
+            get(child(ref(db, `2_asistencias/${fecha}/${prog}`))), 
             get(ref(db, '1_trabajadores')) 
         ]);
         
