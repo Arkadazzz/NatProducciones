@@ -94,7 +94,7 @@ function poblarSelectoresHora() {
             let h12 = h % 12; 
             if (h12 === 0) h12 = 12;
             let hh12 = h12.toString().padStart(2, '0');
-            opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm}${ampm}</option>`;
+            opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm} ${ampm}</option>`;
         }
     }
     const selectCitacion = document.getElementById('horaCitacion');
@@ -114,6 +114,8 @@ get(ref(db, '1_trabajadores')).then(snap => {
         if (typeof window.renderTablaPuerta === "function") window.renderTablaPuerta();
     }
 });
+
+
 
 
 // ==========================================
@@ -153,7 +155,7 @@ function inicializarContador() {
             if (typeof nodosProgramas !== 'object') return;
 
             Object.keys(nodosProgramas).forEach(prog => {
-                infoMeses[mes].programas.add(`${fecha}\vert{}${prog}`);
+                infoMeses[mes].programas.add(`${fecha}|${prog}`);
                 const asistentes = nodosProgramas[prog];
                 
                 if (typeof asistentes !== 'object') return;
@@ -186,7 +188,7 @@ function inicializarContador() {
                 const yyyy = partes[0];
                 const mm = parseInt(partes[1]) - 1;
                 if (!isNaN(mm) && mm >= 0 && mm < 12) {
-                    htmlOptions += `<option value="${m}">📆 ${nombresMeses[mm].toUpperCase()}${yyyy}</option>`;
+                    htmlOptions += `<option value="${m}">📆 ${nombresMeses[mm].toUpperCase()} ${yyyy}</option>`;
                 }
             }
         });
@@ -1057,6 +1059,7 @@ if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnC
     if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none');
 });
 
+
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     
@@ -1132,7 +1135,7 @@ window.anularAsistencia = async function(rut) {
 // ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
-    const asisSnap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)));
+    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     
@@ -2376,14 +2379,9 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                                         </thead>
                                         <tbody>`;
                     
-                    // ORDENAR POR CANTIDAD DE TICKETS (DESCENDENTE) Y LUEGO ALFABÉTICAMENTE
+                    // ORDENAR POR CANTIDAD DE TICKETS (DESCENDENTE)
                     const rutsOrdenados = Object.keys(weekData.ruts).sort((a, b) => {
-                        const cantidadA = weekData.ruts[a].tickets.length;
-                        const cantidadB = weekData.ruts[b].tickets.length;
-                        if (cantidadA !== cantidadB) {
-                            return cantidadB - cantidadA; // Mayor cantidad primero
-                        }
-                        return weekData.ruts[a].nombres.localeCompare(weekData.ruts[b].nombres); // Desempate por nombre
+                        return weekData.ruts[b].fechas.length - weekData.ruts[a].fechas.length;
                     });
                     
                     for (const rut of rutsOrdenados) {
@@ -3363,7 +3361,7 @@ window.descargarZIPCpciones = async function(event, prog, fecha) {
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            get(child(ref(db, `2_asistencias/${fecha}/${prog}`))), 
+            get(child(ref(db), `2_asistencias/${fecha}/${prog}`)), 
             get(ref(db, '1_trabajadores')) 
         ]);
         
