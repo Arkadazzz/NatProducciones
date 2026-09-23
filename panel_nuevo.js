@@ -116,6 +116,8 @@ get(ref(db, '1_trabajadores')).then(snap => {
 });
 
 
+
+
 // ==========================================
 // CIERRE CONTABLE MENSUAL (CONTADOR)
 // ==========================================
@@ -1057,6 +1059,7 @@ if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnC
     if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none');
 });
 
+
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     
@@ -1574,7 +1577,7 @@ if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-t
             fila.innerHTML = `
                 <td>${r}</td>
                 <td>${tr.nombres} ${tr.apellidos}</td>
-                <td><span class="badge bg-secondary">${deudas[r].dias} days</span></td>
+                <td><span class="badge bg-secondary">${deudas[r].dias} días</span></td>
                 <td class="text-success fw-bold fs-5">$${deudas[r].monto}</td>
             `; 
             tbody.appendChild(fila);
@@ -2376,7 +2379,12 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                                         </thead>
                                         <tbody>`;
                     
-                    for (const rut in weekData.ruts) {
+                    // ORDENAR POR CANTIDAD DE TICKETS (DESCENDENTE)
+                    const rutsOrdenados = Object.keys(weekData.ruts).sort((a, b) => {
+                        return weekData.ruts[b].fechas.length - weekData.ruts[a].fechas.length;
+                    });
+                    
+                    for (const rut of rutsOrdenados) {
                         const asisData = weekData.ruts[rut];
                         const rowClass = asisData.todoLiquidado ? 'table-success' : '';
                         const textColor = asisData.todoLiquidado ? 'text-dark' : 'text-white';
