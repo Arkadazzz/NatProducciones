@@ -94,7 +94,7 @@ function poblarSelectoresHora() {
             let h12 = h % 12; 
             if (h12 === 0) h12 = 12;
             let hh12 = h12.toString().padStart(2, '0');
-            opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm} ${ampm}</option>`;
+            opcionesHTML += `<option value="${hh24}:${mm}">${hh12}:${mm}${ampm}</option>`;
         }
     }
     const selectCitacion = document.getElementById('horaCitacion');
@@ -153,7 +153,7 @@ function inicializarContador() {
             if (typeof nodosProgramas !== 'object') return;
 
             Object.keys(nodosProgramas).forEach(prog => {
-                infoMeses[mes].programas.add(`${fecha}|${prog}`);
+                infoMeses[mes].programas.add(`${fecha}\vert{}${prog}`);
                 const asistentes = nodosProgramas[prog];
                 
                 if (typeof asistentes !== 'object') return;
@@ -186,7 +186,7 @@ function inicializarContador() {
                 const yyyy = partes[0];
                 const mm = parseInt(partes[1]) - 1;
                 if (!isNaN(mm) && mm >= 0 && mm < 12) {
-                    htmlOptions += `<option value="${m}">📆 ${nombresMeses[mm].toUpperCase()} ${yyyy}</option>`;
+                    htmlOptions += `<option value="${m}">📆 ${nombresMeses[mm].toUpperCase()}${yyyy}</option>`;
                 }
             }
         });
@@ -460,7 +460,7 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
     if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
 
     try {
-        const snap = await get(child(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
+        const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
         if (snap.exists()) {
             const asistencias = snap.val();
             let actualizacionesFirebase = {};
