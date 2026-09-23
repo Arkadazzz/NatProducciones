@@ -116,8 +116,6 @@ get(ref(db, '1_trabajadores')).then(snap => {
 });
 
 
-
-
 // ==========================================
 // CIERRE CONTABLE MENSUAL (CONTADOR)
 // ==========================================
@@ -1576,7 +1574,7 @@ if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-t
             fila.innerHTML = `
                 <td>${r}</td>
                 <td>${tr.nombres} ${tr.apellidos}</td>
-                <td><span class="badge bg-secondary">${deudas[r].dias} días</span></td>
+                <td><span class="badge bg-secondary">${deudas[r].dias} days</span></td>
                 <td class="text-success fw-bold fs-5">$${deudas[r].monto}</td>
             `; 
             tbody.appendChild(fila);
@@ -1825,14 +1823,21 @@ async function cargarListaEfectivo() {
                                 rut: r,
                                 montoTotal: 0,
                                 programasDetalle: [],
-                                firma: asis.firma_digital || null
+                                firma: asis.firma_digital || null,
+                                ticketsResumen: []
                             };
                         }
                         deudasEfectivo[r].montoTotal += montoLimpio;
+                        
+                        const numTicket = asis.numero_asignado ? asis.numero_asignado : "S/T";
+                        if (!deudasEfectivo[r].ticketsResumen.includes(numTicket)) {
+                            deudasEfectivo[r].ticketsResumen.push(numTicket);
+                        }
+
                         deudasEfectivo[r].programasDetalle.push({
                             fecha: f,
                             prog: p,
-                            nombreStr: `${p.replace(" - ", " / ")} (${f})`,
+                            nombreStr: `${p.replace(" - ", " / ")} (${f} | Ticket: ${numTicket})`,
                             monto: montoLimpio,
                             ruta: `2_asistencias/${f}/${p}/${r}`
                         });
@@ -1882,7 +1887,10 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
         html += `
         <tr>
             <td class="fw-bold">${r}</td>
-            <td>${nombreLimpio}</td>
+            <td>
+                ${nombreLimpio}<br>
+                <span class="badge bg-warning text-dark border border-warning mt-1">Ticket: ${d.ticketsResumen.join(' | ')}</span>
+            </td>
             <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
             <td>
                 <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/['\"\`]/g, '')}')">💸 Pagar</button>
@@ -1895,14 +1903,17 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
     containerLista.innerHTML = html;
 }
 
-// Cambiar el comportamiento del botón "Buscar" para que filtre la lista renderizada
+// Cambiar el comportamiento del botón "Buscar" para que filtre la lista ignorando tildes
 if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
-    const term = document.getElementById('rutEfectivo').value.trim().toLowerCase();
+    const termOriginal = document.getElementById('rutEfectivo').value.trim().toLowerCase();
+    // Normalizamos el texto de búsqueda quitando tildes y acentos
+    const termSinTildes = termOriginal.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
     if(!window.deudasEfectivoGlobal) return;
     
     get(ref(db, '1_trabajadores')).then(snap => {
         const trabObj = snap.exists() ? snap.val() : {};
-        if(!term) {
+        if(!termOriginal) {
             renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
             return;
         }
@@ -1911,10 +1922,14 @@ if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBu
         for (const r in window.deudasEfectivoGlobal) {
             const tr = trabObj[r] || { nombres: "", apellidos: "" };
             const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
-            const rutLimpio = r.replace(/[^0-9kK]/g, '');
-            const inputLimpio = term.replace(/[^0-9kK]/g, '');
+            // Normalizamos el nombre de la base de datos quitando tildes y acentos
+            const nombreLimpioTildes = nombreCompleto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
             
-            if (r.toLowerCase() === term || rutLimpio === inputLimpio || nombreCompleto.includes(term)) {
+            const rutLimpio = r.replace(/[^0-9kK]/g, '');
+            const inputLimpio = termOriginal.replace(/[^0-9kK]/g, '');
+            
+            // Comparamos los textos ya sin tildes
+            if (r.toLowerCase() === termOriginal || rutLimpio === inputLimpio || nombreLimpioTildes.includes(termSinTildes)) {
                 filtrado[r] = window.deudasEfectivoGlobal[r];
             }
         }
