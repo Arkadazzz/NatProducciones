@@ -27,6 +27,7 @@ const CORREOS_ADMINISTRADORES = [
     "natalyseguel.va@gmail.com",
     "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
+    "Matijesus.pz@gmail.com",
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -1796,13 +1797,11 @@ async function cargarListaEfectivo() {
         searchBoxParent.parentElement.insertBefore(containerLista, searchBoxParent.nextSibling);
     }
     
-    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold">⏳ Buscando personas con pagos pendientes en efectivo...</div>';
+    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold">⏳ Consultando bóveda y optimizando datos...</div>';
     
     try {
-        const [asisSnap, trabSnap] = await Promise.all([
-            get(ref(db, '2_asistencias')),
-            get(ref(db, '1_trabajadores'))
-        ]);
+        // 🔥 OPTIMIZACIÓN: Solo pedimos las asistencias. Los trabajadores ya están en listaGlobalCRM.
+        const asisSnap = await get(ref(db, '2_asistencias'));
         
         if (!asisSnap.exists()) {
             containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ No hay pagos pendientes en el sistema.</div>';
@@ -1810,44 +1809,47 @@ async function cargarListaEfectivo() {
         }
         
         const todas = asisSnap.val();
-        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         let deudasEfectivo = {};
         
         // Recorrer asistencias para armar el consolidado
         for (const f in todas) {
-            for (const p in todas[f]) {
-                for (const r in todas[f][p]) {
-                    const asis = todas[f][p][r];
-                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+            const progs = todas[f];
+            for (const p in progs) {
+                const ruts = progs[p];
+                for (const r in ruts) {
+                    const asis = ruts[r];
                     
-                    if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
-                        if (!deudasEfectivo[r]) {
-                            deudasEfectivo[r] = {
-                                rut: r,
-                                montoTotal: 0,
-                                programasDetalle: [],
-                                firma: asis.firma_digital || null,
-                                ticketsResumen: []
-                            };
-                        }
-                        deudasEfectivo[r].montoTotal += montoLimpio;
-                        
-                        const numTicket = asis.numero_asignado ? asis.numero_asignado : "S/T";
-                        if (!deudasEfectivo[r].ticketsResumen.includes(numTicket)) {
-                            deudasEfectivo[r].ticketsResumen.push(numTicket);
-                        }
+                    if (asis.estado_pago === "Pendiente") {
+                        const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
+                        if (montoLimpio > 0) {
+                            if (!deudasEfectivo[r]) {
+                                deudasEfectivo[r] = {
+                                    rut: r,
+                                    montoTotal: 0,
+                                    programasDetalle: [],
+                                    firma: asis.firma_digital || null,
+                                    ticketsResumen: []
+                                };
+                            }
+                            deudasEfectivo[r].montoTotal += montoLimpio;
+                            
+                            const numTicket = asis.numero_asignado ? asis.numero_asignado : "S/T";
+                            if (!deudasEfectivo[r].ticketsResumen.includes(numTicket)) {
+                                deudasEfectivo[r].ticketsResumen.push(numTicket);
+                            }
 
-                        deudasEfectivo[r].programasDetalle.push({
-                            fecha: f,
-                            prog: p,
-                            nombreStr: `${p.replace(" - ", " / ")} (${f} | Ticket: ${numTicket})`,
-                            monto: montoLimpio,
-                            ruta: `2_asistencias/${f}/${p}/${r}`
-                        });
-                        
-                        // Rescate de firma por si el primer registro no tenía
-                        if (!deudasEfectivo[r].firma && asis.firma_digital) {
-                            deudasEfectivo[r].firma = asis.firma_digital;
+                            deudasEfectivo[r].programasDetalle.push({
+                                fecha: f,
+                                prog: p,
+                                nombreStr: `${p.replace(" - ", " / ")} (${f} | Ticket: ${numTicket})`,
+                                monto: montoLimpio,
+                                ruta: `2_asistencias/${f}/${p}/${r}`
+                            });
+                            
+                            // Rescate de firma por si el primer registro no tenía
+                            if (!deudasEfectivo[r].firma && asis.firma_digital) {
+                                deudasEfectivo[r].firma = asis.firma_digital;
+                            }
                         }
                     }
                 }
@@ -1855,14 +1857,14 @@ async function cargarListaEfectivo() {
         }
         
         window.deudasEfectivoGlobal = deudasEfectivo; // Guardar global para el buscador local
-        renderTablaDeudasEfectivo(deudasEfectivo, trabajadores);
+        renderTablaDeudasEfectivo(deudasEfectivo);
         
     } catch (e) {
         containerLista.innerHTML = '<div class="alert alert-danger text-center mt-4">Error de conexión al cargar la lista.</div>';
     }
 }
 
-function renderTablaDeudasEfectivo(deudasObj, trabObj) {
+function renderTablaDeudasEfectivo(deudasObj) {
     const containerLista = document.getElementById('contenedorListaEfectivo');
     if(!containerLista) return;
     
@@ -1873,21 +1875,21 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
         return;
     }
     
-    let html = `
-    <div class="table-responsive mt-4">
-        <table class="table table-dark table-hover align-middle text-center" style="font-size: 0.9em; border: 1px solid #444;">
-            <thead style="color: #00d26a; background: #111;">
-                <tr><th>RUT</th><th>Nombre Completo</th><th>Monto Total</th><th>Acción</th></tr>
-            </thead>
-            <tbody>
-    `;
+    // 🔥 OPTIMIZACIÓN: Array Join en vez de concatenación +=
+    let htmlArray = [
+        '<div class="table-responsive mt-4">',
+        '<table class="table table-dark table-hover align-middle text-center" style="font-size: 0.9em; border: 1px solid #444;">',
+        '<thead style="color: #00d26a; background: #111;">',
+        '<tr><th>RUT</th><th>Nombre Completo</th><th>Monto Total</th><th>Acción</th></tr>',
+        '</thead><tbody>'
+    ];
     
     ruts.forEach(r => {
-        const tr = trabObj[r] || { nombres: "Desconocido", apellidos: "" };
+        const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
         const d = deudasObj[r];
         const nombreLimpio = `${tr.nombres} ${tr.apellidos}`;
         
-        html += `
+        htmlArray.push(`
         <tr>
             <td class="fw-bold">${r}</td>
             <td>
@@ -1896,48 +1898,43 @@ function renderTablaDeudasEfectivo(deudasObj, trabObj) {
             </td>
             <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
             <td>
-                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/['\"\`]/g, '')}')">💸 Pagar</button>
+                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/['"\`]/g, '')}')">💸 Pagar</button>
             </td>
         </tr>
-        `;
+        `);
     });
     
-    html += `</tbody></table></div>`;
-    containerLista.innerHTML = html;
+    htmlArray.push('</tbody></table></div>');
+    containerLista.innerHTML = htmlArray.join('');
 }
 
-// Cambiar el comportamiento del botón "Buscar" para que filtre la lista ignorando tildes
+// Cambiar el comportamiento del botón "Buscar" para que filtre la lista ignorando tildes e instantáneamente
 if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
     const termOriginal = document.getElementById('rutEfectivo').value.trim().toLowerCase();
-    // Normalizamos el texto de búsqueda quitando tildes y acentos
     const termSinTildes = termOriginal.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
     if(!window.deudasEfectivoGlobal) return;
     
-    get(ref(db, '1_trabajadores')).then(snap => {
-        const trabObj = snap.exists() ? snap.val() : {};
-        if(!termOriginal) {
-            renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
-            return;
-        }
+    // 🔥 OPTIMIZACIÓN: Eliminamos el fetch a Firebase. Buscamos directo en memoria.
+    if(!termOriginal) {
+        renderTablaDeudasEfectivo(window.deudasEfectivoGlobal);
+        return;
+    }
+    
+    let filtrado = {};
+    for (const r in window.deudasEfectivoGlobal) {
+        const tr = listaGlobalCRM[r] || { nombres: "", apellidos: "" };
+        const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
+        const nombreLimpioTildes = nombreCompleto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
-        let filtrado = {};
-        for (const r in window.deudasEfectivoGlobal) {
-            const tr = trabObj[r] || { nombres: "", apellidos: "" };
-            const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
-            // Normalizamos el nombre de la base de datos quitando tildes y acentos
-            const nombreLimpioTildes = nombreCompleto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            
-            const rutLimpio = r.replace(/[^0-9kK]/g, '');
-            const inputLimpio = termOriginal.replace(/[^0-9kK]/g, '');
-            
-            // Comparamos los textos ya sin tildes
-            if (r.toLowerCase() === termOriginal || rutLimpio === inputLimpio || nombreLimpioTildes.includes(termSinTildes)) {
-                filtrado[r] = window.deudasEfectivoGlobal[r];
-            }
+        const rutLimpio = r.replace(/[^0-9kK]/g, '');
+        const inputLimpio = termOriginal.replace(/[^0-9kK]/g, '');
+        
+        if (r.toLowerCase() === termOriginal || rutLimpio === inputLimpio || nombreLimpioTildes.includes(termSinTildes)) {
+            filtrado[r] = window.deudasEfectivoGlobal[r];
         }
-        renderTablaDeudasEfectivo(filtrado, trabObj);
-    });
+    }
+    renderTablaDeudasEfectivo(filtrado);
 });
 
 window.abrirPagoEfectivo = function(rut, nombrePersona) {
