@@ -80,6 +80,8 @@ let reservasGlobales = {};
 let asistenciasGlobales = {};
 let totalIPGlobal = 0;
 let totalCortesiaGlobal = 0;
+let faltanIPGlobal = 0;
+let faltanCortesiaGlobal = 0;
 window.siguienteTicketAutomatico = 1;
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; 
@@ -554,7 +556,16 @@ function activarRadares() {
 
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
-        totalFirmados = Object.keys(asistenciasGlobales).length; 
+        totalFirmados = 0;
+        window.adentroIP = 0;
+        window.adentroCortesia = 0;
+        for (const r in asistenciasGlobales) {
+            if (asistenciasGlobales[r].tipo_ingreso !== "Anulado") {
+                totalFirmados++;
+                if (asistenciasGlobales[r].tipo_ingreso === "Cortesía") window.adentroCortesia++;
+                else window.adentroIP++;
+            }
+        }
         actualizarTablero();
         
         // Inyectar barra de búsqueda y orden
@@ -614,6 +625,8 @@ function activarRadares() {
             const num = parseInt(asis.numero_asignado) || 0; 
             
             if (num > maxNumero) { maxNumero = num; }
+            
+            if (asis.tipo_ingreso === "Anulado") continue;
             
             if (asis.tipo_ingreso === "Cortesía" && asis.invitado_por) {
                 conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
@@ -701,15 +714,15 @@ function activarRadares() {
 
 function actualizarTablero() {
     try {
-        let faltanIP = 0;
-        let faltanCortesia = 0;
+        faltanIPGlobal = 0;
+        faltanCortesiaGlobal = 0;
         let htmlFaltantes = "";
         
         // Coliseo también se comporta sin cortesías en el tablero principal
         let esDalePlay = nombrePrograma.includes("Dale Play") || nombrePrograma.includes("Coliseo");
 
         for (const rut in reservasGlobales) {
-            if (!asistenciasGlobales[rut]) {
+            if (!asistenciasGlobales[rut] || asistenciasGlobales[rut].tipo_ingreso === "Anulado") {
                 const res = reservasGlobales[rut];
                 const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
                 
@@ -722,9 +735,9 @@ function actualizarTablero() {
                 </li>`;
 
                 if (res.tipo === "Cortesía") {
-                    faltanCortesia++;
+                    faltanCortesiaGlobal++;
                 } else {
-                    faltanIP++;
+                    faltanIPGlobal++;
                 }
             }
         }
@@ -788,7 +801,7 @@ function actualizarTablero() {
         
         if (faltan > 0) {
             if (!esDalePlay) {
-                textoFaltan += ` <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px;">Faltan: ${faltanIP} I/P | ${faltanCortesia} CORT</span>`;
+                textoFaltan += ` <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px;">Faltan: ${faltanIPGlobal} I/P | ${faltanCortesiaGlobal} CORT</span>`;
             }
             textoFaltan += `<img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/56.gif" style="height: 30px; margin-top:2px;" title="En camino"> <span style="font-size: 0.4em; display:block; color:#ffcc00; margin-top:1px;">¡EN CAMINO!</span>`;
         }
@@ -931,6 +944,16 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
 if (document.getElementById('btnIngresoManual')) document.getElementById('btnIngresoManual').addEventListener('click', () => {
     const rutIngresado = document.getElementById('rutManual').value.trim();
     if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
+    
+    if (!/^[0-9]+[-|‐]{1}[0-9kK]{1}$/.test(rutIngresado)) return alert("❌ Formato inválido. Usa guión (Ej: 12345678-9).");
+    let tmp = rutIngresado.split('-');
+    let digv = tmp[1].toLowerCase(); 
+    let rutNum = parseInt(tmp[0], 10);
+    let m = 0, s = 1;
+    for(; rutNum; rutNum = Math.floor(rutNum / 10)) { s = (s + rutNum % 10 * (9 - m++ % 6)) % 11; }
+    let dvEsperado = s ? s - 1 : 'k';
+    if(dvEsperado != digv) return alert("❌ RUT INVÁLIDO. El dígito verificador es incorrecto.");
+    
     onScanSuccess(rutIngresado); 
     document.getElementById('rutManual').value = "";
 });
@@ -1128,8 +1151,15 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
 });
 
 window.anularAsistencia = async function(rut) { 
-    if(confirm("¿Seguro que deseas anular esta asistencia?")) {
-        await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); 
+    if(confirm("¿Seguro que deseas anular esta asistencia?\nLa persona se ocultará de la lista, pero su Ticket quedará bloqueado para mantener el orden numérico exacto.")) {
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), {
+            tipo_ingreso: "Anulado",
+            monto: 0,
+            estado_pago: "Anulado",
+            aplica_contrato: false,
+            estado_dt: "Anulado",
+            hora_salida: "Anulado"
+        }); 
     }
 }
 
