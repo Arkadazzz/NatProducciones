@@ -590,6 +590,8 @@
             const rutValidar = document.getElementById('rut').value.trim();
             if (!/^[0-9]+[-|‐]{1}[0-9kK]{1}$/.test(rutValidar)) {
                 alert("❌ Formato de RUT incorrecto. Usa guión (Ej: 12345678-9).");
+                btn.disabled = false;
+                btn.innerText = "ENVIAR REGISTRO 🚀";
                 throw new Error("RUT Invalido");
             }
             let tmpR = rutValidar.split('-');
@@ -600,27 +602,13 @@
             let dvEsperado = s ? s - 1 : 'k';
             if(dvEsperado != digv) {
                 alert("❌ RUT INVÁLIDO. El RUT es falso o el dígito verificador está mal digitado.");
+                btn.disabled = false;
+                btn.innerText = "ENVIAR REGISTRO 🚀";
                 throw new Error("RUT Invalido");
             }
             // ---> FIN DEFENSA <---
+            
             const radioSeleccionado = document.querySelector('input[name="programaRadio"]:checked');
-            // ---> NUEVA DEFENSA DE RUT <---
-            const rutValidar = document.getElementById('rut').value.trim();
-            if (!/^[0-9]+[-|‐]{1}[0-9kK]{1}$/.test(rutValidar)) {
-                alert("❌ Formato de RUT incorrecto. Usa guión (Ej: 12345678-9).");
-                throw new Error("RUT Invalido");
-            }
-            let tmpR = rutValidar.split('-');
-            let digv = tmpR[1].toLowerCase(); 
-            let rutNum = parseInt(tmpR[0], 10);
-            let m = 0, s = 1;
-            for(; rutNum; rutNum = Math.floor(rutNum / 10)) { s = (s + rutNum % 10 * (9 - m++ % 6)) % 11; }
-            let dvEsperado = s ? s - 1 : 'k';
-            if(dvEsperado != digv) {
-                alert("❌ RUT INVÁLIDO. El RUT es falso o el dígito verificador está mal digitado.");
-                throw new Error("RUT Invalido");
-            }
-            // ---> FIN DEFENSA <---
             const progClave = radioSeleccionado ? radioSeleccionado.value : null;
             if (!progClave) { alert("Selecciona un evento."); throw new Error(); }
             const prog = programasDisponibles[progClave];
