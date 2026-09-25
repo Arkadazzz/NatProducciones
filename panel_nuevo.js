@@ -552,16 +552,7 @@ function activarRadares() {
 
     unsubscribeAsistencias = onValue(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`), (snapshot) => {
         asistenciasGlobales = snapshot.exists() ? snapshot.val() : {};
-        totalFirmados = 0;
-        window.adentroIP = 0;
-        window.adentroCortesia = 0;
-        for (const r in asistenciasGlobales) {
-            if (asistenciasGlobales[r].tipo_ingreso !== "Anulado") {
-                totalFirmados++;
-                if (asistenciasGlobales[r].tipo_ingreso === "Cortesía") window.adentroCortesia++;
-                else window.adentroIP++;
-            }
-        }
+        totalFirmados = Object.keys(asistenciasGlobales).length; 
         actualizarTablero();
         
         // Inyectar barra de búsqueda y orden
@@ -621,8 +612,6 @@ function activarRadares() {
             const num = parseInt(asis.numero_asignado) || 0; 
             
             if (num > maxNumero) { maxNumero = num; }
-            
-            if (asis.tipo_ingreso === "Anulado") continue;
             
             if (asis.tipo_ingreso === "Cortesía" && asis.invitado_por) {
                 conteoStaff[asis.invitado_por] = (conteoStaff[asis.invitado_por] || 0) + 1;
@@ -940,16 +929,6 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
 if (document.getElementById('btnIngresoManual')) document.getElementById('btnIngresoManual').addEventListener('click', () => {
     const rutIngresado = document.getElementById('rutManual').value.trim();
     if (!rutIngresado) return alert("Por favor, ingresa el RUT para buscarlo.");
-    
-    if (!/^[0-9]+[-|‐]{1}[0-9kK]{1}$/.test(rutIngresado)) return alert("❌ Formato inválido. Usa guión (Ej: 12345678-9).");
-    let tmp = rutIngresado.split('-');
-    let digv = tmp[1].toLowerCase(); 
-    let rutNum = parseInt(tmp[0], 10);
-    let m = 0, s = 1;
-    for(; rutNum; rutNum = Math.floor(rutNum / 10)) { s = (s + rutNum % 10 * (9 - m++ % 6)) % 11; }
-    let dvEsperado = s ? s - 1 : 'k';
-    if(dvEsperado != digv) return alert("❌ RUT INVÁLIDO. El dígito verificador es incorrecto.");
-    
     onScanSuccess(rutIngresado); 
     document.getElementById('rutManual').value = "";
 });
@@ -1147,15 +1126,8 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
 });
 
 window.anularAsistencia = async function(rut) { 
-    if(confirm("¿Seguro que deseas anular esta asistencia?\nLa persona se ocultará de la lista, pero su Ticket quedará bloqueado para mantener el orden numérico exacto.")) {
-        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), {
-            tipo_ingreso: "Anulado",
-            monto: 0,
-            estado_pago: "Anulado",
-            aplica_contrato: false,
-            estado_dt: "Anulado",
-            hora_salida: "Anulado"
-        }); 
+    if(confirm("¿Seguro que deseas anular esta asistencia?")) {
+        await remove(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`)); 
     }
 }
 
@@ -1825,11 +1797,13 @@ async function cargarListaEfectivo() {
         searchBoxParent.parentElement.insertBefore(containerLista, searchBoxParent.nextSibling);
     }
     
-    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold">⏳ Consultando bóveda y optimizando datos...</div>';
+    containerLista.innerHTML = '<div class="alert alert-warning text-center mt-4 fw-bold">⏳ Buscando personas con pagos pendientes en efectivo...</div>';
     
     try {
-        // 🔥 OPTIMIZACIÓN: Solo pedimos las asistencias. Los trabajadores ya están en listaGlobalCRM.
-        const asisSnap = await get(ref(db, '2_asistencias'));
+        const [asisSnap, trabSnap] = await Promise.all([
+            get(ref(db, '2_asistencias')),
+            get(ref(db, '1_trabajadores'))
+        ]);
         
         if (!asisSnap.exists()) {
             containerLista.innerHTML = '<div class="alert alert-success text-center mt-4 fw-bold">✅ No hay pagos pendientes en el sistema.</div>';
@@ -1837,47 +1811,44 @@ async function cargarListaEfectivo() {
         }
         
         const todas = asisSnap.val();
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         let deudasEfectivo = {};
         
         // Recorrer asistencias para armar el consolidado
         for (const f in todas) {
-            const progs = todas[f];
-            for (const p in progs) {
-                const ruts = progs[p];
-                for (const r in ruts) {
-                    const asis = ruts[r];
+            for (const p in todas[f]) {
+                for (const r in todas[f][p]) {
+                    const asis = todas[f][p][r];
+                    const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
                     
-                    if (asis.estado_pago === "Pendiente") {
-                        const montoLimpio = parseInt(String(asis.monto).replace(/\D/g, '')) || 0;
-                        if (montoLimpio > 0) {
-                            if (!deudasEfectivo[r]) {
-                                deudasEfectivo[r] = {
-                                    rut: r,
-                                    montoTotal: 0,
-                                    programasDetalle: [],
-                                    firma: asis.firma_digital || null,
-                                    ticketsResumen: []
-                                };
-                            }
-                            deudasEfectivo[r].montoTotal += montoLimpio;
-                            
-                            const numTicket = asis.numero_asignado ? asis.numero_asignado : "S/T";
-                            if (!deudasEfectivo[r].ticketsResumen.includes(numTicket)) {
-                                deudasEfectivo[r].ticketsResumen.push(numTicket);
-                            }
+                    if (asis.estado_pago === "Pendiente" && montoLimpio > 0) {
+                        if (!deudasEfectivo[r]) {
+                            deudasEfectivo[r] = {
+                                rut: r,
+                                montoTotal: 0,
+                                programasDetalle: [],
+                                firma: asis.firma_digital || null,
+                                ticketsResumen: []
+                            };
+                        }
+                        deudasEfectivo[r].montoTotal += montoLimpio;
+                        
+                        const numTicket = asis.numero_asignado ? asis.numero_asignado : "S/T";
+                        if (!deudasEfectivo[r].ticketsResumen.includes(numTicket)) {
+                            deudasEfectivo[r].ticketsResumen.push(numTicket);
+                        }
 
-                            deudasEfectivo[r].programasDetalle.push({
-                                fecha: f,
-                                prog: p,
-                                nombreStr: `${p.replace(" - ", " / ")} (${f} | Ticket: ${numTicket})`,
-                                monto: montoLimpio,
-                                ruta: `2_asistencias/${f}/${p}/${r}`
-                            });
-                            
-                            // Rescate de firma por si el primer registro no tenía
-                            if (!deudasEfectivo[r].firma && asis.firma_digital) {
-                                deudasEfectivo[r].firma = asis.firma_digital;
-                            }
+                        deudasEfectivo[r].programasDetalle.push({
+                            fecha: f,
+                            prog: p,
+                            nombreStr: `${p.replace(" - ", " / ")} (${f} | Ticket: ${numTicket})`,
+                            monto: montoLimpio,
+                            ruta: `2_asistencias/${f}/${p}/${r}`
+                        });
+                        
+                        // Rescate de firma por si el primer registro no tenía
+                        if (!deudasEfectivo[r].firma && asis.firma_digital) {
+                            deudasEfectivo[r].firma = asis.firma_digital;
                         }
                     }
                 }
@@ -1885,14 +1856,14 @@ async function cargarListaEfectivo() {
         }
         
         window.deudasEfectivoGlobal = deudasEfectivo; // Guardar global para el buscador local
-        renderTablaDeudasEfectivo(deudasEfectivo);
+        renderTablaDeudasEfectivo(deudasEfectivo, trabajadores);
         
     } catch (e) {
         containerLista.innerHTML = '<div class="alert alert-danger text-center mt-4">Error de conexión al cargar la lista.</div>';
     }
 }
 
-function renderTablaDeudasEfectivo(deudasObj) {
+function renderTablaDeudasEfectivo(deudasObj, trabObj) {
     const containerLista = document.getElementById('contenedorListaEfectivo');
     if(!containerLista) return;
     
@@ -1903,21 +1874,21 @@ function renderTablaDeudasEfectivo(deudasObj) {
         return;
     }
     
-    // 🔥 OPTIMIZACIÓN: Array Join en vez de concatenación +=
-    let htmlArray = [
-        '<div class="table-responsive mt-4">',
-        '<table class="table table-dark table-hover align-middle text-center" style="font-size: 0.9em; border: 1px solid #444;">',
-        '<thead style="color: #00d26a; background: #111;">',
-        '<tr><th>RUT</th><th>Nombre Completo</th><th>Monto Total</th><th>Acción</th></tr>',
-        '</thead><tbody>'
-    ];
+    let html = `
+    <div class="table-responsive mt-4">
+        <table class="table table-dark table-hover align-middle text-center" style="font-size: 0.9em; border: 1px solid #444;">
+            <thead style="color: #00d26a; background: #111;">
+                <tr><th>RUT</th><th>Nombre Completo</th><th>Monto Total</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+    `;
     
     ruts.forEach(r => {
-        const tr = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
+        const tr = trabObj[r] || { nombres: "Desconocido", apellidos: "" };
         const d = deudasObj[r];
         const nombreLimpio = `${tr.nombres} ${tr.apellidos}`;
         
-        htmlArray.push(`
+        html += `
         <tr>
             <td class="fw-bold">${r}</td>
             <td>
@@ -1926,43 +1897,48 @@ function renderTablaDeudasEfectivo(deudasObj) {
             </td>
             <td class="text-success fw-bold fs-5">$${d.montoTotal.toLocaleString('es-CL')}</td>
             <td>
-                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/['"\`]/g, '')}')">💸 Pagar</button>
+                <button class="btn btn-success btn-sm fw-bold w-100" onclick="window.abrirPagoEfectivo('${r}', '${nombreLimpio.replace(/['\"\`]/g, '')}')">💸 Pagar</button>
             </td>
         </tr>
-        `);
+        `;
     });
     
-    htmlArray.push('</tbody></table></div>');
-    containerLista.innerHTML = htmlArray.join('');
+    html += `</tbody></table></div>`;
+    containerLista.innerHTML = html;
 }
 
-// Cambiar el comportamiento del botón "Buscar" para que filtre la lista ignorando tildes e instantáneamente
+// Cambiar el comportamiento del botón "Buscar" para que filtre la lista ignorando tildes
 if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBuscarEfectivo').addEventListener('click', () => {
     const termOriginal = document.getElementById('rutEfectivo').value.trim().toLowerCase();
+    // Normalizamos el texto de búsqueda quitando tildes y acentos
     const termSinTildes = termOriginal.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
     if(!window.deudasEfectivoGlobal) return;
     
-    // 🔥 OPTIMIZACIÓN: Eliminamos el fetch a Firebase. Buscamos directo en memoria.
-    if(!termOriginal) {
-        renderTablaDeudasEfectivo(window.deudasEfectivoGlobal);
-        return;
-    }
-    
-    let filtrado = {};
-    for (const r in window.deudasEfectivoGlobal) {
-        const tr = listaGlobalCRM[r] || { nombres: "", apellidos: "" };
-        const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
-        const nombreLimpioTildes = nombreCompleto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        
-        const rutLimpio = r.replace(/[^0-9kK]/g, '');
-        const inputLimpio = termOriginal.replace(/[^0-9kK]/g, '');
-        
-        if (r.toLowerCase() === termOriginal || rutLimpio === inputLimpio || nombreLimpioTildes.includes(termSinTildes)) {
-            filtrado[r] = window.deudasEfectivoGlobal[r];
+    get(ref(db, '1_trabajadores')).then(snap => {
+        const trabObj = snap.exists() ? snap.val() : {};
+        if(!termOriginal) {
+            renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
+            return;
         }
-    }
-    renderTablaDeudasEfectivo(filtrado);
+        
+        let filtrado = {};
+        for (const r in window.deudasEfectivoGlobal) {
+            const tr = trabObj[r] || { nombres: "", apellidos: "" };
+            const nombreCompleto = `${tr.nombres} ${tr.apellidos}`.toLowerCase();
+            // Normalizamos el nombre de la base de datos quitando tildes y acentos
+            const nombreLimpioTildes = nombreCompleto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            
+            const rutLimpio = r.replace(/[^0-9kK]/g, '');
+            const inputLimpio = termOriginal.replace(/[^0-9kK]/g, '');
+            
+            // Comparamos los textos ya sin tildes
+            if (r.toLowerCase() === termOriginal || rutLimpio === inputLimpio || nombreLimpioTildes.includes(termSinTildes)) {
+                filtrado[r] = window.deudasEfectivoGlobal[r];
+            }
+        }
+        renderTablaDeudasEfectivo(filtrado, trabObj);
+    });
 });
 
 window.abrirPagoEfectivo = function(rut, nombrePersona) {
@@ -3321,11 +3297,14 @@ async function cargarPanelCesiones() {
         const todas = asisSnap.val();
         let agrupacionCesiones = {};
 
-        // Agrupar por Programa -> Fecha
+        // Agrupar por Programa -> Fechas y Cantidad Total
         for (const fecha in todas) {
             for (const prog in todas[fecha]) {
-                if (!agrupacionCesiones[prog]) agrupacionCesiones[prog] = {};
-                agrupacionCesiones[prog][fecha] = Object.keys(todas[fecha][prog]).length;
+                if (!agrupacionCesiones[prog]) {
+                    agrupacionCesiones[prog] = { fechas: [], total: 0 };
+                }
+                agrupacionCesiones[prog].fechas.push(fecha);
+                agrupacionCesiones[prog].total += Object.keys(todas[fecha][prog]).length;
             }
         }
 
@@ -3334,38 +3313,23 @@ async function cargarPanelCesiones() {
             return;
         }
 
-        let html = '<div class="accordion" id="accCesiones">';
-        let pIdx = 0;
-        
+        let html = '<div class="row">';
         for (const prog of Object.keys(agrupacionCesiones).sort()) {
-            pIdx++;
+            const dataProg = agrupacionCesiones[prog];
+            const fechasStr = dataProg.fechas.join(',');
+            
             html += `
-            <div class="accordion-item" style="border: 1px solid #ff9900; margin-bottom: 10px; background: #1a1a1a;">
-                <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cesProg_${pIdx}" style="background: #331a00; color: #ff9900; font-size: 1.1em; font-weight:bold;">
-                        📺 ${prog.replace(" - ", " / ")}
-                    </button>
-                </h2>
-                <div id="cesProg_${pIdx}" class="accordion-collapse collapse" data-bs-parent="#accCesiones">
-                    <div class="accordion-body p-0" style="background: #141414;">
-                        <ul class="list-group list-group-flush">`;
-            
-            const fechasDesc = Object.keys(agrupacionCesiones[prog]).sort().reverse();
-            for (const fecha of fechasDesc) {
-                const cantidad = agrupacionCesiones[prog][fecha];
-                html += `
-                            <li class="list-group-item d-flex justify-content-between align-items-center" style="background: transparent; color: white; border-bottom: 1px solid #333;">
-                                <div>
-                                    <strong class="text-white fs-5">${fecha.split('-').reverse().join('-')}</strong><br>
-                                    <span class="badge bg-secondary">${cantidad} personas registradas</span>
-                                </div>
-                                <button class="btn btn-warning fw-bold text-dark shadow-sm" onclick="window.descargarZIPCpciones(event, '${prog}', '${fecha}')">
-                                    📥 Descargar ZIP de Cesiones
-                                </button>
-                            </li>`;
-            }
-            
-            html += `   </ul>
+            <div class="col-12 mb-3">
+                <div class="card shadow-sm" style="background: #1a1a1a; border: 1px solid #ff9900; border-radius: 10px;">
+                    <div class="card-body d-flex flex-column flex-md-row justify-content-between align-items-center">
+                        <div class="mb-3 mb-md-0 text-center text-md-start">
+                            <h5 class="card-title text-warning mb-1 fw-bold" style="font-size: 1.3em;">📺 ${prog.replace(" - ", " / ")}</h5>
+                            <p class="card-text text-muted small mb-1">Total de asistentes registrados: <b class="text-white fs-6">${dataProg.total} personas</b></p>
+                            <p class="card-text text-muted small mb-0">Fechas incluidas: ${dataProg.fechas.sort().reverse().map(f => f.split('-').reverse().join('-')).join(', ')}</p>
+                        </div>
+                        <button class="btn btn-warning fw-bold text-dark shadow-sm px-4 py-3" onclick="window.descargarZIPCesionesPrograma(event, '${prog}', '${fechasStr}')">
+                            📥 Descargar ZIP Completo del Programa
+                        </button>
                     </div>
                 </div>
             </div>`;
@@ -3378,42 +3342,42 @@ async function cargarPanelCesiones() {
     }
 }
 
-window.descargarZIPCpciones = async function(event, prog, fecha) {
+window.descargarZIPCesionesPrograma = async function(event, prog, fechasStr) {
     const btnId = event.target;
     const textoOriginal = btnId.innerText;
-    btnId.innerText = "⏳ Generando PDFs...";
+    btnId.innerText = "⏳ Generando PDFs... (Puede tardar)";
     btnId.disabled = true;
 
     try {
-        const [asisSnap, trabSnap] = await Promise.all([ 
-            get(child(ref(db), `2_asistencias/${fecha}/${prog}`)), 
-            get(ref(db, '1_trabajadores')) 
-        ]);
-        
-        if (!asisSnap.exists()) throw new Error("No hay asistentes para esta fecha.");
-
-        const asistentes = asisSnap.val();
-        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
-        
+        const fechas = fechasStr.split(',');
         const zip = new JSZip();
         const { jsPDF } = window.jspdf;
         let generados = 0;
 
-        for (const rut in asistentes) {
-            const asis = asistentes[rut];
-            const trab = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", telefono: "-" };
-            
-            if (asis.firma_digital) {
-                const doc = new jsPDF({ format: 'legal' });
-                
-                doc.setFont("helvetica", "bold");
-                doc.setFontSize(14);
-                doc.text("CESION Y AUTORIZACION", 105, 20, null, null, "center");
-                
-                doc.setFont("helvetica", "normal");
-                doc.setFontSize(8);
+        const trabSnap = await get(ref(db, '1_trabajadores'));
+        const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
 
-                const textoCesion = `En Santiago de Chile, quien suscribe la presente autorización, declara y deja expresa constancia de lo siguiente:
+        for (const fecha of fechas) {
+            const asisSnap = await get(child(ref(db, `2_asistencias/${fecha}/${prog}`)));
+            if (!asisSnap.exists()) continue;
+
+            const asistentes = asisSnap.val();
+
+            for (const rut in asistentes) {
+                const asis = asistentes[rut];
+                const trab = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", telefono: "-" };
+                
+                if (asis.firma_digital) {
+                    const doc = new jsPDF({ format: 'legal' });
+                    
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(14);
+                    doc.text("CESION Y AUTORIZACION", 105, 20, null, null, "center");
+                    
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(8);
+
+                    const textoCesion = `En Santiago de Chile, quien suscribe la presente autorización, declara y deja expresa constancia de lo siguiente:
 
 PRIMERO: Por el presente instrumento y, en este acto, autorizo a MEGAMEDIA S.A., en adelante MEGAMEDIA, y a los terceros que ésta designe, para que utilicen mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad, en adelante "mi imagen" (i) en los programas de televisión o casting de estos, en que haya intervenido, participado o haya tenido alguna presencia; (ii) en aquellos productos, bienes, servicios y/o negocios que se comercialicen y/o desarrollen por MEGAMEDIA o por los terceros que designe, que incluyan mi imagen; y (iii) en la publicidad o promoción de (i) y (ii) anteriores. La autorización de que da cuenta este instrumento se presta en forma exclusiva; sin cargo adicional alguno; en forma irrevocable; ilimitada; por el plazo durante el cual se transmitan los programas de televisión en los cuales participe o haya participado o aparecido, en forma individual o en conjunto, y/o durante el plazo en que se comercialicen los productos, bienes, servicios y/o negocios en los que se utilice mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad ya sea en forma individual o en conjunto con otros - y en Chile y el Extranjero; y tanto para sistemas de televisión de libre recepción, servicios limitados de televisión, televisión satelital, televisión digital, internet, radio o en cualquier otro medio o sistema de comunicación como para cualquier otro soporte material; y/o de audio; y/o audiovisual que se utilicen para estos efectos por MEGAMEDIA o por los terceros que MEGAMEDIA determine. Todos los soportes materiales; y/o de audio; y/o de audio y video en que se incluya o aparezca mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material de mi imagen o personalidad, es y será de propiedad exclusiva de MEGAMEDIA. En consecuencia, podrán proceder, personalmente o a través de terceros, a la elaboración y comercialización de cuantos productos considere oportunos y sin que esta enumeración se considere taxativa: discos compactos con obras musicales ejecutadas o interpretadas por mi, en forma individual o en conjunto con otros, dvds, u otros soportes de audio, video y/o de audio y video, entre otros, en los que aparezca, por ejemplo, mi imagen o nombre, así como expresiones que se hayan podido popularizar durante la emisión del programa de televisión. Asimismo y sin perjuicio de los derechos de televisión que corresponden a MEGAMEDIA, en forma exclusiva, podrán proceder a la grabación, publicación y copia de actuaciones, ejecuciones o interpretaciones, en cualquier tipo de forma o soporte; la reproducción y adaptación de la actuación como cantante, solista o como parte de un grupo musical o de mi intervención en el programa de televisión, el muestreo, la representación mímica, la mezcla y el doblaje de la actuación o intervención, la reproducción y comunicación pública mediante la utilización de cualquier soporte, así como, en general, cualquier otro medio. También y sin perjuicio de los derechos de televisión y de los derechos musicales que corresponden a MEGAMEDIA, en forma exclusiva, podrá difundir, en cualquier otra forma, información respecto mi persona mediante imágenes y/o sonido, incluyéndose los pases o transmisiones mediante sistemas de comunicación de libre recepción, sistemas de comunicación por satélite, sistemas de comunicación por cable (por ejemplo; como parte de una suscripción o abono a una cadena de televisión de pago o a través de la modalidad de "pay per view" o a través de un circuito cerrado de televisión e incluso como parte de un paquete o compilación de programas), internet, radio, música y cualquier otro medio actualmente conocido o que se conozca en el futuro. Sin perjuicio de lo ya señalado, autorizo la cesión, en este mismo acto, a MEGAMEDIA por lo que respecta a los derechos de televisión y musicales, la totalidad de los derechos de explotación y, en especial, los de reproducción, distribución y/o comunicación pública que me pudieren corresponder sobre mi intervención o participación o presencia en el programa de televisión de acuerdo con la legislación vigente en la República de Chile en materia de propiedad intelectual, efectuándose dicha cesión por el plazo máximo de protección legal, en forma ilimitada, por un número ilimitado de veces, en Chile y el extranjero. Por último, MEGAMEDIA, por lo que respecta a los derechos de televisión y musicales, gozará del derecho a explotar el programa de televisión y las obras musicales en que cante o ejecute, en cualquier forma y a través de cualquier medio, actualmente conocido o que se conozca en el futuro, pudiendo hacerlo, directamente, o a través de cualquier tercero al que, a su vez, ceda, total o parcialmente, los derechos de explotación cuya titularidad ostenta. Asimismo, reconozco y acepto que MEGAMEDIA podrá, directamente o a través de un tercero, producir discos, álbumes musicales u otros soportes materiales conteniendo fonogramas interpretados por mi, en forma individual o en conjunto con otros, en el programa de televisión y que podrá o no a criterio de MEGAMEDIA contener fonogramas interpretados por mi. En tal sentido, en conformidad a la presente autorización, otorgo a MEGAMEDIA el derecho exclusivo para efectuar grabaciones fonográficas de las interpretaciones efectuadas por mi, sea como solista y/o en conjunto con otro u otros participantes del programa de televisión y/o artistas, con o sin imágenes, efectuadas por cualquier medio creado o crearse en el futuro y el derecho exclusivo para fabricar, producir, licenciar, promover y/o de cualquier otra forma explotar fonogramas y/o álbumes y/o videogramas conteniendo dichas grabaciones sin límite de tiempo, ni de territorios, pudiendo ceder este derecho a terceros, sin limitación alguna. Durante toda la vigencia de la presente autorización, ya sea como solista o en conjunto, otorgo a MEGAMEDIA la plena y absoluta exclusividad de mis interpretaciones para fijaciones sonoras y audiovisuales, que se realicen por cualquier medio o tecnología creada o a crearse, comprometiéndome a no grabarlas para mí mismo ni para terceros, ya sea actuando como solista o como integrante de un conjunto y aun sin mención de mi nombre o seudónimo. Asimismo, me obligo a no re-grabar ningún trabajo musical contenido en las grabaciones y/o en los videogramas y/o álbumes y/o fonogramas en los que se incluyan interpretaciones y/o grabaciones, durante un período de 2 años contados desde la finalización del periodo de vigencia de la presente autorización.
 
@@ -3424,54 +3388,56 @@ SEGUNDO: Sin perjuicio de lo señalado en la cláusula anterior, en particular y
 
 Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representante.`;
 
-                const lineas = doc.splitTextToSize(textoCesion, 175);
-                doc.text(lineas, 20, 30);
-                
-                let yFinalText = 30 + (lineas.length * 3.5);
-                
-                const nombreCompleto = `${trab.nombres || ''} ${trab.apellidos || ''}`.toUpperCase();
-                
-                if (yFinalText > 270) {
-                    doc.addPage();
-                    yFinalText = 30;
-                }
+                    const lineas = doc.splitTextToSize(textoCesion, 175);
+                    doc.text(lineas, 20, 30);
+                    
+                    let yFinalText = 30 + (lineas.length * 3.5);
+                    
+                    const nombreCompleto = `${trab.nombres || ''} ${trab.apellidos || ''}`.toUpperCase();
+                    
+                    if (yFinalText > 270) {
+                        doc.addPage();
+                        yFinalText = 30;
+                    }
 
-                yFinalText += 10;
-                
-                doc.setFontSize(10);
-                doc.text(`Fecha: ${fecha.split('-').reverse().join('-')}`, 20, yFinalText); yFinalText += 6;
-                doc.text(`Nombre: ${nombreCompleto}`, 20, yFinalText); yFinalText += 6;
-                doc.text(`RUT: ${rut}`, 20, yFinalText); yFinalText += 6;
-                doc.text(`Empresa (si aplica): `, 20, yFinalText); yFinalText += 6;
-                doc.text(`RUT (si aplica): `, 20, yFinalText); yFinalText += 6;
-                doc.text(`Teléfono: ${trab.telefono || '-'}`, 20, yFinalText); yFinalText += 15;
-                
-                if (yFinalText > 300) {
-                    doc.addPage();
-                    yFinalText = 40;
-                }
-                
-                doc.setFont("helvetica", "bold");
-                doc.text("_________________________________", 20, yFinalText + 20); 
-                doc.text("Firma", 40, yFinalText + 25); 
-                
-                try {
-                    doc.addImage(asis.firma_digital, 'JPEG', 30, yFinalText - 10, 60, 20); 
-                } catch(e) {}
-                
-                doc.text("_________________________________", 120, yFinalText + 20); 
-                doc.text("pp. MEGAMEDIA S.A.", 130, yFinalText + 25); 
+                    yFinalText += 10;
+                    
+                    doc.setFontSize(10);
+                    doc.text(`Fecha: ${fecha.split('-').reverse().join('-')}`, 20, yFinalText); yFinalText += 6;
+                    doc.text(`Nombre: ${nombreCompleto}`, 20, yFinalText); yFinalText += 6;
+                    doc.text(`RUT: ${rut}`, 20, yFinalText); yFinalText += 6;
+                    doc.text(`Empresa (si aplica): `, 20, yFinalText); yFinalText += 6;
+                    doc.text(`RUT (si aplica): `, 20, yFinalText); yFinalText += 6;
+                    doc.text(`Teléfono: ${trab.telefono || '-'}`, 20, yFinalText); yFinalText += 15;
+                    
+                    if (yFinalText > 300) {
+                        doc.addPage();
+                        yFinalText = 40;
+                    }
+                    
+                    doc.setFont("helvetica", "bold");
+                    doc.text("_________________________________", 20, yFinalText + 20); 
+                    doc.text("Firma", 40, yFinalText + 25); 
+                    
+                    try {
+                        doc.addImage(asis.firma_digital, 'JPEG', 30, yFinalText - 10, 60, 20); 
+                    } catch(e) {}
+                    
+                    doc.text("_________________________________", 120, yFinalText + 20); 
+                    doc.text("pp. MEGAMEDIA S.A.", 130, yFinalText + 25); 
 
-                const nombreCompletoLimpio = nombreCompleto.replace(/[^a-zA-Z0-9_]/g, "");
-                const pdfBlob = doc.output('blob');
-                
-                zip.file(`Cesion_MEGAMEDIA_${nombreCompletoLimpio}_${rut}.pdf`, pdfBlob);
-                generados++;
+                    const nombreCompletoLimpio = nombreCompleto.replace(/[^a-zA-Z0-9_]/g, "");
+                    const pdfBlob = doc.output('blob');
+                    
+                    // Organize inside the ZIP by date
+                    zip.folder(fecha).file(`Cesion_MEGAMEDIA_${nombreCompletoLimpio}_${rut}.pdf`, pdfBlob);
+                    generados++;
+                }
             }
         }
 
         if (generados === 0) {
-            alert("No se encontraron firmas digitales en este grupo.");
+            alert("No se encontraron firmas digitales en este programa.");
             btnId.innerText = textoOriginal;
             btnId.disabled = false;
             return;
@@ -3480,7 +3446,7 @@ Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representa
         const zipContent = await zip.generateAsync({type:"blob"});
         const a = document.createElement("a");
         a.href = URL.createObjectURL(zipContent);
-        a.download = `Cesiones_MEGAMEDIA_${prog.replace(/[ \/]/g, "_")}_${fecha}.zip`;
+        a.download = `Cesiones_${prog.replace(/[ \/]/g, "_")}_Completas.zip`;
         a.click();
 
         btnId.innerText = "✅ Descargado";
@@ -3495,7 +3461,6 @@ Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representa
         btnId.disabled = false;
     }
 }
-
 // Inicializar
 const tabMant = document.getElementById('mantenimiento-tab');
 if (tabMant) {
