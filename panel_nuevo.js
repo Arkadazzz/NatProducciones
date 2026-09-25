@@ -78,6 +78,8 @@ let totalEsperados = 0;
 let totalFirmados = 0; 
 let reservasGlobales = {};
 let asistenciasGlobales = {};
+let totalIPGlobal = 0;
+let totalCortesiaGlobal = 0;
 window.siguienteTicketAutomatico = 1;
 window.asistentesSinSalida = 0; 
 let unsubscribeReservas = null; 
@@ -541,11 +543,11 @@ function activarRadares() {
         reservasGlobales = snapshot.exists() ? snapshot.val() : {};
         totalEsperados = Object.keys(reservasGlobales).length; 
         
-        let totalIP = 0;
-        let totalCortesia = 0;
+        totalIPGlobal = 0;
+        totalCortesiaGlobal = 0;
         for (const r in reservasGlobales) {
-            if (reservasGlobales[r].tipo === "Cortesía") totalCortesia++;
-            else totalIP++;
+            if (reservasGlobales[r].tipo === "Cortesía") totalCortesiaGlobal++;
+            else totalIPGlobal++;
         }
         actualizarTablero();
     });
@@ -777,7 +779,7 @@ function actualizarTablero() {
             if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados}`;
             if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados}`;
         } else {
-            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIP} | CORT: ${totalCortesia}</span>`;
+            if (document.getElementById('contEsperados')) document.getElementById('contEsperados').innerHTML = `${totalEsperados} <br><span style="font-size:0.35em; color:#d6b3ff; display:block; margin-top:2px; font-weight:normal;">I/P: ${totalIPGlobal} | CORT: ${totalCortesiaGlobal}</span>`;
             if (document.getElementById('contFirmados')) document.getElementById('contFirmados').innerHTML = `${totalFirmados} <br><span style="font-size:0.35em; color:#00d26a; display:block; margin-top:2px; font-weight:normal;">I/P: ${window.adentroIP || 0} | CORT: ${window.adentroCortesia || 0}</span>`;
         }
         
