@@ -26,8 +26,8 @@ const CORREOS_ADMINISTRADORES = [
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
     "javier.rojas.fer@gmail.com",
-    "luisemilio.jorquera.avaria@gmail.com",
     "Matijesus.pz@gmail.com",
+    "luisemilio.jorquera.avaria@gmail.com",
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -87,50 +87,6 @@ window.asistentesSinSalida = 0;
 let unsubscribeReservas = null; 
 let unsubscribeAsistencias = null;
 
-// ==========================================
-// CACHÉ GLOBAL ANTI-COLAPSO (AHORRO DE DATOS)
-// ==========================================
-window.cacheAsistencias = null;
-window.cacheTrabajadores = null;
-
-class FakeSnapshot {
-    constructor(data) { this.data = data; }
-    exists() { return this.data !== null && this.data !== undefined; }
-    val() { return this.data; }
-}
-
-window.obtenerAsistencias = async function(forzar = false) {
-    if (!forzar && window.cacheAsistencias) {
-        console.log("♻️ Usando caché de Asistencias (0 bytes de descarga)");
-        return new FakeSnapshot(window.cacheAsistencias);
-    }
-    console.log("⬇️ Descargando Asistencias de Firebase (Consumiendo Ancho de Banda)...");
-    const snap = await window.obtenerAsistencias();
-    window.cacheAsistencias = snap.exists() ? snap.val() : null;
-    return snap;
-};
-
-window.obtenerTrabajadores = async function(forzar = false) {
-    if (!forzar && window.cacheTrabajadores) {
-        console.log("♻️ Usando caché de Trabajadores (0 bytes de descarga)");
-        return new FakeSnapshot(window.cacheTrabajadores);
-    }
-    console.log("⬇️ Descargando Trabajadores de Firebase (Consumiendo Ancho de Banda)...");
-    const snap = await window.obtenerTrabajadores();
-    window.cacheTrabajadores = snap.exists() ? snap.val() : null;
-    listaGlobalCRM = window.cacheTrabajadores || {};
-    return snap;
-};
-
-window.limpiarCache = function() {
-    window.cacheAsistencias = null;
-    window.cacheTrabajadores = null;
-    console.log("🧹 Caché limpiado por actualización de datos.");
-};
-
-// ==========================================
-
-
 function poblarSelectoresHora() {
     let opcionesHTML = '<option value="">-- Selecciona --</option>';
     const horas = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1];
@@ -155,7 +111,7 @@ function poblarSelectoresHora() {
 poblarSelectoresHora();
 
 // Carga de la base de datos de trabajadores al iniciar para que la puerta muestre los nombres
-window.obtenerTrabajadores().then(snap => { 
+get(ref(db, '1_trabajadores')).then(snap => { 
     if (snap.exists()) {
         listaGlobalCRM = snap.val();
         // Si la sala ya cargó antes que los nombres, forzamos un refresco visual:
@@ -183,7 +139,7 @@ function inicializarContador() {
     if (btnDescargar) btnDescargar.disabled = true;
     if (resumenMes) resumenMes.classList.add('d-none');
 
-    window.obtenerAsistencias().then((snap) => {
+    get(ref(db, '2_asistencias')).then((snap) => {
         if (!snap.exists()) {
             selectMes.innerHTML = '<option value="">❌ No hay registros históricos</option>';
             return;
@@ -327,7 +283,7 @@ if (btnDescargarMesElegido) {
             
             let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
             
-            const trabSnap = await window.obtenerTrabajadores();
+            const trabSnap = await get(ref(db, '1_trabajadores'));
             const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
             
             for (const r in tot) {
@@ -542,7 +498,6 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
 
             if (Object.keys(actualizacionesFirebase).length > 0) {
                 await update(ref(db), actualizacionesFirebase);
-        window.limpiarCache();
                 alert(`✅ Checkout Masivo Exitoso.
 Se calculó la salida y el pago a ${procesados} personas.`);
             }
@@ -936,7 +891,6 @@ window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
     if (isNaN(nuevoMonto)) return alert("Por favor ingresa solo números.");
     
     try { 
-        window.limpiarCache();
         await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { monto: nuevoMonto }); 
     } catch (e) { 
         alert("Error al actualizar el pago."); 
@@ -950,8 +904,7 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     if (tipoIngreso === "Cortesía") {
         if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
         try { 
-            window.limpiarCache();
-        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: 0, monto: 0 }); 
+            await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: 0, monto: 0 }); 
         } catch (e) {}
         return;
     } 
@@ -978,7 +931,6 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     const nuevoMontoTotal = calculo.montoBaseNuevo + bonoExtraConfirmado;
 
     try { 
-        window.limpiarCache();
         await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
             hora_salida: horaSalida, 
             bono_horas_extras: bonoExtraConfirmado, 
@@ -1219,16 +1171,14 @@ window.anularAsistencia = async function(rut) {
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
     const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
-    const menorSnap = await get(child(ref(db), `8_autorizaciones_menores/${fechaPrograma}/${nombrePrograma}/${rut}`));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     
     const asis = asisSnap.val(); 
-    const datosMenor = menorSnap.exists() ? menorSnap.val() : null;
     const { jsPDF } = window.jspdf; 
     const doc = new jsPDF({ format: 'legal' });
     
-    dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "), datosMenor);
+    dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
     
     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
     const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
@@ -1243,7 +1193,7 @@ window.generarContratoPDF = async function(rut) {
     doc.save(nombreArchivo);
 }
 
-function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg, datosMenor = null) {
+function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
     let y = 15; 
     doc.setFont("helvetica", "bold"); 
     doc.setFontSize(11);
@@ -1257,32 +1207,16 @@ function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg, datos
 
     let titulo = ""; 
     let textoContrato = "";
-    let firmaAsistenteFinal = asis.firma_digital;
-    let nombreFirmaAsistente = nombreCompleto;
-    let rutFirmaAsistente = rut;
 
     if (asis.aplica_contrato === false || asis.tipo_ingreso === "Cortesía") {
         titulo = "Acuerdo de Cesión de Derechos de Imagen y Voz";
-        if (datosMenor) {
-            textoContrato = `En Santiago, a ${fechaTexto}, don/a ${datosMenor.nombre_apoderado.toUpperCase()}, cédula de identidad Nº ${datosMenor.rut_apoderado}, domiciliado/a en calle ${datosMenor.domicilio_apoderado.toUpperCase()}, en calidad de ${datosMenor.relacion_apoderado} y representante legal del menor ${nombreCompleto}, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, en adelante “el/la Cedente”, declara y acepta lo siguiente:
+        textoContrato = `En Santiago, a ${fechaTexto}, don/a ${nombreCompleto}, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, domiciliado/a en calle ${direccion}, ciudad de Santiago, en adelante “el/la Cedente”, declara y acepta lo siguiente:
 
 PRIMERO. El Cedente asiste a la producción "${nombreProg}" en calidad de invitado/a o extra sin relación de subordinación ni dependencia.
 
 SEGUNDO. Por el presente acto, el Cedente autoriza a Camila Alejandra Fevre Seguel Produccion E.I.R.L de forma gratuita, irrevocable y sin límite territorial, la fijación, fijación audiovisual, reproducción y difusión de su imagen y voz captadas durante su asistencia a la producción.
 
 TERCERO. Se deja expresa constancia de que la participación es voluntaria y no existe remuneración laboral asociada a este acuerdo.`;
-            nombreFirmaAsistente = datosMenor.nombre_apoderado.toUpperCase();
-            rutFirmaAsistente = datosMenor.rut_apoderado;
-            firmaAsistenteFinal = datosMenor.firma_apoderado || asis.firma_digital;
-        } else {
-            textoContrato = `En Santiago, a ${fechaTexto}, don/a ${nombreCompleto}, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, domiciliado/a en calle ${direccion}, ciudad de Santiago, en adelante “el/la Cedente”, declara y acepta lo siguiente:
-
-PRIMERO. El Cedente asiste a la producción "${nombreProg}" en calidad de invitado/a o extra sin relación de subordinación ni dependencia.
-
-SEGUNDO. Por el presente acto, el Cedente autoriza a Camila Alejandra Fevre Seguel Produccion E.I.R.L de forma gratuita, irrevocable y sin límite territorial, la fijación, fijación audiovisual, reproducción y difusión de su imagen y voz captadas durante su asistencia a la producción.
-
-TERCERO. Se deja expresa constancia de que la participación es voluntaria y no existe remuneración laboral asociada a este acuerdo.`;
-        }
     } else {
         titulo = "Contrato de Trabajo Extras Público (Televisión)";
         textoContrato = `En Santiago, a ${fechaTexto}, entre Camila Alejandra Fevre Seguel Produccion E.I.R.L, RUT 76.932.592-1, representada por don/a Camila Alejandra Fevre Seguel en su calidad de representante legal, cédula de identidad Nº 19.700.978-0, correo electrónico nat.producciones2020@gmail.com, ambos domiciliados en calle Carriel Sur, Nº 3106, comuna de Cerrillos, ciudad de Santiago, que en adelante se denominará “el/la empleador/a”, y don/a ${nombreCompleto}, de nacionalidad chilena, nacido/a el ${fechaNac}, cédula de identidad Nº ${rut}, de profesión u oficio Extra de Televisión, correo electrónico ${trab.email || '___________________________'}, domiciliado/a en ${direccion}, ciudad de Santiago, que en adelante se denominará “el/la trabajador/a”, se ha convenido el siguiente contrato de trabajo temporal, de acuerdo a lo señalado en el Artículo 145 A y siguientes del Código del Trabajo:
@@ -1340,20 +1274,20 @@ DUODÉCIMO. El trabajador autoriza expresamente a la Productora para que la firm
     } 
 
     doc.setFont("helvetica", "bold"); 
-    if (firmaAsistenteFinal) { 
+    if (asis.firma_digital) { 
         try { 
-            doc.addImage(firmaAsistenteFinal, 'JPEG', 115, y - 25, 80, 25); 
+            doc.addImage(asis.firma_digital, 'JPEG', 115, y - 25, 80, 25); 
         } catch(e) { 
             console.error("Error firma"); 
         } 
     }
     
     doc.text("_________________________________", 155, y, null, null, "center"); 
-    doc.text("Firma Asistente / Apoderado", 155, y + 5, null, null, "center"); 
+    doc.text("Firma Asistente", 155, y + 5, null, null, "center"); 
     doc.setFont("helvetica", "normal"); 
-    doc.text(nombreFirmaAsistente, 155, y + 10, null, null, "center");
+    doc.text(nombreCompleto, 155, y + 10, null, null, "center");
     // RUT INCLUIDO BAJO LA FIRMA
-    doc.text(`RUT: ${rutFirmaAsistente}`, 155, y + 15, null, null, "center"); 
+    doc.text(`RUT: ${rut}`, 155, y + 15, null, null, "center"); 
 }
 
 
@@ -1362,7 +1296,7 @@ DUODÉCIMO. El trabajador autoriza expresamente a la Productora para que la firm
 // ==========================================
 if (document.getElementById('crm-tab')) document.getElementById('crm-tab').addEventListener('click', async () => {
     const [trabSnap, blackSnap] = await Promise.all([ 
-        window.obtenerTrabajadores(), 
+        get(ref(db, '1_trabajadores')), 
         get(ref(db, '4_blacklist')) 
     ]);
     
@@ -1550,7 +1484,6 @@ window.forzarIngresoPasado = async function(rut, nombre) {
         }
         const numeroFinal = numReal + 1;
         
-        window.limpiarCache();
         await set(ref(db, `2_asistencias/${fec}/${prog}/${rut}`), {
             rut: rut,
             nombre_programa: prog,
@@ -1577,7 +1510,6 @@ window.forzarIngresoPasado = async function(rut, nombre) {
 
 if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
-        window.limpiarCache();
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
             nombres: document.getElementById('editNombres').value, 
             apellidos: document.getElementById('editApellidos').value,
@@ -1609,7 +1541,6 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
 if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
-        window.limpiarCache();
         delete listaGlobalCRM[rutPerfilActual]; 
         renderCRM(listaGlobalCRM); 
         modalFichaInstance.hide(); 
@@ -1644,10 +1575,10 @@ if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbl
 // FINANZAS Y BÓVEDA
 // ==========================================
 if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-tab').addEventListener('click', async () => {
-    const snap = await window.obtenerAsistencias(); 
+    const snap = await get(ref(db, '2_asistencias')); 
     if (!snap.exists()) return;
     
-    const trabSnap = await window.obtenerTrabajadores(); 
+    const trabSnap = await get(ref(db, '1_trabajadores')); 
     if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     let deudas = {}; 
@@ -1700,7 +1631,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
     let actualizacionesFirebase = {};
     
-    const trabSnap = await window.obtenerTrabajadores(); 
+    const trabSnap = await get(ref(db, '1_trabajadores')); 
     if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     for (const r in window.deudasGlobales) {
@@ -1717,8 +1648,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     }
     
     try { 
-        await update(ref(db), actualizacionesFirebase);
-        window.limpiarCache(); 
+        await update(ref(db), actualizacionesFirebase); 
         descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`); 
         alert("¡Liquidación exitosa!"); 
         if (document.getElementById('tablaDeudas')) document.getElementById('tablaDeudas').innerHTML = ""; 
@@ -1736,7 +1666,7 @@ if (document.getElementById('btnExcelBanco')) document.getElementById('btnExcelB
     btn.disabled = true;
 
     try {
-        const snap = await window.obtenerAsistencias();
+        const snap = await get(ref(db, '2_asistencias'));
         if (!snap.exists()) { 
             alert("No hay asistencias registradas en el sistema."); 
             btn.innerText = "Generar Nómina de Pago"; 
@@ -1813,8 +1743,8 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(), 
-            window.obtenerTrabajadores() 
+            get(ref(db, '2_asistencias')), 
+            get(ref(db, '1_trabajadores')) 
         ]);
         
         const todas = asisSnap.val(); 
@@ -1860,7 +1790,6 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
         }
 
         await update(ref(db), actualizacionesFirebase);
-        window.limpiarCache();
         descargarCSV(csv, `Nomina_Banco_Agrupada_${new Date().toISOString().split('T')[0]}.csv`);
         
         alert("¡Nómina generada con éxito! Revisa tus descargas.");
@@ -1906,8 +1835,8 @@ async function cargarListaEfectivo() {
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([
-            window.obtenerAsistencias(),
-            window.obtenerTrabajadores()
+            get(ref(db, '2_asistencias')),
+            get(ref(db, '1_trabajadores'))
         ]);
         
         if (!asisSnap.exists()) {
@@ -2020,7 +1949,7 @@ if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBu
     
     if(!window.deudasEfectivoGlobal) return;
     
-    window.obtenerTrabajadores().then(snap => {
+    get(ref(db, '1_trabajadores')).then(snap => {
         const trabObj = snap.exists() ? snap.val() : {};
         if(!termOriginal) {
             renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
@@ -2167,7 +2096,6 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
         let updates = {};
         rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
         await update(ref(db), updates);
-        window.limpiarCache();
 
         alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda.");
         
@@ -2247,7 +2175,7 @@ async function renderPanelRecibosBatch() {
             try {
                 const zip = new JSZip();
                 const { jsPDF } = window.jspdf;
-                const trabSnap = await window.obtenerTrabajadores();
+                const trabSnap = await get(ref(db, '1_trabajadores'));
                 const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
                 
                 for (const id in recibos) {
@@ -2355,7 +2283,7 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
     try {
-        const [asisSnap, trabSnap] = await Promise.all([ window.obtenerAsistencias(), window.obtenerTrabajadores() ]);
+        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
         
         if (!asisSnap.exists()) {
             contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes.</div>";
@@ -2580,7 +2508,6 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
 
     try {
         await update(ref(db), updates);
-        window.limpiarCache();
         asisData.todoLiquidado = nuevoEstado;
     } catch (e) {
         console.error("Error al actualizar estado en BD", e);
@@ -2601,7 +2528,6 @@ window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
     
     try {
         await update(ref(db), updates);
-        window.limpiarCache();
         alert("Contrato anulado correctamente por retiro.");
         if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click(); 
     } catch(e) {
@@ -2647,7 +2573,6 @@ if (document.getElementById('btnArchivarContratosDT')) document.getElementById('
 
     try {
         await update(ref(db), updates);
-        window.limpiarCache();
         alert(`✅ ¡Éxito! Se archivaron ${rutsArchivados} contratos de los programas:\n${Array.from(resumenProgramas).join(', ')}`);
         if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click();
     } catch (e) {
@@ -2659,7 +2584,7 @@ if (document.getElementById('btnArchivarContratosDT')) document.getElementById('
 // ==========================================
 // PESTAÑA 4: SEGURIDAD (ACORDEÓN MES -> PROGRAMA)
 // ==========================================
-async function cargarReportesDT(forzar = false) {
+async function cargarReportesDT() {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarSeguridad');
     
@@ -2668,10 +2593,9 @@ async function cargarReportesDT(forzar = false) {
         btnRefresh.disabled = true;
     }
     
-    // Si se hizo clic en el botón refrescar, forzamos la descarga
     const [asisSnap, trabSnap] = await Promise.all([ 
-        window.obtenerAsistencias(forzar === true), 
-        window.obtenerTrabajadores(forzar === true) 
+        get(ref(db, '2_asistencias')), 
+        get(ref(db, '1_trabajadores')) 
     ]);
     
     if(btnRefresh) {
@@ -2830,7 +2754,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         const asisSnap = await get(child(ref(db), `2_asistencias/${fechaElegida}/${programaElegido}`));
         if (!asisSnap.exists()) return alert("No hay datos para descargar.");
         
-        const trabSnap = await window.obtenerTrabajadores();
+        const trabSnap = await get(ref(db, '1_trabajadores'));
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         
         const asistentes = asisSnap.val();
@@ -2852,7 +2776,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
 }
 
 if (document.getElementById('seguridad-tab')) document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
-if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('btnRefrescarSeguridad').addEventListener('click', () => cargarReportesDT(true));
+if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
 
 
 // ==========================================
@@ -2860,10 +2784,10 @@ if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('b
 // ==========================================
 if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
-        const snap = await window.obtenerAsistencias(); 
+        const snap = await get(ref(db, '2_asistencias')); 
         if (!snap.exists()) return alert("No hay datos de asistencias.");
         
-        const trabSnap = await window.obtenerTrabajadores(); 
+        const trabSnap = await get(ref(db, '1_trabajadores')); 
         if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         let agrupado = {};
@@ -2912,14 +2836,14 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
         btn.innerText = "⏳ Empaquetando PDFs... (Espera)"; 
         btn.disabled = true;
         
-        const snap = await window.obtenerAsistencias(); 
+        const snap = await get(ref(db, '2_asistencias')); 
         if (!snap.exists()) { 
             alert("No hay contratos."); 
             resetBtnZip(btn); 
             return; 
         }
         
-        const trabSnap = await window.obtenerTrabajadores(); 
+        const trabSnap = await get(ref(db, '1_trabajadores')); 
         if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         const todas = snap.val(); 
@@ -2992,8 +2916,7 @@ if(inputConfirmar) inputConfirmar.addEventListener('input', (e) => {
 
 if(btnEjecutar) btnEjecutar.addEventListener('click', async () => {
     try {
-        await remove(ref(db, '2_asistencias'));
-        window.limpiarCache(); 
+        await remove(ref(db, '2_asistencias')); 
         await remove(ref(db, '3_reservas'));
         alert("✅ Nube limpiada con éxito."); 
         
@@ -3017,7 +2940,7 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
     
     try {
         const [snapAsis, snapSorteos] = await Promise.all([ 
-            window.obtenerAsistencias(), 
+            get(ref(db, '2_asistencias')), 
             get(ref(db, '6_sorteos_fechas_usadas')) 
         ]);
         
@@ -3073,8 +2996,8 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(), 
-            window.obtenerTrabajadores() 
+            get(ref(db, '2_asistencias')), 
+            get(ref(db, '1_trabajadores')) 
         ]);
         
         if (!asisSnap.exists()) throw new Error("No hay datos");
@@ -3365,7 +3288,6 @@ document.body.addEventListener('click', async (e) => {
             }
             if (count > 0) {
                 await update(ref(db), updates);
-        window.limpiarCache();
                 alert(`✅ ¡ÉXITO! Se restauraron los sueldos al 100% ($${montoReal}) a las ${count} personas afectadas.`);
             } else {
                 alert("No habían personas de pago en esa sala.");
@@ -3390,16 +3312,16 @@ document.body.addEventListener('click', async (e) => {
 // CESIONES MEGAMEDIA
 // ==========================================
 if (document.getElementById('cesiones-tab')) document.getElementById('cesiones-tab').addEventListener('click', cargarPanelCesiones);
-if (document.getElementById('btnRefrescarCesiones')) document.getElementById('btnRefrescarCesiones').addEventListener('click', () => cargarPanelCesiones(true));
+if (document.getElementById('btnRefrescarCesiones')) document.getElementById('btnRefrescarCesiones').addEventListener('click', cargarPanelCesiones);
 
-async function cargarPanelCesiones(forzar = false) {
+async function cargarPanelCesiones() {
     const contenedor = document.getElementById('contenedorCesionesMega');
     if (!contenedor) return;
     
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-warning'></div></div>";
 
     try {
-        const [asisSnap, trabSnap] = await Promise.all([ window.obtenerAsistencias(forzar === true), window.obtenerTrabajadores(forzar === true) ]);
+        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
         
         if (!asisSnap.exists()) {
             contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay asistencias registradas.</div>";
@@ -3490,7 +3412,7 @@ window.descargarZIPCesionesSemana = async function(event, prog, weekLabel, fecha
         const { jsPDF } = window.jspdf;
         let generados = 0;
 
-        const trabSnap = await window.obtenerTrabajadores();
+        const trabSnap = await get(ref(db, '1_trabajadores'));
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
 
         for (const fecha of fechas) {
@@ -3498,17 +3420,12 @@ window.descargarZIPCesionesSemana = async function(event, prog, weekLabel, fecha
             if (!asisSnap.exists()) continue;
 
             const asistentes = asisSnap.val();
-            
-            // Traemos los datos de menores por si hay alguno en esta fecha
-            const menoresSnap = await get(child(ref(db, `8_autorizaciones_menores/${fecha}/${prog}`)));
-            const menores = menoresSnap.exists() ? menoresSnap.val() : {};
 
             for (const rut in asistentes) {
                 const asis = asistentes[rut];
                 const trab = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", telefono: "-" };
-                const datosMenor = menores[rut];
                 
-                if (asis.firma_digital || (datosMenor && datosMenor.firma_apoderado)) {
+                if (asis.firma_digital) {
                     const doc = new jsPDF({ format: 'legal' });
                     
                     doc.setFont("helvetica", "bold");
@@ -3518,7 +3435,9 @@ window.descargarZIPCesionesSemana = async function(event, prog, weekLabel, fecha
                     doc.setFont("helvetica", "normal");
                     doc.setFontSize(8);
 
-                    const textoBaseMega = `PRIMERO: Por el presente instrumento y, en este acto, autorizo a MEGAMEDIA S.A., en adelante MEGAMEDIA, y a los terceros que ésta designe, para que utilicen mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad, en adelante "mi imagen" (i) en los programas de televisión o casting de estos, en que haya intervenido, participado o haya tenido alguna presencia; (ii) en aquellos productos, bienes, servicios y/o negocios que se comercialicen y/o desarrollen por MEGAMEDIA o por los terceros que designe, que incluyan mi imagen; y (iii) en la publicidad o promoción de (i) y (ii) anteriores. La autorización de que da cuenta este instrumento se presta en forma exclusiva; sin cargo adicional alguno; en forma irrevocable; ilimitada; por el plazo durante el cual se transmitan los programas de televisión en los cuales participe o haya participado o aparecido, en forma individual o en conjunto, y/o durante el plazo en que se comercialicen los productos, bienes, servicios y/o negocios en los que se utilice mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad ya sea en forma individual o en conjunto con otros - y en Chile y el Extranjero; y tanto para sistemas de televisión de libre recepción, servicios limitados de televisión, televisión satelital, televisión digital, internet, radio o en cualquier otro medio o sistema de comunicación como para cualquier otro soporte material; y/o de audio; y/o audiovisual que se utilicen para estos efectos por MEGAMEDIA o por los terceros que MEGAMEDIA determine. Todos los soportes materiales; y/o de audio; y/o de audio y video en que se incluya o aparezca mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material de mi imagen o personalidad, es y será de propiedad exclusiva de MEGAMEDIA. En consecuencia, podrán proceder, personalmente o a través de terceros, a la elaboración y comercialización de cuantos productos considere oportunos y sin que esta enumeración se considere taxativa: discos compactos con obras musicales ejecutadas o interpretadas por mi, en forma individual o en conjunto con otros, dvds, u otros soportes de audio, video y/o de audio y video, entre otros, en los que aparezca, por ejemplo, mi imagen o nombre, así como expresiones que se hayan podido popularizar durante la emisión del programa de televisión. Asimismo y sin perjuicio de los derechos de televisión que corresponden a MEGAMEDIA, en forma exclusiva, podrán proceder a la grabación, publicación y copia de actuaciones, ejecuciones o interpretaciones, en cualquier tipo de forma o soporte; la reproducción y adaptación de la actuación como cantante, solista o como parte de un grupo musical o de mi intervención en el programa de televisión, el muestreo, la representación mímica, la mezcla y el doblaje de la actuación o intervención, la reproducción y comunicación pública mediante la utilización de cualquier soporte, así como, en general, cualquier otro medio. También y sin perjuicio de los derechos de televisión y de los derechos musicales que corresponden a MEGAMEDIA, en forma exclusiva, podrá difundir, en cualquier otra forma, información respecto mi persona mediante imágenes y/o sonido, incluyéndose los pases o transmisiones mediante sistemas de comunicación de libre recepción, sistemas de comunicación por satélite, sistemas de comunicación por cable (por ejemplo; como parte de una suscripción o abono a una cadena de televisión de pago o a través de la modalidad de "pay per view" o a través de un circuito cerrado de televisión e incluso como parte de un paquete o compilación de programas), internet, radio, música y cualquier otro medio actualmente conocido o que se conozca en el futuro. Sin perjuicio de lo ya señalado, autorizo la cesión, en este mismo acto, a MEGAMEDIA por lo que respecta a los derechos de televisión y musicales, la totalidad de los derechos de explotación y, en especial, los de reproducción, distribución y/o comunicación pública que me pudieren corresponder sobre mi intervención o participación o presencia en el programa de televisión de acuerdo con la legislación vigente en la República de Chile en materia de propiedad intelectual, efectuándose dicha cesión por el plazo máximo de protección legal, en forma ilimitada, por un número ilimitado de veces, en Chile y el extranjero. Por último, MEGAMEDIA, por lo que respecta a los derechos de televisión y musicales, gozará del derecho a explotar el programa de televisión y las obras musicales en que cante o ejecute, en cualquier forma y a través de cualquier medio, actualmente conocido o que se conozca en el futuro, pudiendo hacerlo, directamente, o a través de cualquier tercero al que, a su vez, ceda, total o parcialmente, los derechos de explotación cuya titularidad ostenta. Asimismo, reconozco y acepto que MEGAMEDIA podrá, directamente o a través de un tercero, producir discos, álbumes musicales u otros soportes materiales conteniendo fonogramas interpretados por mi, en forma individual o en conjunto con otros, en el programa de televisión y que podrá o no a criterio de MEGAMEDIA contener fonogramas interpretados por mi. En tal sentido, en conformidad a la presente autorización, otorgo a MEGAMEDIA el derecho exclusivo para efectuar grabaciones fonográficas de las interpretaciones efectuadas por mi, sea como solista y/o en conjunto con otro u otros participantes del programa de televisión y/o artistas, con o sin images, efectuadas por cualquier medio creado o crearse en el futuro y el derecho exclusivo para fabricar, producir, licenciar, promover y/o de cualquier otra forma explotar fonogramas y/o álbumes y/o videogramas conteniendo dichas grabaciones sin límite de tiempo, ni de territorios, pudiendo ceder este derecho a terceros, sin limitación alguna. Durante toda la vigencia de la presente autorización, ya sea como solista o en conjunto, otorgo a MEGAMEDIA la plena y absoluta exclusividad de mis interpretaciones para fijaciones sonoras y audiovisuales, que se realicen por cualquier medio o tecnología creada o a crearse, comprometiéndome a no grabarlas para mí mismo ni para terceros, ya sea actuando como solista o como integrante de un conjunto y aun sin mención de mi nombre o seudónimo. Asimismo, me obligo a no re-grabar ningún trabajo musical contenido en las grabaciones y/o en los videogramas y/o álbumes y/o fonogramas en los que se incluyan interpretaciones y/o grabaciones, durante un período de 2 años contados desde la finalización del periodo de vigencia de la presente autorización.
+                    const textoCesion = `En Santiago de Chile, quien suscribe la presente autorización, declara y deja expresa constancia de lo siguiente:
+
+PRIMERO: Por el presente instrumento y, en este acto, autorizo a MEGAMEDIA S.A., en adelante MEGAMEDIA, y a los terceros que ésta designe, para que utilicen mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad, en adelante "mi imagen" (i) en los programas de televisión o casting de estos, en que haya intervenido, participado o haya tenido alguna presencia; (ii) en aquellos productos, bienes, servicios y/o negocios que se comercialicen y/o desarrollen por MEGAMEDIA o por los terceros que designe, que incluyan mi imagen; y (iii) en la publicidad o promoción de (i) y (ii) anteriores. La autorización de que da cuenta este instrumento se presta en forma exclusiva; sin cargo adicional alguno; en forma irrevocable; ilimitada; por el plazo durante el cual se transmitan los programas de televisión en los cuales participe o haya participado o aparecido, en forma individual o en conjunto, y/o durante el plazo en que se comercialicen los productos, bienes, servicios y/o negocios en los que se utilice mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad ya sea en forma individual o en conjunto con otros - y en Chile y el Extranjero; y tanto para sistemas de televisión de libre recepción, servicios limitados de televisión, televisión satelital, televisión digital, internet, radio o en cualquier otro medio o sistema de comunicación como para cualquier otro soporte material; y/o de audio; y/o audiovisual que se utilicen para estos efectos por MEGAMEDIA o por los terceros que MEGAMEDIA determine. Todos los soportes materiales; y/o de audio; y/o de audio y video en que se incluya o aparezca mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material de mi imagen o personalidad, es y será de propiedad exclusiva de MEGAMEDIA. En consecuencia, podrán proceder, personalmente o a través de terceros, a la elaboración y comercialización de cuantos productos considere oportunos y sin que esta enumeración se considere taxativa: discos compactos con obras musicales ejecutadas o interpretadas por mi, en forma individual o en conjunto con otros, dvds, u otros soportes de audio, video y/o de audio y video, entre otros, en los que aparezca, por ejemplo, mi imagen o nombre, así como expresiones que se hayan podido popularizar durante la emisión del programa de televisión. Asimismo y sin perjuicio de los derechos de televisión que corresponden a MEGAMEDIA, en forma exclusiva, podrán proceder a la grabación, publicación y copia de actuaciones, ejecuciones o interpretaciones, en cualquier tipo de forma o soporte; la reproducción y adaptación de la actuación como cantante, solista o como parte de un grupo musical o de mi intervención en el programa de televisión, el muestreo, la representación mímica, la mezcla y el doblaje de la actuación o intervención, la reproducción y comunicación pública mediante la utilización de cualquier soporte, así como, en general, cualquier otro medio. También y sin perjuicio de los derechos de televisión y de los derechos musicales que corresponden a MEGAMEDIA, en forma exclusiva, podrá difundir, en cualquier otra forma, información respecto mi persona mediante imágenes y/o sonido, incluyéndose los pases o transmisiones mediante sistemas de comunicación de libre recepción, sistemas de comunicación por satélite, sistemas de comunicación por cable (por ejemplo; como parte de una suscripción o abono a una cadena de televisión de pago o a través de la modalidad de "pay per view" o a través de un circuito cerrado de televisión e incluso como parte de un paquete o compilación de programas), internet, radio, música y cualquier otro medio actualmente conocido o que se conozca en el futuro. Sin perjuicio de lo ya señalado, autorizo la cesión, en este mismo acto, a MEGAMEDIA por lo que respecta a los derechos de televisión y musicales, la totalidad de los derechos de explotación y, en especial, los de reproducción, distribución y/o comunicación pública que me pudieren corresponder sobre mi intervención o participación o presencia en el programa de televisión de acuerdo con la legislación vigente en la República de Chile en materia de propiedad intelectual, efectuándose dicha cesión por el plazo máximo de protección legal, en forma ilimitada, por un número ilimitado de veces, en Chile y el extranjero. Por último, MEGAMEDIA, por lo que respecta a los derechos de televisión y musicales, gozará del derecho a explotar el programa de televisión y las obras musicales en que cante o ejecute, en cualquier forma y a través de cualquier medio, actualmente conocido o que se conozca en el futuro, pudiendo hacerlo, directamente, o a través de cualquier tercero al que, a su vez, ceda, total o parcialmente, los derechos de explotación cuya titularidad ostenta. Asimismo, reconozco y acepto que MEGAMEDIA podrá, directamente o a través de un tercero, producir discos, álbumes musicales u otros soportes materiales conteniendo fonogramas interpretados por mi, en forma individual o en conjunto con otros, en el programa de televisión y que podrá o no a criterio de MEGAMEDIA contener fonogramas interpretados por mi. En tal sentido, en conformidad a la presente autorización, otorgo a MEGAMEDIA el derecho exclusivo para efectuar grabaciones fonográficas de las interpretaciones efectuadas por mi, sea como solista y/o en conjunto con otro u otros participantes del programa de televisión y/o artistas, con o sin images, efectuadas por cualquier medio creado o crearse en el futuro y el derecho exclusivo para fabricar, producir, licenciar, promover y/o de cualquier otra forma explotar fonogramas y/o álbumes y/o videogramas conteniendo dichas grabaciones sin límite de tiempo, ni de territorios, pudiendo ceder este derecho a terceros, sin limitación alguna. Durante toda la vigencia de la presente autorización, ya sea como solista o en conjunto, otorgo a MEGAMEDIA la plena y absoluta exclusividad de mis interpretaciones para fijaciones sonoras y audiovisuales, que se realicen por cualquier medio o tecnología creada o a crearse, comprometiéndome a no grabarlas para mí mismo ni para terceros, ya sea actuando como solista o como integrante de un conjunto y aun sin mención de mi nombre o seudónimo. Asimismo, me obligo a no re-grabar ningún trabajo musical contenido en las grabaciones y/o en los videogramas y/o álbumes y/o fonogramas en los que se incluyan interpretaciones y/o grabaciones, durante un período de 2 años contados desde la finalización del periodo de vigencia de la presente autorización.
 
 SEGUNDO: Sin perjuicio de lo señalado en la cláusula anterior, en particular y sin que ello importe limitación alguna, y sólo a título ejemplar, MEGAMEDIA estará autorizada y será titular de todos los derechos de:
 1) Transmisión televisiva, en directo o diferido, por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro del programa de televisión y de mi imagen, en Chile y en el extranjero, a través de los sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro que MEGAMEDIA designe.
@@ -3527,35 +3446,12 @@ SEGUNDO: Sin perjuicio de lo señalado en la cláusula anterior, en particular y
 
 Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representante.`;
 
-                    const nombreCompletoAsistente = `${trab.nombres || ''} ${trab.apellidos || ''}`.toUpperCase();
-                    let textoCesion = "";
-                    let nombreFirma = "";
-                    let rutFirma = "";
-                    let firmaAUsar = null;
-
-                    if (datosMenor) {
-                        nombreFirma = datosMenor.nombre_apoderado.toUpperCase();
-                        rutFirma = datosMenor.rut_apoderado;
-                        firmaAUsar = datosMenor.firma_apoderado || asis.firma_digital;
-                        
-                        let txtMenorModificado = textoBaseMega.replace(/mi imagen/g, "la imagen del menor").replace(/mi persona/g, "el menor").replace(/que me pudieren/g, "que le pudieren").replace(/interpretados por mi/g, "interpretados por el menor").replace(/para mí mismo/g, "para el menor mismo");
-
-                        textoCesion = `En Santiago de Chile, yo, ${nombreFirma}, Cédula de Identidad N° ${rutFirma}, en representación legal del menor ${nombreCompletoAsistente}, Cédula de Identidad N° ${rut}, declaro y dejo expresa constancia de lo siguiente:
-
-${txtMenorModificado}`;
-                    } else {
-                        nombreFirma = nombreCompletoAsistente;
-                        rutFirma = rut;
-                        firmaAUsar = asis.firma_digital;
-                        textoCesion = `En Santiago de Chile, quien suscribe la presente autorización, declara y deja expresa constancia de lo siguiente:
-
-${textoBaseMega}`;
-                    }
-
                     const lineas = doc.splitTextToSize(textoCesion, 175);
                     doc.text(lineas, 20, 30);
                     
                     let yFinalText = 30 + (lineas.length * 3.5);
+                    
+                    const nombreCompleto = `${trab.nombres || ''} ${trab.apellidos || ''}`.toUpperCase();
                     
                     if (yFinalText > 270) {
                         doc.addPage();
@@ -3566,19 +3462,10 @@ ${textoBaseMega}`;
                     
                     doc.setFontSize(10);
                     doc.text(`Fecha: ${fecha.split('-').reverse().join('-')}`, 20, yFinalText); yFinalText += 6;
-                    
-                    if (datosMenor) {
-                        doc.text(`Nombre Representante: ${nombreFirma}`, 20, yFinalText); yFinalText += 6;
-                        doc.text(`RUT Representante: ${rutFirma}`, 20, yFinalText); yFinalText += 6;
-                        doc.text(`Nombre Menor: ${nombreCompletoAsistente}`, 20, yFinalText); yFinalText += 6;
-                        doc.text(`RUT Menor: ${rut}`, 20, yFinalText); yFinalText += 6;
-                    } else {
-                        doc.text(`Nombre: ${nombreFirma}`, 20, yFinalText); yFinalText += 6;
-                        doc.text(`RUT: ${rutFirma}`, 20, yFinalText); yFinalText += 6;
-                        doc.text(`Empresa (si aplica): `, 20, yFinalText); yFinalText += 6;
-                        doc.text(`RUT (si aplica): `, 20, yFinalText); yFinalText += 6;
-                    }
-                    
+                    doc.text(`Nombre: ${nombreCompleto}`, 20, yFinalText); yFinalText += 6;
+                    doc.text(`RUT: ${rut}`, 20, yFinalText); yFinalText += 6;
+                    doc.text(`Empresa (si aplica): `, 20, yFinalText); yFinalText += 6;
+                    doc.text(`RUT (si aplica): `, 20, yFinalText); yFinalText += 6;
                     doc.text(`Teléfono: ${trab.telefono || '-'}`, 20, yFinalText); yFinalText += 15;
                     
                     if (yFinalText > 300) {
@@ -3591,13 +3478,13 @@ ${textoBaseMega}`;
                     doc.text("Firma", 40, yFinalText + 25); 
                     
                     try {
-                        if (firmaAUsar) doc.addImage(firmaAUsar, 'JPEG', 30, yFinalText - 10, 60, 20); 
+                        doc.addImage(asis.firma_digital, 'JPEG', 30, yFinalText - 10, 60, 20); 
                     } catch(e) {}
                     
                     doc.text("_________________________________", 120, yFinalText + 20); 
                     doc.text("pp. MEGAMEDIA S.A.", 130, yFinalText + 25); 
 
-                    const nombreCompletoLimpio = nombreCompletoAsistente.replace(/[^a-zA-Z0-9_]/g, "");
+                    const nombreCompletoLimpio = nombreCompleto.replace(/[^a-zA-Z0-9_]/g, "");
                     const pdfBlob = doc.output('blob');
                     
                     // Organize inside the ZIP by date folder
