@@ -26,8 +26,8 @@ const CORREOS_ADMINISTRADORES = [
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
     "javier.rojas.fer@gmail.com",
-    "Matijesus.pz@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
+    "Matijesus.pz@gmail.com",
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -113,6 +113,7 @@ poblarSelectoresHora();
 // Carga de la base de datos de trabajadores al iniciar para que la puerta muestre los nombres
 get(ref(db, '1_trabajadores')).then(snap => { 
     if (snap.exists()) {
+        window.cacheTrabajadores = snap.val();
         listaGlobalCRM = snap.val();
         // Si la sala ya cargó antes que los nombres, forzamos un refresco visual:
         if (typeof actualizarTablero === "function") actualizarTablero();
