@@ -26,8 +26,8 @@ const CORREOS_ADMINISTRADORES = [
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
     "javier.rojas.fer@gmail.com",
-    "luisemilio.jorquera.avaria@gmail.com",
     "Matijesus.pz@gmail.com",
+    "luisemilio.jorquera.avaria@gmail.com",
 ];
 
 onAuthStateChanged(auth, (user) => { 
