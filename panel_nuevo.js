@@ -87,6 +87,110 @@ window.asistentesSinSalida = 0;
 let unsubscribeReservas = null; 
 let unsubscribeAsistencias = null;
 
+// ==========================================
+// CACHÉ GLOBAL PERSISTENTE EN DISCO (INDEXEDDB)
+// ==========================================
+window.cacheAsistencias = null;
+window.cacheTrabajadores = null;
+
+class FakeSnapshot {
+    constructor(data) { this.data = data; }
+    exists() { return this.data !== null && this.data !== undefined; }
+    val() { return this.data; }
+}
+
+const localDBName = "NatProduccionesDB";
+const storeName = "cacheStore";
+
+function initLocalDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(localDBName, 1);
+        request.onupgradeneeded = (e) => {
+            const ldb = e.target.result;
+            if (!ldb.objectStoreNames.contains(storeName)) ldb.createObjectStore(storeName);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+async function setLocalCache(key, data) {
+    try {
+        const ldb = await initLocalDB();
+        return new Promise((resolve) => {
+            const tx = ldb.transaction(storeName, 'readwrite');
+            tx.objectStore(storeName).put(data, key);
+            tx.oncomplete = () => resolve(true);
+        });
+    } catch(e) { console.error("Error guardando cache local", e); }
+}
+
+async function getLocalCache(key) {
+    try {
+        const ldb = await initLocalDB();
+        return new Promise((resolve) => {
+            const tx = ldb.transaction(storeName, 'readonly');
+            const req = tx.objectStore(storeName).get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
+    } catch(e) { return null; }
+}
+
+window.obtenerAsistencias = async function(forzar = false) {
+    if (!forzar) {
+        if (window.cacheAsistencias) return new FakeSnapshot(window.cacheAsistencias);
+        const diskCache = await getLocalCache('asistencias_nat');
+        if (diskCache) {
+            console.log("♻️ Usando caché de DISCO (0 bytes descargados)");
+            window.cacheAsistencias = diskCache;
+            return new FakeSnapshot(diskCache);
+        }
+    }
+    console.log("⬇️ Descargando Asistencias de Firebase...");
+    const snap = await get(ref(db, '2_asistencias'));
+    const val = snap.exists() ? snap.val() : null;
+    window.cacheAsistencias = val;
+    if (val) await setLocalCache('asistencias_nat', val);
+    return snap;
+};
+
+window.obtenerTrabajadores = async function(forzar = false) {
+    if (!forzar) {
+        if (window.cacheTrabajadores) {
+            listaGlobalCRM = window.cacheTrabajadores;
+            return new FakeSnapshot(window.cacheTrabajadores);
+        }
+        const diskCache = await getLocalCache('trabajadores_nat');
+        if (diskCache) {
+            console.log("♻️ Usando caché de DISCO (0 bytes descargados)");
+            window.cacheTrabajadores = diskCache;
+            listaGlobalCRM = diskCache;
+            return new FakeSnapshot(diskCache);
+        }
+    }
+    console.log("⬇️ Descargando Trabajadores de Firebase...");
+    const snap = await get(ref(db, '1_trabajadores'));
+    const val = snap.exists() ? snap.val() : null;
+    window.cacheTrabajadores = val;
+    listaGlobalCRM = val || {};
+    if (val) await setLocalCache('trabajadores_nat', val);
+    return snap;
+};
+
+window.limpiarCache = async function() {
+    window.cacheAsistencias = null;
+    window.cacheTrabajadores = null;
+    try {
+        const ldb = await initLocalDB();
+        const tx = ldb.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
+    } catch(e) {}
+    console.log("🧹 Caché borrado por actualización de datos.");
+};
+
+// ==========================================
+
 function poblarSelectoresHora() {
     let opcionesHTML = '<option value="">-- Selecciona --</option>';
     const horas = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1];
@@ -111,7 +215,7 @@ function poblarSelectoresHora() {
 poblarSelectoresHora();
 
 // Carga de la base de datos de trabajadores al iniciar para que la puerta muestre los nombres
-get(ref(db, '1_trabajadores')).then(snap => { 
+window.obtenerTrabajadores().then(snap => { 
     if (snap.exists()) {
         window.cacheTrabajadores = snap.val();
         listaGlobalCRM = snap.val();
@@ -140,7 +244,7 @@ function inicializarContador() {
     if (btnDescargar) btnDescargar.disabled = true;
     if (resumenMes) resumenMes.classList.add('d-none');
 
-    get(ref(db, '2_asistencias')).then((snap) => {
+    window.obtenerAsistencias().then((snap) => {
         if (!snap.exists()) {
             selectMes.innerHTML = '<option value="">❌ No hay registros históricos</option>';
             return;
@@ -284,7 +388,7 @@ if (btnDescargarMesElegido) {
             
             let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
             
-            const trabSnap = await get(ref(db, '1_trabajadores'));
+            const trabSnap = await window.obtenerTrabajadores();
             const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
             
             for (const r in tot) {
@@ -499,6 +603,7 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
 
             if (Object.keys(actualizacionesFirebase).length > 0) {
                 await update(ref(db), actualizacionesFirebase);
+        window.limpiarCache();
                 alert(`✅ Checkout Masivo Exitoso.
 Se calculó la salida y el pago a ${procesados} personas.`);
             }
@@ -892,6 +997,7 @@ window.editarMontoIndividual = async function(rut, montoActual, nombrePersona) {
     if (isNaN(nuevoMonto)) return alert("Por favor ingresa solo números.");
     
     try { 
+        window.limpiarCache();
         await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { monto: nuevoMonto }); 
     } catch (e) { 
         alert("Error al actualizar el pago."); 
@@ -905,7 +1011,8 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     if (tipoIngreso === "Cortesía") {
         if (!confirm(`¿Marcar salida para este Invitado de Cortesía a las ${horaSalida}?\n(Se mantendrá su pago en $0).`)) return;
         try { 
-            await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: 0, monto: 0 }); 
+            window.limpiarCache();
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { hora_salida: horaSalida, bono_horas_extras: 0, monto: 0 }); 
         } catch (e) {}
         return;
     } 
@@ -932,6 +1039,7 @@ window.marcarSalida = async function(rut, tipoIngreso, montoBaseActual) {
     const nuevoMontoTotal = calculo.montoBaseNuevo + bonoExtraConfirmado;
 
     try { 
+        window.limpiarCache();
         await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { 
             hora_salida: horaSalida, 
             bono_horas_extras: bonoExtraConfirmado, 
@@ -1297,7 +1405,7 @@ DUODÉCIMO. El trabajador autoriza expresamente a la Productora para que la firm
 // ==========================================
 if (document.getElementById('crm-tab')) document.getElementById('crm-tab').addEventListener('click', async () => {
     const [trabSnap, blackSnap] = await Promise.all([ 
-        get(ref(db, '1_trabajadores')), 
+        window.obtenerTrabajadores(), 
         get(ref(db, '4_blacklist')) 
     ]);
     
@@ -1485,6 +1593,7 @@ window.forzarIngresoPasado = async function(rut, nombre) {
         }
         const numeroFinal = numReal + 1;
         
+        window.limpiarCache();
         await set(ref(db, `2_asistencias/${fec}/${prog}/${rut}`), {
             rut: rut,
             nombre_programa: prog,
@@ -1511,6 +1620,7 @@ window.forzarIngresoPasado = async function(rut, nombre) {
 
 if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
+        window.limpiarCache();
         await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
             nombres: document.getElementById('editNombres').value, 
             apellidos: document.getElementById('editApellidos').value,
@@ -1542,6 +1652,7 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
 if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
         await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
+        window.limpiarCache();
         delete listaGlobalCRM[rutPerfilActual]; 
         renderCRM(listaGlobalCRM); 
         modalFichaInstance.hide(); 
@@ -1576,10 +1687,10 @@ if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbl
 // FINANZAS Y BÓVEDA
 // ==========================================
 if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-tab').addEventListener('click', async () => {
-    const snap = await get(ref(db, '2_asistencias')); 
+    const snap = await window.obtenerAsistencias(); 
     if (!snap.exists()) return;
     
-    const trabSnap = await get(ref(db, '1_trabajadores')); 
+    const trabSnap = await window.obtenerTrabajadores(); 
     if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     let deudas = {}; 
@@ -1632,7 +1743,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     let csv = "﻿Cuenta origen;Moneda origen;Cuenta destino;Moneda destino;Código banco destino;RUT beneficiario;Nombre beneficiario;Monto transferir;Glosa personalizada transferencia;Correo beneficiario;Mensaje correo;Glosa cartola originador;Glosa cartola beneficiario\n";
     let actualizacionesFirebase = {};
     
-    const trabSnap = await get(ref(db, '1_trabajadores')); 
+    const trabSnap = await window.obtenerTrabajadores(); 
     if (trabSnap.exists()) listaGlobalCRM = trabSnap.val();
     
     for (const r in window.deudasGlobales) {
@@ -1649,7 +1760,8 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     }
     
     try { 
-        await update(ref(db), actualizacionesFirebase); 
+        await update(ref(db), actualizacionesFirebase);
+        window.limpiarCache(); 
         descargarCSV(csv, `Nomina_Semanal_Acumulada_${fechaHoy}.csv`); 
         alert("¡Liquidación exitosa!"); 
         if (document.getElementById('tablaDeudas')) document.getElementById('tablaDeudas').innerHTML = ""; 
@@ -1667,7 +1779,7 @@ if (document.getElementById('btnExcelBanco')) document.getElementById('btnExcelB
     btn.disabled = true;
 
     try {
-        const snap = await get(ref(db, '2_asistencias'));
+        const snap = await window.obtenerAsistencias();
         if (!snap.exists()) { 
             alert("No hay asistencias registradas en el sistema."); 
             btn.innerText = "Generar Nómina de Pago"; 
@@ -1744,8 +1856,8 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            get(ref(db, '2_asistencias')), 
-            get(ref(db, '1_trabajadores')) 
+            window.obtenerAsistencias(), 
+            window.obtenerTrabajadores() 
         ]);
         
         const todas = asisSnap.val(); 
@@ -1791,6 +1903,7 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
         }
 
         await update(ref(db), actualizacionesFirebase);
+        window.limpiarCache();
         descargarCSV(csv, `Nomina_Banco_Agrupada_${new Date().toISOString().split('T')[0]}.csv`);
         
         alert("¡Nómina generada con éxito! Revisa tus descargas.");
@@ -1836,8 +1949,8 @@ async function cargarListaEfectivo() {
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([
-            get(ref(db, '2_asistencias')),
-            get(ref(db, '1_trabajadores'))
+            window.obtenerAsistencias(),
+            window.obtenerTrabajadores()
         ]);
         
         if (!asisSnap.exists()) {
@@ -1950,7 +2063,7 @@ if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBu
     
     if(!window.deudasEfectivoGlobal) return;
     
-    get(ref(db, '1_trabajadores')).then(snap => {
+    window.obtenerTrabajadores().then(snap => {
         const trabObj = snap.exists() ? snap.val() : {};
         if(!termOriginal) {
             renderTablaDeudasEfectivo(window.deudasEfectivoGlobal, trabObj);
@@ -2097,6 +2210,7 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
         let updates = {};
         rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
         await update(ref(db), updates);
+        window.limpiarCache();
 
         alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda.");
         
@@ -2176,7 +2290,7 @@ async function renderPanelRecibosBatch() {
             try {
                 const zip = new JSZip();
                 const { jsPDF } = window.jspdf;
-                const trabSnap = await get(ref(db, '1_trabajadores'));
+                const trabSnap = await window.obtenerTrabajadores();
                 const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
                 
                 for (const id in recibos) {
@@ -2284,7 +2398,7 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
     try {
-        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
+        const [asisSnap, trabSnap] = await Promise.all([ window.obtenerAsistencias(forzar === true), window.obtenerTrabajadores(forzar === true) ]);
         
         if (!asisSnap.exists()) {
             contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes.</div>";
@@ -2509,6 +2623,7 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
 
     try {
         await update(ref(db), updates);
+        window.limpiarCache();
         asisData.todoLiquidado = nuevoEstado;
     } catch (e) {
         console.error("Error al actualizar estado en BD", e);
@@ -2529,6 +2644,7 @@ window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
     
     try {
         await update(ref(db), updates);
+        window.limpiarCache();
         alert("Contrato anulado correctamente por retiro.");
         if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click(); 
     } catch(e) {
@@ -2574,6 +2690,7 @@ if (document.getElementById('btnArchivarContratosDT')) document.getElementById('
 
     try {
         await update(ref(db), updates);
+        window.limpiarCache();
         alert(`✅ ¡Éxito! Se archivaron ${rutsArchivados} contratos de los programas:\n${Array.from(resumenProgramas).join(', ')}`);
         if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click();
     } catch (e) {
@@ -2585,7 +2702,7 @@ if (document.getElementById('btnArchivarContratosDT')) document.getElementById('
 // ==========================================
 // PESTAÑA 4: SEGURIDAD (ACORDEÓN MES -> PROGRAMA)
 // ==========================================
-async function cargarReportesDT() {
+async function cargarReportesDT(forzar = false) {
     const contenedor = document.getElementById('acordeonDT');
     const btnRefresh = document.getElementById('btnRefrescarSeguridad');
     
@@ -2595,8 +2712,8 @@ async function cargarReportesDT() {
     }
     
     const [asisSnap, trabSnap] = await Promise.all([ 
-        get(ref(db, '2_asistencias')), 
-        get(ref(db, '1_trabajadores')) 
+        window.obtenerAsistencias(forzar === true), 
+        window.obtenerTrabajadores(forzar === true) 
     ]);
     
     if(btnRefresh) {
@@ -2755,7 +2872,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         const asisSnap = await get(child(ref(db), `2_asistencias/${fechaElegida}/${programaElegido}`));
         if (!asisSnap.exists()) return alert("No hay datos para descargar.");
         
-        const trabSnap = await get(ref(db, '1_trabajadores'));
+        const trabSnap = await window.obtenerTrabajadores();
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         
         const asistentes = asisSnap.val();
@@ -2777,7 +2894,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
 }
 
 if (document.getElementById('seguridad-tab')) document.getElementById('seguridad-tab').addEventListener('click', cargarReportesDT);
-if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('btnRefrescarSeguridad').addEventListener('click', cargarReportesDT);
+if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('btnRefrescarSeguridad').addEventListener('click', () => cargarReportesDT(true));
 
 
 // ==========================================
@@ -2785,10 +2902,10 @@ if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('b
 // ==========================================
 if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
-        const snap = await get(ref(db, '2_asistencias')); 
+        const snap = await window.obtenerAsistencias(); 
         if (!snap.exists()) return alert("No hay datos de asistencias.");
         
-        const trabSnap = await get(ref(db, '1_trabajadores')); 
+        const trabSnap = await window.obtenerTrabajadores(); 
         if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         let agrupado = {};
@@ -2837,14 +2954,14 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
         btn.innerText = "⏳ Empaquetando PDFs... (Espera)"; 
         btn.disabled = true;
         
-        const snap = await get(ref(db, '2_asistencias')); 
+        const snap = await window.obtenerAsistencias(); 
         if (!snap.exists()) { 
             alert("No hay contratos."); 
             resetBtnZip(btn); 
             return; 
         }
         
-        const trabSnap = await get(ref(db, '1_trabajadores')); 
+        const trabSnap = await window.obtenerTrabajadores(); 
         if (trabSnap.exists()) listaGlobalCRM = trabSnap.val(); 
         
         const todas = snap.val(); 
@@ -2917,7 +3034,8 @@ if(inputConfirmar) inputConfirmar.addEventListener('input', (e) => {
 
 if(btnEjecutar) btnEjecutar.addEventListener('click', async () => {
     try {
-        await remove(ref(db, '2_asistencias')); 
+        await remove(ref(db, '2_asistencias'));
+        window.limpiarCache(); 
         await remove(ref(db, '3_reservas'));
         alert("✅ Nube limpiada con éxito."); 
         
@@ -2941,7 +3059,7 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
     
     try {
         const [snapAsis, snapSorteos] = await Promise.all([ 
-            get(ref(db, '2_asistencias')), 
+            window.obtenerAsistencias(), 
             get(ref(db, '6_sorteos_fechas_usadas')) 
         ]);
         
@@ -2997,8 +3115,8 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            get(ref(db, '2_asistencias')), 
-            get(ref(db, '1_trabajadores')) 
+            window.obtenerAsistencias(), 
+            window.obtenerTrabajadores() 
         ]);
         
         if (!asisSnap.exists()) throw new Error("No hay datos");
@@ -3289,6 +3407,7 @@ document.body.addEventListener('click', async (e) => {
             }
             if (count > 0) {
                 await update(ref(db), updates);
+        window.limpiarCache();
                 alert(`✅ ¡ÉXITO! Se restauraron los sueldos al 100% ($${montoReal}) a las ${count} personas afectadas.`);
             } else {
                 alert("No habían personas de pago en esa sala.");
@@ -3313,16 +3432,16 @@ document.body.addEventListener('click', async (e) => {
 // CESIONES MEGAMEDIA
 // ==========================================
 if (document.getElementById('cesiones-tab')) document.getElementById('cesiones-tab').addEventListener('click', cargarPanelCesiones);
-if (document.getElementById('btnRefrescarCesiones')) document.getElementById('btnRefrescarCesiones').addEventListener('click', cargarPanelCesiones);
+if (document.getElementById('btnRefrescarCesiones')) document.getElementById('btnRefrescarCesiones').addEventListener('click', () => cargarPanelCesiones(true));
 
-async function cargarPanelCesiones() {
+async function cargarPanelCesiones(forzar = false) {
     const contenedor = document.getElementById('contenedorCesionesMega');
     if (!contenedor) return;
     
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-warning'></div></div>";
 
     try {
-        const [asisSnap, trabSnap] = await Promise.all([ get(ref(db, '2_asistencias')), get(ref(db, '1_trabajadores')) ]);
+        const [asisSnap, trabSnap] = await Promise.all([ window.obtenerAsistencias(forzar === true), window.obtenerTrabajadores(forzar === true) ]);
         
         if (!asisSnap.exists()) {
             contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay asistencias registradas.</div>";
@@ -3413,7 +3532,7 @@ window.descargarZIPCesionesSemana = async function(event, prog, weekLabel, fecha
         const { jsPDF } = window.jspdf;
         let generados = 0;
 
-        const trabSnap = await get(ref(db, '1_trabajadores'));
+        const trabSnap = await window.obtenerTrabajadores();
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
 
         for (const fecha of fechas) {
