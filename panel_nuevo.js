@@ -28,7 +28,6 @@ const CORREOS_ADMINISTRADORES = [
     "javier.rojas.fer@gmail.com",
     "Matijesus.pz@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
-    "Matijesus.pz@gmail.com",
 ];
 
 onAuthStateChanged(auth, (user) => { 
@@ -143,7 +142,7 @@ window.obtenerAsistencias = async function(forzar = false) {
         if (window.cacheAsistencias) return new FakeSnapshot(window.cacheAsistencias);
         const diskCache = await getLocalCache('asistencias_nat');
         if (diskCache) {
-            console.log("♻️ Usando caché de DISCO (0 bytes descargados)");
+            console.log("♻️ Usando caché de DISCO para Asistencias");
             window.cacheAsistencias = diskCache;
             return new FakeSnapshot(diskCache);
         }
@@ -164,7 +163,7 @@ window.obtenerTrabajadores = async function(forzar = false) {
         }
         const diskCache = await getLocalCache('trabajadores_nat');
         if (diskCache) {
-            console.log("♻️ Usando caché de DISCO (0 bytes descargados)");
+            console.log("♻️ Usando caché de DISCO para Trabajadores");
             window.cacheTrabajadores = diskCache;
             listaGlobalCRM = diskCache;
             return new FakeSnapshot(diskCache);
@@ -191,7 +190,6 @@ window.limpiarCache = async function() {
 };
 
 // ==========================================
-
 function poblarSelectoresHora() {
     let opcionesHTML = '<option value="">-- Selecciona --</option>';
     const horas = [8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,0,1];
@@ -1238,6 +1236,7 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
 
     try {
         window.limpiarCache();
+        window.limpiarCache();
         await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
             rut: rutActual, 
             nombre_programa: nombrePrograma, 
@@ -1263,6 +1262,7 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
 
 window.anularAsistencia = async function(rut) { 
     if(confirm("¿Seguro que deseas anular esta asistencia?\nLa persona se ocultará de la lista, pero su Ticket quedará bloqueado para mantener el orden numérico exacto.")) {
+        window.limpiarCache();
         window.limpiarCache();
         await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), {
             tipo_ingreso: "Anulado",
@@ -1453,9 +1453,23 @@ if (document.getElementById('buscadorCRM')) document.getElementById('buscadorCRM
 
 let rutPerfilActual = "";
 
-window.verPerfil = function(rut) {
+window.verPerfil = async function(rut) {
     rutPerfilActual = rut; 
     const p = listaGlobalCRM[rut];
+    
+    const strSnap = await get(child(ref(db), `9_strikes/${rut}`));
+    const strikesActuales = strSnap.exists() ? (strSnap.val().count || 0) : 0;
+    
+    const progBansSnap = await get(child(ref(db), `4_blacklist_programas`));
+    let programasBloqueados = [];
+    if (progBansSnap.exists()) {
+        const allBans = progBansSnap.val();
+        for (const progName in allBans) {
+            if (allBans[progName][rut]) {
+                programasBloqueados.push(progName);
+            }
+        }
+    }
     
     const contenido = document.getElementById('contenidoFicha');
     if (contenido) contenido.innerHTML = `
@@ -1532,6 +1546,37 @@ window.verPerfil = function(rut) {
                 </select>
             </div>
             <div class="col-6 mb-2"><label class="text-muted small">N° Cuenta</label><input type="text" class="form-control bg-dark text-white" id="editCuenta" value="${p.numeroCuenta || ''}"></div>
+            <div class="col-12 mt-4 pt-3 border-top border-secondary">
+                <h6 class="text-danger fw-bold mb-2">🛑 Sanciones y Bloqueos</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-dark rounded border border-danger">
+                    <div>
+                        <span class="text-white">Strikes por Inasistencia:</span>
+                        <span class="badge bg-warning text-dark fs-6 ms-2" id="displayStrikes">${strikesActuales}</span>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-success btn-sm" onclick="window.modificarStrikes('${rut}', -1)">- Quitar</button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="window.modificarStrikes('${rut}', 1)">+ Añadir</button>
+                    </div>
+                </div>
+                
+                <div class="mb-3 p-2 bg-dark rounded border border-warning">
+                    <label class="text-white mb-1 small">Bloquear de un programa específico:</label>
+                    <div class="input-group">
+                        <select class="form-select bg-dark text-white" id="selectProgBloqueo">
+                            <option value="Dale Play">Dale Play</option>
+                            <option value="Coliseo">Coliseo</option>
+                            <option value="Detrás del Muro">Detrás del Muro</option>
+                            <option value="Only Fama">Only Fama</option>
+                            <option value="Otro">Otro (Escribir)</option>
+                        </select>
+                        <button class="btn btn-warning text-dark fw-bold" onclick="window.bloquearPrograma('${rut}')">Bloquear</button>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        Bloqueos vigentes: ${programasBloqueados.length > 0 ? programasBloqueados.map(pr => `<span class="badge bg-danger me-1 mb-1">${pr} <span style="cursor:pointer;" onclick="window.desbloquearPrograma('${rut}', '${pr}')">✖</span></span>`).join('') : 'Ninguno'}
+                    </div>
+                </div>
+            </div>
+
             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                 <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
                 <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
@@ -1683,6 +1728,43 @@ if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbl
         alert("Usuario desbloqueado.");
     }
 });
+
+
+window.modificarStrikes = async function(rut, cant) {
+    const strRef = ref(db, `9_strikes/${rut}/count`);
+    const snap = await get(strRef);
+    let actual = snap.exists() ? snap.val() : 0;
+    let nuevo = actual + cant;
+    if (nuevo < 0) nuevo = 0;
+    
+    await set(strRef, nuevo);
+    if (nuevo >= 3) {
+        if(confirm(`Esta persona ha alcanzado ${nuevo} strikes. ¿Deseas bloquearla GLOBALMENTE (Blacklist)?`)) {
+            await set(ref(db, `4_blacklist/${rut}`), { fecha: new Date().toISOString(), motivo: "Alcanzó 3 strikes manualmente." });
+        }
+    }
+    const display = document.getElementById('displayStrikes');
+    if (display) display.innerText = nuevo;
+};
+
+window.bloquearPrograma = async function(rut) {
+    let prog = document.getElementById('selectProgBloqueo').value;
+    if (prog === "Otro") prog = prompt("Escribe el nombre del programa a bloquear:");
+    if (!prog) return;
+    
+    await set(ref(db, `4_blacklist_programas/${prog}/${rut}`), {
+        fecha: new Date().toISOString(),
+        motivo: "Bloqueo específico de programa por administración."
+    });
+    alert(`Bloqueado exitosamente de ${prog}. Cierra y vuelve a abrir la ficha para ver los cambios.`);
+};
+
+window.desbloquearPrograma = async function(rut, prog) {
+    if(confirm(`¿Desbloquear a esta persona de ${prog}?`)) {
+        await remove(ref(db, `4_blacklist_programas/${prog}/${rut}`));
+        alert(`Desbloqueado de ${prog}. Cierra y vuelve a abrir la ficha.`);
+    }
+};
 
 // ==========================================
 // FINANZAS Y BÓVEDA
@@ -2399,7 +2481,7 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
     contenedor.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
     try {
-        const [asisSnap, trabSnap] = await Promise.all([ window.obtenerAsistencias(forzar === true), window.obtenerTrabajadores(forzar === true) ]);
+        const [asisSnap, trabSnap] = await Promise.all([ window.obtenerAsistencias(), window.obtenerTrabajadores() ]);
         
         if (!asisSnap.exists()) {
             contenedor.innerHTML = "<div class='alert alert-success text-center fw-bold'>✅ No hay contratos pendientes.</div>";
@@ -2873,7 +2955,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         const asisSnap = await get(child(ref(db), `2_asistencias/${fechaElegida}/${programaElegido}`));
         if (!asisSnap.exists()) return alert("No hay datos para descargar.");
         
-        const trabSnap = await window.obtenerTrabajadores();
+        const trabSnap = await window.obtenerTrabajadores(forzar === true);
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         
         const asistentes = asisSnap.val();
@@ -2903,7 +2985,7 @@ if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('b
 // ==========================================
 if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
-        const snap = await window.obtenerAsistencias(); 
+        const snap = await window.obtenerAsistencias(forzar === true); 
         if (!snap.exists()) return alert("No hay datos de asistencias.");
         
         const trabSnap = await window.obtenerTrabajadores(); 
