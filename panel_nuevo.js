@@ -2697,7 +2697,14 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
 
     try {
         await update(ref(db), updates);
-        window.limpiarCache();
+        if (window.cacheAsistencias) {
+            asisData.fechas.forEach(fecha => {
+                if (window.cacheAsistencias[fecha] && window.cacheAsistencias[fecha][prog] && window.cacheAsistencias[fecha][prog][rut]) {
+                    window.cacheAsistencias[fecha][prog][rut].dt_liquidado = nuevoEstado;
+                }
+            });
+            setLocalCache('asistencias_nat', window.cacheAsistencias);
+        }
         asisData.todoLiquidado = nuevoEstado;
     } catch (e) {
         console.error("Error al actualizar estado en BD", e);
@@ -2718,7 +2725,15 @@ window.eliminarContratoDT = async function(event, rut, prog, wkSortKey) {
     
     try {
         await update(ref(db), updates);
-        window.limpiarCache();
+        if (window.cacheAsistencias) {
+            asisData.fechas.forEach(fecha => {
+                if (window.cacheAsistencias[fecha] && window.cacheAsistencias[fecha][prog] && window.cacheAsistencias[fecha][prog][rut]) {
+                    window.cacheAsistencias[fecha][prog][rut].aplica_contrato = false;
+                    window.cacheAsistencias[fecha][prog][rut].tipo_ingreso = "Se retiró";
+                }
+            });
+            setLocalCache('asistencias_nat', window.cacheAsistencias);
+        }
         alert("Contrato anulado correctamente por retiro.");
         if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click(); 
     } catch(e) {
@@ -2764,7 +2779,23 @@ if (document.getElementById('btnArchivarContratosDT')) document.getElementById('
 
     try {
         await update(ref(db), updates);
-        window.limpiarCache();
+        if (window.cacheAsistencias) {
+            for (const progName in window.agrupacionDTGlobal) {
+                for (const wk in window.agrupacionDTGlobal[progName]) {
+                    for (const rutNum in window.agrupacionDTGlobal[progName][wk].ruts) {
+                        const asisInfo = window.agrupacionDTGlobal[progName][wk].ruts[rutNum];
+                        if (asisInfo.todoLiquidado) {
+                            asisInfo.fechas.forEach(f => {
+                                if (window.cacheAsistencias[f] && window.cacheAsistencias[f][progName] && window.cacheAsistencias[f][progName][rutNum]) {
+                                    window.cacheAsistencias[f][progName][rutNum].dt_archivado = true;
+                                }
+                            });
+                        }
+                    }
+                }
+            }
+            setLocalCache('asistencias_nat', window.cacheAsistencias);
+        }
         alert(`✅ ¡Éxito! Se archivaron ${rutsArchivados} contratos de los programas:\n${Array.from(resumenProgramas).join(', ')}`);
         if (document.getElementById('btnCargarContratosDT')) document.getElementById('btnCargarContratosDT').click();
     } catch (e) {
