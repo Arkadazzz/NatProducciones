@@ -25,8 +25,8 @@ const CORREOS_ADMINISTRADORES = [
     "cami.fevreseguel@gmail.com",
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
-    "Matijesus.pz@gmail.com",
     "javier.rojas.fer@gmail.com",
+    "Matijesus.pz@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
 ];
 
@@ -138,14 +138,11 @@ async function getLocalCache(key) {
 }
 
 window.obtenerAsistencias = async function(forzar = false) {
-    if (!forzar) {
-        if (window.cacheAsistencias) return new FakeSnapshot(window.cacheAsistencias);
-        const diskCache = await getLocalCache('asistencias_nat');
-        if (diskCache) {
-            console.log("♻️ Usando caché de DISCO para Asistencias");
-            window.cacheAsistencias = diskCache;
-            return new FakeSnapshot(diskCache);
-        }
+    const diskCache = await getLocalCache('asistencias_nat');
+    if (diskCache && !forzar) {
+        console.log("♻️ Usando caché de DISCO (0 bytes descargados)");
+        window.cacheAsistencias = diskCache;
+        return new FakeSnapshot(diskCache);
     }
     console.log("⬇️ Descargando Asistencias de Firebase...");
     const snap = await get(ref(db, '2_asistencias'));
@@ -156,18 +153,12 @@ window.obtenerAsistencias = async function(forzar = false) {
 };
 
 window.obtenerTrabajadores = async function(forzar = false) {
-    if (!forzar) {
-        if (window.cacheTrabajadores) {
-            listaGlobalCRM = window.cacheTrabajadores;
-            return new FakeSnapshot(window.cacheTrabajadores);
-        }
-        const diskCache = await getLocalCache('trabajadores_nat');
-        if (diskCache) {
-            console.log("♻️ Usando caché de DISCO para Trabajadores");
-            window.cacheTrabajadores = diskCache;
-            listaGlobalCRM = diskCache;
-            return new FakeSnapshot(diskCache);
-        }
+    const diskCache = await getLocalCache('trabajadores_nat');
+    if (diskCache && !forzar) {
+        console.log("♻️ Usando caché de DISCO (0 bytes descargados)");
+        window.cacheTrabajadores = diskCache;
+        listaGlobalCRM = diskCache;
+        return new FakeSnapshot(diskCache);
     }
     console.log("⬇️ Descargando Trabajadores de Firebase...");
     const snap = await get(ref(db, '1_trabajadores'));
@@ -1939,8 +1930,8 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(true), 
-            window.obtenerTrabajadores(true) 
+            window.obtenerAsistencias(), 
+            window.obtenerTrabajadores() 
         ]);
         
         const todas = asisSnap.val(); 
@@ -3142,7 +3133,7 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
     
     try {
         const [snapAsis, snapSorteos] = await Promise.all([ 
-            window.obtenerAsistencias(true), 
+            window.obtenerAsistencias(), 
             get(ref(db, '6_sorteos_fechas_usadas')) 
         ]);
         
@@ -3198,8 +3189,8 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(true), 
-            window.obtenerTrabajadores(true) 
+            window.obtenerAsistencias(), 
+            window.obtenerTrabajadores() 
         ]);
         
         if (!asisSnap.exists()) throw new Error("No hay datos");
