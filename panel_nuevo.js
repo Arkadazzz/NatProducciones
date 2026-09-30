@@ -24,8 +24,8 @@ const db = getDatabase(app);
 const CORREOS_ADMINISTRADORES = [
     "cami.fevreseguel@gmail.com",
     "pinoelgueta@gmail.com", 
-    "Matijesus.pz@gmail.com",
     "natalyseguel.va@gmail.com",
+    "Matijesus.pz@gmail.com",
     "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
 ];
@@ -3641,7 +3641,7 @@ window.descargarZIPCesionesSemana = async function(event, prog, weekLabel, fecha
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
 
         for (const fecha of fechas) {
-            const asisSnap = await get(child(ref(db, `2_asistencias/${fecha}/${prog}`)));
+            const asisSnap = await get(ref(db, `2_asistencias/${fecha}/${prog}`));
             if (!asisSnap.exists()) continue;
 
             const asistentes = asisSnap.val();
