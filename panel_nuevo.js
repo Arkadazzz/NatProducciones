@@ -26,10 +26,9 @@ const CORREOS_ADMINISTRADORES = [
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
     "Matijesus.pz@gmail.com",
-    "Matijesus.pz@gmail.com",
     "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
-];
+].map(c => c.trim().toLowerCase()); // Se normalizan a minúsculas para que mayúsculas no bloqueen el acceso
 
 onAuthStateChanged(auth, (user) => { 
     if (!user) {
@@ -179,6 +178,66 @@ window.limpiarCache = async function() {
         tx.objectStore(storeName).clear();
     } catch(e) {}
     console.log("🧹 Caché borrado por actualización de datos.");
+};
+
+// ==========================================
+// FIRMAS OPTIMIZADAS (AHORRO DE DESCARGAS)
+// Las firmas nuevas se guardan comprimidas y en un nodo aparte (10_firmas),
+// así las pestañas de Finanzas/Contratos/etc. no descargan imágenes.
+// Las firmas antiguas (guardadas dentro de 2_asistencias) se siguen leyendo igual.
+// ==========================================
+const NODO_FIRMAS = '10_firmas';
+
+window.comprimirFirma = function(pad) {
+    try {
+        const original = pad && pad.canvas;
+        if (original && original.width > 0 && original.height > 0) {
+            const ANCHO_MAX = 800;
+            const escala = Math.min(1, ANCHO_MAX / original.width);
+            const w = Math.max(1, Math.round(original.width * escala));
+            const h = Math.max(1, Math.round(original.height * escala));
+            const lienzo = document.createElement('canvas');
+            lienzo.width = w;
+            lienzo.height = h;
+            const ctx = lienzo.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(original, 0, 0, w, h);
+            const comprimida = lienzo.toDataURL('image/jpeg', 0.75);
+            if (comprimida && comprimida.startsWith('data:image/jpeg') && comprimida.length > 500) return comprimida;
+        }
+    } catch (e) {
+        console.error("No se pudo comprimir la firma, se usa la original", e);
+    }
+    return pad.toDataURL("image/jpeg"); // Respaldo: firma original sin comprimir
+};
+
+window.tieneFirma = function(asis) {
+    return !!(asis && (asis.firma_digital || asis.tiene_firma));
+};
+
+window.obtenerFirma = async function(fecha, prog, rut, asis) {
+    if (asis && asis.firma_digital) return asis.firma_digital; // Formato antiguo
+    if (!asis || !asis.tiene_firma) return null;
+    try {
+        const s = await get(ref(db, `${NODO_FIRMAS}/${fecha}/${prog}/${rut}`));
+        return s.exists() ? s.val() : null;
+    } catch (e) {
+        console.error("Error leyendo firma", e);
+        return null;
+    }
+};
+
+window.obtenerFirmasPrograma = async function(fecha, prog) {
+    try {
+        const s = await get(ref(db, `${NODO_FIRMAS}/${fecha}/${prog}`));
+        return s.exists() ? s.val() : {};
+    } catch (e) {
+        console.error("Error leyendo firmas del programa", e);
+        return {};
+    }
 };
 
 // ==========================================
@@ -1189,7 +1248,7 @@ if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnC
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     
-    const firmaBase64 = signaturePad.toDataURL("image/jpeg"); 
+    const firmaBase64 = window.comprimirFirma(signaturePad); 
     const now = new Date();
     const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     const numeroFinal = document.getElementById('numeroAsignado').value;
@@ -1229,19 +1288,33 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
     try {
         window.limpiarCache();
         window.limpiarCache();
-        await set(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`), { 
+        const rutaAsistencia = `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`;
+        const datosAsistencia = { 
             rut: rutActual, 
             nombre_programa: nombrePrograma, 
             monto: (tipo === "Pago" ? montoPago : 0), 
             tipo_ingreso: tipo, 
             hora_ingreso: horaActual, 
-            firma_digital: firmaBase64, 
+            tiene_firma: true, 
             estado_pago: "Pendiente", 
             numero_asignado: numeroFinal, 
             invitado_por: invitadoPor, 
             aplica_contrato: aplicaContrato, 
             estado_dt: "Pendiente" 
-        });
+        };
+        try {
+            // Guardado atómico: la asistencia y su firma se guardan juntas o no se guarda nada
+            await update(ref(db), {
+                [rutaAsistencia]: datosAsistencia,
+                [`${NODO_FIRMAS}/${fechaPrograma}/${nombrePrograma}/${rutActual}`]: firmaBase64
+            });
+        } catch (errorNodoFirmas) {
+            // Respaldo de seguridad: si el nodo de firmas no está permitido, se guarda como antes (firma dentro de la asistencia)
+            console.warn("No se pudo usar el nodo de firmas, se guarda en formato clásico", errorNodoFirmas);
+            const datosClasicos = { ...datosAsistencia, firma_digital: firmaBase64 };
+            delete datosClasicos.tiene_firma;
+            await set(ref(db, rutaAsistencia), datosClasicos);
+        }
         
         if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.add('d-none'); 
         signaturePad.clear(); 
@@ -1277,6 +1350,9 @@ window.generarContratoPDF = async function(rut) {
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     
     const asis = asisSnap.val(); 
+    if (!asis.firma_digital && asis.tiene_firma) {
+        asis.firma_digital = await window.obtenerFirma(fechaPrograma, nombrePrograma, rut, asis);
+    }
     const { jsPDF } = window.jspdf; 
     const doc = new jsPDF({ format: 'legal' });
     
@@ -1368,8 +1444,10 @@ DUODÉCIMO. El trabajador autoriza expresamente a la Productora para que la firm
     // Dibujar firma de Camila
     if (FIRMA_CAMILA_BASE64 && FIRMA_CAMILA_BASE64 !== "PEGAR_AQUI_TU_BASE64_DE_LA_CAMI") {
         try {
-            let formatoCami = FIRMA_CAMILA_BASE64.toUpperCase().includes("IMAGE/PNG") ? "PNG" : "JPEG";
-            doc.addImage(FIRMA_CAMILA_BASE64, formatoCami, 10, y - 25, 80, 25);
+            const firmaCamiLimpia = FIRMA_CAMILA_BASE64.replace(/\s/g, '');
+            let formatoCami = firmaCamiLimpia.toUpperCase().includes("IMAGE/PNG") ? "PNG" : "JPEG";
+            const firmaCamiSrc = firmaCamiLimpia.startsWith("data:") ? firmaCamiLimpia : "data:image/jpeg;base64," + firmaCamiLimpia;
+            doc.addImage(firmaCamiSrc, formatoCami, 10, y - 25, 80, 25);
         } catch(e) {
             console.error("Error al cargar firma de Producción", e);
         }
@@ -2073,6 +2151,10 @@ async function cargarListaEfectivo() {
                         if (!deudasEfectivo[r].firma && asis.firma_digital) {
                             deudasEfectivo[r].firma = asis.firma_digital;
                         }
+                        // Firma guardada en el nodo nuevo (se descarga solo al abrir el pago)
+                        if (!deudasEfectivo[r].firma && !deudasEfectivo[r].firmaRef && asis.tiene_firma) {
+                            deudasEfectivo[r].firmaRef = { fecha: f, prog: p };
+                        }
                     }
                 }
             }
@@ -2164,9 +2246,12 @@ if (document.getElementById('btnBuscarEfectivo')) document.getElementById('btnBu
     });
 });
 
-window.abrirPagoEfectivo = function(rut, nombrePersona) {
+window.abrirPagoEfectivo = async function(rut, nombrePersona) {
     const deuda = window.deudasEfectivoGlobal[rut];
     if(!deuda) return;
+    if (!deuda.firma && deuda.firmaRef) {
+        deuda.firma = await window.obtenerFirma(deuda.firmaRef.fecha, deuda.firmaRef.prog, rut, { tiene_firma: true });
+    }
     
     if (document.getElementById('nombreEfectivo')) document.getElementById('nombreEfectivo').innerText = nombrePersona;
     
@@ -2278,7 +2363,7 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
             rut: rutEfectivoActual,
             monto: deudaEfectivoActual.montoCalculado,
             fecha: nowIso,
-            firma: firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" ? signaturePadEfectivo.toDataURL("image/jpeg") : ""),
+            firma: firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" ? window.comprimirFirma(signaturePadEfectivo) : ""),
             programas: nombresProgramas
         });
         
@@ -3078,14 +3163,21 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
         for (const fecha in todas) { 
             for (const prog in todas[fecha]) {
                 const carpetaPrograma = zip.folder(`${fecha}_${prog.replace(/[ \/]/g, "_")}`);
+                let firmasProgZip = null;
                 
                 for (const r in todas[fecha][prog]) {
                     const asis = todas[fecha][prog][r]; 
                     const trab = listaGlobalCRM[r] || { nombres: "Desconocido", apellidos: "" };
                     
-                    if (asis.firma_digital) {
+                    let firmaZip = asis.firma_digital || null;
+                    if (!firmaZip && asis.tiene_firma) {
+                        if (firmasProgZip === null) firmasProgZip = await window.obtenerFirmasPrograma(fecha, prog);
+                        firmaZip = firmasProgZip[r] || null;
+                    }
+                    
+                    if (firmaZip) {
                         const doc = new jsPDF({ format: 'legal' }); 
-                        dibujarContratoEnPDF(doc, r, trab, asis, fecha, prog.replace(" - ", " / "));
+                        dibujarContratoEnPDF(doc, r, trab, { ...asis, firma_digital: firmaZip }, fecha, prog.replace(" - ", " / "));
                         
                         const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
                         const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
@@ -3143,6 +3235,7 @@ if(btnEjecutar) btnEjecutar.addEventListener('click', async () => {
         await remove(ref(db, '2_asistencias'));
         window.limpiarCache(); 
         await remove(ref(db, '3_reservas'));
+        try { await remove(ref(db, NODO_FIRMAS)); } catch (eFirmas) { console.warn("No se pudo limpiar el nodo de firmas", eFirmas); }
         alert("✅ Nube limpiada con éxito."); 
         
         const modal = bootstrap.Modal.getInstance(document.getElementById('modalLimpieza'));
@@ -3646,12 +3739,19 @@ window.descargarZIPCesionesSemana = async function(event, prog, weekLabel, fecha
             if (!asisSnap.exists()) continue;
 
             const asistentes = asisSnap.val();
+            let firmasProgCesion = null;
 
             for (const rut in asistentes) {
                 const asis = asistentes[rut];
                 const trab = trabajadores[rut] || { nombres: "Desconocido", apellidos: "", telefono: "-" };
                 
-                if (asis.firma_digital) {
+                let firmaCesion = asis.firma_digital || null;
+                if (!firmaCesion && asis.tiene_firma) {
+                    if (firmasProgCesion === null) firmasProgCesion = await window.obtenerFirmasPrograma(fecha, prog);
+                    firmaCesion = firmasProgCesion[rut] || null;
+                }
+                
+                if (firmaCesion) {
                     const doc = new jsPDF({ format: 'legal' });
                     
                     doc.setFont("helvetica", "bold");
@@ -3704,7 +3804,7 @@ Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representa
                     doc.text("Firma", 40, yFinalText + 25); 
                     
                     try {
-                        doc.addImage(asis.firma_digital, 'JPEG', 30, yFinalText - 10, 60, 20); 
+                        doc.addImage(firmaCesion, 'JPEG', 30, yFinalText - 10, 60, 20); 
                     } catch(e) {}
                     
                     doc.text("_________________________________", 120, yFinalText + 20); 
