@@ -24,8 +24,8 @@ const db = getDatabase(app);
 const CORREOS_ADMINISTRADORES = [
     "cami.fevreseguel@gmail.com",
     "pinoelgueta@gmail.com", 
-    "natalyseguel.va@gmail.com",
     "Matijesus.pz@gmail.com",
+    "natalyseguel.va@gmail.com",
     "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
 ];
@@ -405,7 +405,8 @@ if (btnDescargarMesElegido) {
             
             descargarCSV(csv, `Reporte_Contable_${mesNombreDescarga}_${mesElegido.split('-')[0]}_NAT.csv`);
         } catch (e) {
-            alert("Error generando el archivo contable.");
+            console.error(e);
+            alert("Error generando el archivo contable: " + e.message);
         }
         btn.innerText = "📥 Descargar Excel del Mes"; 
         btn.disabled = false;
@@ -2994,7 +2995,8 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         
         descargarCSV(csv, `Lista_Seguridad_${programaElegido.replace(/[ \/]/g, "_")}_${fechaElegida}.csv`);
     } catch (e) {
-        alert("Error al descargar lista de seguridad.");
+        console.error(e);
+        alert("Error al descargar lista de seguridad: " + e.message);
     }
 }
 
@@ -3007,7 +3009,7 @@ if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('b
 // ==========================================
 if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
-        const snap = await window.obtenerAsistencias(forzar === true); 
+        const snap = await window.obtenerAsistencias(); 
         if (!snap.exists()) return alert("No hay datos de asistencias.");
         
         const trabSnap = await window.obtenerTrabajadores(); 
@@ -3049,7 +3051,8 @@ if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnR
         descargarCSV(csv, `Respaldo_Maestro_Agrupado_${new Date().toISOString().split('T')[0]}.csv`);
         
     } catch (error) { 
-        alert("Error al generar el respaldo maestro."); 
+        console.error(error);
+        alert("Error al generar el respaldo maestro: " + error.message); 
     }
 });
 
@@ -3120,7 +3123,8 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
         resetBtnZip(btn);
         
     } catch (error) { 
-        alert("Error al empaquetar los PDFs."); 
+        console.error(error);
+        alert("Error al empaquetar los PDFs: " + error.message); 
         resetBtnZip(btn); 
     }
 });
