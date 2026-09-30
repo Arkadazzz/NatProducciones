@@ -25,8 +25,8 @@ const CORREOS_ADMINISTRADORES = [
     "cami.fevreseguel@gmail.com",
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
-    "javier.rojas.fer@gmail.com",
     "Matijesus.pz@gmail.com",
+    "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
 ];
 
@@ -2977,7 +2977,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         const asisSnap = await get(child(ref(db), `2_asistencias/${fechaElegida}/${programaElegido}`));
         if (!asisSnap.exists()) return alert("No hay datos para descargar.");
         
-        const trabSnap = await window.obtenerTrabajadores(forzar === true);
+        const trabSnap = await window.obtenerTrabajadores();
         const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
         
         const asistentes = asisSnap.val();
