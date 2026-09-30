@@ -405,8 +405,7 @@ if (btnDescargarMesElegido) {
             
             descargarCSV(csv, `Reporte_Contable_${mesNombreDescarga}_${mesElegido.split('-')[0]}_NAT.csv`);
         } catch (e) {
-            console.error(e);
-            alert("Error generando el archivo contable: " + e.message);
+            alert("Error generando el archivo contable.");
         }
         btn.innerText = "📥 Descargar Excel del Mes"; 
         btn.disabled = false;
@@ -563,7 +562,7 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
     if (!confirm(`🎬 ¡ATENCIÓN EQUIPO! 🎬\n\n¿Cerrar la jornada y dar por terminado el evento?\n\nEl sistema marcará la salida a las ${horaSalidaMasiva} y calculará horas extras o penalizaciones para todos.\n\n¿Proceder?`)) return;
 
     try {
-        const snap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
+        const snap = await get(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}`));
         if (snap.exists()) {
             const asistencias = snap.val();
             let actualizacionesFirebase = {};
@@ -1065,7 +1064,7 @@ async function onScanSuccess(decodedText) {
     rutActual = decodedText; 
     
     try {
-        const blacklistSnap = await get(child(ref(db), `4_blacklist/${rutActual}`));
+        const blacklistSnap = await get(ref(db, `4_blacklist/${rutActual}`));
         if (blacklistSnap.exists()) { 
             alert(`⛔ ACCESO DENEGADO ⛔\nLa persona no tiene permitido el ingreso.`); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
@@ -1073,8 +1072,8 @@ async function onScanSuccess(decodedText) {
             return; 
         }
         
-        const reservaSnap = await get(child(ref(db), `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`));
-        const snapshot = await get(child(ref(db), `1_trabajadores/${rutActual}`));
+        const reservaSnap = await get(ref(db, `3_reservas/${fechaPrograma}/${nombrePrograma}/${rutActual}`));
+        const snapshot = await get(ref(db, `1_trabajadores/${rutActual}`));
         
         if (snapshot.exists()) {
             const datos = snapshot.val(); 
@@ -1272,7 +1271,7 @@ window.anularAsistencia = async function(rut) {
 // ==========================================
 window.generarContratoPDF = async function(rut) {
     const trab = listaGlobalCRM[rut]; 
-    const asisSnap = await get(child(ref(db), `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
+    const asisSnap = await get(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     
     if (!trab || !asisSnap.exists()) return alert("Faltan datos.");
     
@@ -1449,10 +1448,10 @@ window.verPerfil = async function(rut) {
     rutPerfilActual = rut; 
     const p = listaGlobalCRM[rut];
     
-    const strSnap = await get(child(ref(db), `9_strikes/${rut}`));
+    const strSnap = await get(ref(db, `9_strikes/${rut}`));
     const strikesActuales = strSnap.exists() ? (strSnap.val().count || 0) : 0;
     
-    const progBansSnap = await get(child(ref(db), `4_blacklist_programas`));
+    const progBansSnap = await get(ref(db, `4_blacklist_programas`));
     let programasBloqueados = [];
     if (progBansSnap.exists()) {
         const allBans = progBansSnap.val();
@@ -1679,7 +1678,7 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
         });
         
         alert("Datos actualizados correctamente."); 
-        listaGlobalCRM[rutPerfilActual] = (await get(child(ref(db, `1_trabajadores/${rutPerfilActual}`)))).val();
+        listaGlobalCRM[rutPerfilActual] = (await get(ref(db, `1_trabajadores/${rutPerfilActual}`))).val();
         renderCRM(listaGlobalCRM); 
         modalFichaInstance.hide();
     } catch (e) { 
@@ -1823,7 +1822,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        const tr = listaGlobalCRM[r] || (await get(child(ref(db, `1_trabajadores/${r}`)))).val();
+        const tr = listaGlobalCRM[r] || (await get(ref(db, `1_trabajadores/${r}`))).val();
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
@@ -2975,7 +2974,7 @@ async function cargarReportesDT(forzar = false) {
 
 window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
     try {
-        const asisSnap = await get(child(ref(db), `2_asistencias/${fechaElegida}/${programaElegido}`));
+        const asisSnap = await get(ref(db, `2_asistencias/${fechaElegida}/${programaElegido}`));
         if (!asisSnap.exists()) return alert("No hay datos para descargar.");
         
         const trabSnap = await window.obtenerTrabajadores();
@@ -2995,8 +2994,7 @@ window.descargarListaSeguridad = async function(fechaElegida, programaElegido) {
         
         descargarCSV(csv, `Lista_Seguridad_${programaElegido.replace(/[ \/]/g, "_")}_${fechaElegida}.csv`);
     } catch (e) {
-        console.error(e);
-        alert("Error al descargar lista de seguridad: " + e.message);
+        alert("Error al descargar lista de seguridad.");
     }
 }
 
@@ -3009,7 +3007,7 @@ if (document.getElementById('btnRefrescarSeguridad')) document.getElementById('b
 // ==========================================
 if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnRespaldoMaestro').addEventListener('click', async () => {
     try {
-        const snap = await window.obtenerAsistencias(); 
+        const snap = await window.obtenerAsistencias(true); 
         if (!snap.exists()) return alert("No hay datos de asistencias.");
         
         const trabSnap = await window.obtenerTrabajadores(); 
@@ -3051,8 +3049,7 @@ if (document.getElementById('btnRespaldoMaestro')) document.getElementById('btnR
         descargarCSV(csv, `Respaldo_Maestro_Agrupado_${new Date().toISOString().split('T')[0]}.csv`);
         
     } catch (error) { 
-        console.error(error);
-        alert("Error al generar el respaldo maestro: " + error.message); 
+        alert("Error al generar el respaldo maestro."); 
     }
 });
 
@@ -3123,8 +3120,7 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
         resetBtnZip(btn);
         
     } catch (error) { 
-        console.error(error);
-        alert("Error al empaquetar los PDFs: " + error.message); 
+        alert("Error al empaquetar los PDFs."); 
         resetBtnZip(btn); 
     }
 });
