@@ -2638,7 +2638,8 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
             return;
         }
 
-        let html = '<div class="accordion" id="accProgramas">';
+        let html = `<div id="contadorDTGlobal" class="mb-3" style="position: sticky; top: 0; z-index: 5;"></div>`;
+        html += '<div class="accordion" id="accProgramas">';
         let progIdx = 0;
         
         const progKeys = Object.keys(window.agrupacionDTGlobal).sort();
@@ -2649,6 +2650,7 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                 <h2 class="accordion-header">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}" style="background: #2d1b4e; color: white; font-size: 1.1em;">
                         🎬 Programa: ${prog.replace(" - ", " / ")}
+                        <span class="badge ms-2 contador-dt-prog" data-prog="${encodeURIComponent(prog)}"></span>
                     </button>
                 </h2>
                 <div id="colProg_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accProgramas">
@@ -2677,7 +2679,7 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                     <div class="accordion-item" style="border: 1px solid #444; margin-bottom: 5px; background: #111;">
                         <h2 class="accordion-header">
                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#colProg_${progIdx}_wk_${wkIdx}" style="background: #1a1a1a; color: #00d26a;">
-                                📅 ${weekData.label} &nbsp; <span class="badge bg-secondary ms-2">${numPersonas} personas pendientes</span>
+                                📅 ${weekData.label} &nbsp; <span class="badge ms-2 contador-dt-wk" data-prog="${encodeURIComponent(prog)}" data-wk="${wk}">${numPersonas} personas</span>
                             </button>
                         </h2>
                         <div id="colProg_${progIdx}_wk_${wkIdx}" class="accordion-collapse collapse" data-bs-parent="#accWeeks_${progIdx}">
@@ -2744,11 +2746,71 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
         }
         html += '</div>';
         contenedor.innerHTML = html;
+        window.actualizarContadoresDT();
 
     } catch (e) {
         contenedor.innerHTML = "<p class='text-danger text-center'>Error al cargar los datos.</p>";
     }
 });
+
+// ==========================================
+// CONTADOR EN VIVO DE CONTRATOS POR MARCAR
+// Se recalcula al instante cada vez que se marca/desmarca un contrato (0 MB de descarga)
+// ==========================================
+window.actualizarContadoresDT = function() {
+    const datos = window.agrupacionDTGlobal || {};
+    let pendientesTotal = 0, listosTotal = 0;
+    const porProg = {}, porSemana = {};
+
+    for (const prog in datos) {
+        porProg[prog] = { pendientes: 0, listos: 0 };
+        for (const wk in datos[prog]) {
+            const semana = { pendientes: 0, listos: 0 };
+            const ruts = datos[prog][wk].ruts || {};
+            for (const rut in ruts) {
+                if (ruts[rut].todoLiquidado) semana.listos++; else semana.pendientes++;
+            }
+            porSemana[prog + '||' + wk] = semana;
+            porProg[prog].pendientes += semana.pendientes;
+            porProg[prog].listos += semana.listos;
+            pendientesTotal += semana.pendientes;
+            listosTotal += semana.listos;
+        }
+    }
+
+    const total = pendientesTotal + listosTotal;
+    const porcentaje = total > 0 ? Math.round((listosTotal / total) * 100) : 100;
+    const cajaGlobal = document.getElementById('contadorDTGlobal');
+    if (cajaGlobal) {
+        const colorBorde = pendientesTotal > 0 ? '#ffcc00' : '#00d26a';
+        cajaGlobal.innerHTML = `
+            <div class="p-3 rounded" style="background: #1a1a1a; border: 2px solid ${colorBorde};">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span class="fs-5 fw-bold" style="color: ${colorBorde};">
+                        ${pendientesTotal > 0 ? `⏳ Faltan ${pendientesTotal} contrato${pendientesTotal === 1 ? '' : 's'} por marcar` : '✅ Todos los contratos están marcados'}
+                    </span>
+                    <span class="text-white">✅ ${listosTotal} marcados de ${total}</span>
+                </div>
+                <div class="progress mt-2" style="height: 8px; background: #333;">
+                    <div class="progress-bar bg-success" style="width: ${porcentaje}%;"></div>
+                </div>
+            </div>`;
+    }
+
+    document.querySelectorAll('.contador-dt-prog').forEach(el => {
+        const c = porProg[decodeURIComponent(el.dataset.prog)];
+        if (!c) return;
+        el.className = 'badge ms-2 contador-dt-prog ' + (c.pendientes > 0 ? 'bg-warning text-dark' : 'bg-success');
+        el.innerText = c.pendientes > 0 ? `⏳ ${c.pendientes} por marcar` : '✅ Todo marcado';
+    });
+
+    document.querySelectorAll('.contador-dt-wk').forEach(el => {
+        const c = porSemana[decodeURIComponent(el.dataset.prog) + '||' + el.dataset.wk];
+        if (!c) return;
+        el.className = 'badge ms-2 contador-dt-wk ' + (c.pendientes > 0 ? 'bg-warning text-dark' : 'bg-success');
+        el.innerText = c.pendientes > 0 ? `⏳ ${c.pendientes} por marcar · ✅ ${c.listos} listos` : `✅ ${c.listos} listos para archivar`;
+    });
+};
 
 
 window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, btnId) {
@@ -2762,7 +2824,8 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
     const btn = document.getElementById(btnId);
     const textElements = tr.querySelectorAll('.dt-text-element'); 
 
-    if (nuevoEstado) {
+    const pintarFila = (estado) => {
+    if (estado) {
         tr.classList.add('table-success');
         textElements.forEach(el => { el.classList.remove('text-white'); el.classList.add('text-dark'); });
         btn.classList.remove('btn-outline-success');
@@ -2775,6 +2838,8 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
         btn.classList.add('btn-outline-success');
         btn.innerText = 'Marcar Contrato';
     }
+    };
+    pintarFila(nuevoEstado);
 
     let updates = {};
     asisData.rutasFirebase.forEach(ruta => {
@@ -2792,9 +2857,11 @@ window.toggleContratoSemana = async function(event, rut, prog, wkSortKey, trId, 
             setLocalCache('asistencias_nat', window.cacheAsistencias);
         }
         asisData.todoLiquidado = nuevoEstado;
+        window.actualizarContadoresDT();
     } catch (e) {
         console.error("Error al actualizar estado en BD", e);
-        alert("Aviso: Hubo una falla de red. Verifica tu conexión.");
+        pintarFila(!nuevoEstado); // Se devuelve la fila a su estado real porque no se guardó
+        alert("Aviso: Hubo una falla de red y el contrato NO se marcó. Verifica tu conexión e inténtalo de nuevo.");
     }
 }
 
