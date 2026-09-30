@@ -1527,10 +1527,21 @@ window.verPerfil = async function(rut) {
     rutPerfilActual = rut; 
     const p = listaGlobalCRM[rut] || { nombres: '', apellidos: '', rut: rut };
     
-    const strSnap = await get(ref(db, `9_strikes/${rut}`));
-    const strikesActuales = strSnap.exists() ? (strSnap.val().count || 0) : 0;
+    // Lecturas protegidas: si Firebase niega el permiso, la ficha se abre igual
+    let strikesActuales = 0;
+    try {
+        const strSnap = await get(ref(db, `9_strikes/${rut}`));
+        strikesActuales = strSnap.exists() ? (strSnap.val().count || 0) : 0;
+    } catch (e) {
+        console.warn("No se pudieron leer los strikes (revisar reglas de Firebase para 9_strikes)", e);
+    }
     
-    const progBansSnap = await get(ref(db, `4_blacklist_programas`));
+    let progBansSnap = { exists: () => false, val: () => null };
+    try {
+        progBansSnap = await get(ref(db, `4_blacklist_programas`));
+    } catch (e) {
+        console.warn("No se pudieron leer los bloqueos por programa (revisar reglas de Firebase)", e);
+    }
     let programasBloqueados = [];
     if (progBansSnap.exists()) {
         const allBans = progBansSnap.val();
@@ -1802,12 +1813,17 @@ if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbl
 
 window.modificarStrikes = async function(rut, cant) {
     const strRef = ref(db, `9_strikes/${rut}/count`);
-    const snap = await get(strRef);
-    let actual = snap.exists() ? snap.val() : 0;
-    let nuevo = actual + cant;
-    if (nuevo < 0) nuevo = 0;
-    
-    await set(strRef, nuevo);
+    let nuevo = 0;
+    try {
+        const snap = await get(strRef);
+        let actual = snap.exists() ? snap.val() : 0;
+        nuevo = actual + cant;
+        if (nuevo < 0) nuevo = 0;
+        await set(strRef, nuevo);
+    } catch (e) {
+        console.error("Error modificando strikes", e);
+        return alert("⚠️ No se pudo modificar los strikes: Firebase no da permiso sobre '9_strikes'. Hay que agregar esa regla en Firebase.");
+    }
     if (nuevo >= 3) {
         if(confirm(`Esta persona ha alcanzado ${nuevo} strikes. ¿Deseas bloquearla GLOBALMENTE (Blacklist)?`)) {
             await set(ref(db, `4_blacklist/${rut}`), { fecha: new Date().toISOString(), motivo: "Alcanzó 3 strikes manualmente." });
@@ -1822,16 +1838,26 @@ window.bloquearPrograma = async function(rut) {
     if (prog === "Otro") prog = prompt("Escribe el nombre del programa a bloquear:");
     if (!prog) return;
     
-    await set(ref(db, `4_blacklist_programas/${prog}/${rut}`), {
-        fecha: new Date().toISOString(),
-        motivo: "Bloqueo específico de programa por administración."
-    });
+    try {
+        await set(ref(db, `4_blacklist_programas/${prog}/${rut}`), {
+            fecha: new Date().toISOString(),
+            motivo: "Bloqueo específico de programa por administración."
+        });
+    } catch (e) {
+        console.error("Error bloqueando programa", e);
+        return alert("⚠️ No se pudo bloquear: Firebase no da permiso sobre '4_blacklist_programas'.");
+    }
     alert(`Bloqueado exitosamente de ${prog}. Cierra y vuelve a abrir la ficha para ver los cambios.`);
 };
 
 window.desbloquearPrograma = async function(rut, prog) {
     if(confirm(`¿Desbloquear a esta persona de ${prog}?`)) {
-        await remove(ref(db, `4_blacklist_programas/${prog}/${rut}`));
+        try {
+            await remove(ref(db, `4_blacklist_programas/${prog}/${rut}`));
+        } catch (e) {
+            console.error("Error desbloqueando programa", e);
+            return alert("⚠️ No se pudo desbloquear: Firebase no da permiso sobre '4_blacklist_programas'.");
+        }
         alert(`Desbloqueado de ${prog}. Cierra y vuelve a abrir la ficha.`);
     }
 };
