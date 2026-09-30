@@ -1423,7 +1423,7 @@ function renderCRM(datos) {
             <td>${p.nombres} ${p.apellidos}</td>
             <td>${p.telefono || '-'}</td>
             <td>${estadoBadge}</td>
-            <td><button class="btn btn-outline-info btn-sm" onclick="verPerfil('${rut}')">Editar / Ficha</button></td>
+            <td><button class="btn btn-outline-info btn-sm" onclick="window.verPerfil('${rut}')">Editar / Ficha</button></td>
         `;
         tbody.appendChild(tr);
     }
@@ -1446,7 +1446,7 @@ let rutPerfilActual = "";
 
 window.verPerfil = async function(rut) {
     rutPerfilActual = rut; 
-    const p = listaGlobalCRM[rut];
+    const p = listaGlobalCRM[rut] || { nombres: '', apellidos: '', rut: rut };
     
     const strSnap = await get(ref(db, `9_strikes/${rut}`));
     const strikesActuales = strSnap.exists() ? (strSnap.val().count || 0) : 0;
@@ -1465,9 +1465,9 @@ window.verPerfil = async function(rut) {
     const contenido = document.getElementById('contenidoFicha');
     if (contenido) contenido.innerHTML = `
         <div class="row">
-            <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">RUT</label><input type="text" class="form-control bg-secondary text-white" value="${p.rut}" readonly></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres || ''}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos || ''}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">RUT</label><input type="text" class="form-control bg-secondary text-white" value="${p.rut || rut}" readonly></div>
             <div class="col-6 mb-2"><label class="text-muted small">Fecha Nacimiento</label><input type="date" class="form-control bg-dark text-white" id="editNacimiento" value="${p.fechaNacimiento || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
             <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
@@ -1571,7 +1571,7 @@ window.verPerfil = async function(rut) {
             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                 <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
                 <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
-                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${p.nombres.replace(/['\"\`]/g, '')}')">
+                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${(p.nombres || \'Desconocido\').replace(/['\"\`]/g, '')}')">
                     ➕ Añadir a Jornada Pasada
                 </button>
             </div>
