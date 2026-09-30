@@ -26,6 +26,7 @@ const CORREOS_ADMINISTRADORES = [
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
     "Matijesus.pz@gmail.com",
+    "Matijesus.pz@gmail.com",
     "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
 ];
@@ -1571,7 +1572,7 @@ window.verPerfil = async function(rut) {
             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                 <h6 class="text-info fw-bold mb-2">🛠️ Herramienta Administrativa</h6>
                 <p class="text-muted small mb-2">Si olvidaste escanear a esta persona y el día ya se cerró, puedes forzar su asistencia aquí.</p>
-                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${(p.nombres || \'Desconocido\').replace(/['\"\`]/g, '')}')">
+                <button class="btn btn-outline-info w-100 fw-bold shadow-sm" onclick="window.forzarIngresoPasado('${rut}', '${(p.nombres || "Desconocido").replace(/['"`]/g, '')}')">
                     ➕ Añadir a Jornada Pasada
                 </button>
             </div>
