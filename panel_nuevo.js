@@ -25,8 +25,8 @@ const CORREOS_ADMINISTRADORES = [
     "cami.fevreseguel@gmail.com",
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
-    "javier.rojas.fer@gmail.com",
     "Matijesus.pz@gmail.com",
+    "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
 ];
 
@@ -1939,8 +1939,8 @@ if (document.getElementById('btnGenerarNominaBanco')) document.getElementById('b
 
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(), 
-            window.obtenerTrabajadores() 
+            window.obtenerAsistencias(true), 
+            window.obtenerTrabajadores(true) 
         ]);
         
         const todas = asisSnap.val(); 
@@ -3142,7 +3142,7 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
     
     try {
         const [snapAsis, snapSorteos] = await Promise.all([ 
-            window.obtenerAsistencias(), 
+            window.obtenerAsistencias(true), 
             get(ref(db, '6_sorteos_fechas_usadas')) 
         ]);
         
@@ -3198,8 +3198,8 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(), 
-            window.obtenerTrabajadores() 
+            window.obtenerAsistencias(true), 
+            window.obtenerTrabajadores(true) 
         ]);
         
         if (!asisSnap.exists()) throw new Error("No hay datos");
