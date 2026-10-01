@@ -448,7 +448,8 @@ if (btnDescargarMesElegido) {
         try {
             // Datos frescos en el momento de descargar
             const { filas } = await filasContadorMes(mesElegido);
-            let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
+            let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico;Código AFP LRE;Código Salud LRE\n";
+            const cfgCodigos = window.configPrevired;
 
             for (const f of filas) {
                 const tr = f.tr || {};
@@ -456,7 +457,7 @@ if (btnDescargarMesElegido) {
                 const parts = r.split('-');
                 const ap = separarApellidosOriginal(tr.apellidos);
                 const [y, m, d] = (tr.fechaNacimiento || "").split('-');
-                csv += `${r};${parts[0]};${parts[1] || ''};${tr.nombres || ''} ${tr.apellidos || ''};${ap.paterno};${ap.materno};${tr.nombres || ''};${d ? d + '-' + m + '-' + y : ''};${fechaPrevired(f.inicio)};${fechaPrevired(f.termino)};${tr.sexo || ''};extra publico (televisión);;${tr.direccion || ''};;Santiago;Pesos;${f.liquido};${tr.afp || ''};${tr.salud || ''};${tr.telefono || ''};${tr.email || ''}\n`;
+                csv += `${r};${parts[0]};${parts[1] || ''};${tr.nombres || ''} ${tr.apellidos || ''};${ap.paterno};${ap.materno};${tr.nombres || ''};${d ? d + '-' + m + '-' + y : ''};${fechaPrevired(f.inicio)};${fechaPrevired(f.termino)};${tr.sexo || ''};extra publico (televisión);;${tr.direccion || ''};;Santiago;Pesos;${f.liquido};${tr.afp || ''};${tr.salud || ''};${tr.telefono || ''};${tr.email || ''};${f.afpKey ? cfgCodigos.afps[f.afpKey].lre : ''};${f.saludKey ? cfgCodigos.saludes[f.saludKey].lre : ''}\n`;
             }
 
             const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -4003,25 +4004,26 @@ const CONFIG_PREVIRED_BASE = {
     cesantiaTrabajador: 0,
     codigoMovimiento: 7,
     tipoJornada: 1,
+    lre: { rutEmpresa: "76932592-1", region: 13, comuna: 13102, jornada: 101, causal: 7, tipoImpuesto: 1, utm: 71721 },
     afpPorDefecto: "",
     afps: {
-        CAPITAL:   { nombre: "Capital",   codigo: "33", tasa: 11.44 },
-        CUPRUM:    { nombre: "Cuprum",    codigo: "03", tasa: 11.44 },
-        HABITAT:   { nombre: "Habitat",   codigo: "05", tasa: 11.27 },
-        MODELO:    { nombre: "Modelo",    codigo: "34", tasa: 10.58 },
-        PLANVITAL: { nombre: "PlanVital", codigo: "29", tasa: 11.16 },
-        PROVIDA:   { nombre: "ProVida",   codigo: "08", tasa: 11.45 },
-        UNO:       { nombre: "Uno",       codigo: "35", tasa: 10.46 }
+        CAPITAL:   { nombre: "Capital",   codigo: "33", lre: "31",  tasa: 11.44 },
+        CUPRUM:    { nombre: "Cuprum",    codigo: "03", lre: "13",  tasa: 11.44 },
+        HABITAT:   { nombre: "Habitat",   codigo: "05", lre: "14",  tasa: 11.27 },
+        MODELO:    { nombre: "Modelo",    codigo: "34", lre: "103", tasa: 10.58 },
+        PLANVITAL: { nombre: "PlanVital", codigo: "29", lre: "11",  tasa: 11.16 },
+        PROVIDA:   { nombre: "ProVida",   codigo: "08", lre: "6",   tasa: 11.45 },
+        UNO:       { nombre: "Uno",       codigo: "35", lre: "19",  tasa: 10.46 }
     },
     saludes: {
-        FONASA:       { nombre: "Fonasa",        codigo: "07" },
-        BANMEDICA:    { nombre: "Banmédica",     codigo: "01" },
-        CONSALUD:     { nombre: "Consalud",      codigo: "02" },
-        VIDATRES:     { nombre: "Vida Tres",     codigo: "03" },
-        COLMENA:      { nombre: "Colmena",       codigo: "04" },
-        CRUZBLANCA:   { nombre: "Cruz Blanca",   codigo: "05" },
-        NUEVAMASVIDA: { nombre: "Nueva Masvida", codigo: "10" },
-        ESENCIAL:     { nombre: "Esencial",      codigo: "28" }
+        FONASA:       { nombre: "Fonasa",        codigo: "07", lre: "102" },
+        BANMEDICA:    { nombre: "Banmédica",     codigo: "01", lre: "3" },
+        CONSALUD:     { nombre: "Consalud",      codigo: "02", lre: "9" },
+        VIDATRES:     { nombre: "Vida Tres",     codigo: "03", lre: "12" },
+        COLMENA:      { nombre: "Colmena",       codigo: "04", lre: "4" },
+        CRUZBLANCA:   { nombre: "Cruz Blanca",   codigo: "05", lre: "1" },
+        NUEVAMASVIDA: { nombre: "Nueva Masvida", codigo: "10", lre: "43" },
+        ESENCIAL:     { nombre: "Esencial",      codigo: "28", lre: "44" }
     }
 };
 
@@ -4142,11 +4144,12 @@ async function cargarConfigPrevired() {
         const base = JSON.parse(JSON.stringify(CONFIG_PREVIRED_BASE));
         if (snap.exists()) {
             const guardada = snap.val();
-            window.configPrevired = {
-                ...base, ...guardada,
-                afps: { ...base.afps, ...(guardada.afps || {}) },
-                saludes: { ...base.saludes, ...(guardada.saludes || {}) }
-            };
+            const afps = {};
+            for (const k in base.afps) {
+                const tasaGuardada = guardada.afps && guardada.afps[k] ? numPrevired(guardada.afps[k].tasa) : 0;
+                afps[k] = { ...base.afps[k], tasa: tasaGuardada > 0 ? tasaGuardada : base.afps[k].tasa }; // códigos fijos, % editable
+            }
+            window.configPrevired = { ...base, ...guardada, afps, saludes: JSON.parse(JSON.stringify(base.saludes)), lre: { ...base.lre, ...(guardada.lre || {}) } };
         } else {
             window.configPrevired = base;
         }
@@ -4164,13 +4167,15 @@ function renderParametrosPrevired() {
     let filasAfp = '';
     for (const k in c.afps) {
         filasAfp += `<tr><td class="text-white">${c.afps[k].nombre}</td>
-            <td><input type="text" maxlength="2" class="form-control form-control-sm bg-dark text-white prev-afp-codigo" data-k="${k}" value="${c.afps[k].codigo}"></td>
+            <td class="text-center text-info fw-bold">${c.afps[k].codigo}</td>
+            <td class="text-center text-info fw-bold">${c.afps[k].lre}</td>
             <td><input type="number" step="0.01" class="form-control form-control-sm bg-dark text-white prev-afp-tasa" data-k="${k}" value="${c.afps[k].tasa}"></td></tr>`;
     }
     let filasSalud = '';
     for (const k in c.saludes) {
         filasSalud += `<tr><td class="text-white">${c.saludes[k].nombre}</td>
-            <td><input type="text" maxlength="2" class="form-control form-control-sm bg-dark text-white prev-salud-codigo" data-k="${k}" value="${c.saludes[k].codigo}" placeholder="Falta"></td></tr>`;
+            <td class="text-center text-info fw-bold">${c.saludes[k].codigo}</td>
+            <td class="text-center text-info fw-bold">${c.saludes[k].lre}</td></tr>`;
     }
     let opcionesAfpDef = `<option value="">— No usar (obligar a corregir) —</option>`;
     for (const k in c.afps) opcionesAfpDef += `<option value="${k}" ${c.afpPorDefecto === k ? 'selected' : ''}>${c.afps[k].nombre}</option>`;
@@ -4181,12 +4186,12 @@ function renderParametrosPrevired() {
         ${aviso}
         <div class="row g-3">
             <div class="col-lg-5">
-                <h6 class="text-info fw-bold">AFP (código Previred y % trabajador)</h6>
-                <table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>AFP</th><th>Código</th><th>% Trabajador</th></tr></thead><tbody>${filasAfp}</tbody></table>
+                <h6 class="text-info fw-bold">AFP (códigos fijos · % editable)</h6>
+                <table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>AFP</th><th class="text-center">Cód. Previred</th><th class="text-center">Cód. LRE</th><th>% Trabajador</th></tr></thead><tbody>${filasAfp}</tbody></table>
             </div>
             <div class="col-lg-3">
-                <h6 class="text-info fw-bold">Salud (código Previred)</h6>
-                <table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>Institución</th><th>Código</th></tr></thead><tbody>${filasSalud}</tbody></table>
+                <h6 class="text-info fw-bold">Salud (códigos fijos)</h6>
+                <table class="table table-dark table-sm align-middle mb-0"><thead><tr><th>Institución</th><th class="text-center">Cód. Previred</th><th class="text-center">Cód. LRE</th></tr></thead><tbody>${filasSalud}</tbody></table>
             </div>
             <div class="col-lg-4">
                 <h6 class="text-info fw-bold">Tasas (%)</h6>
@@ -4208,6 +4213,16 @@ function renderParametrosPrevired() {
                 </div>
             </div>
         </div>
+        <h6 class="text-success fw-bold mt-3">📘 Libro de Remuneraciones Electrónico (LRE)</h6>
+        <div class="row g-2 small text-white">
+            <div class="col-md-3">RUT empresa<input id="lreRut" class="form-control form-control-sm bg-dark text-white" value="${(c.lre || {}).rutEmpresa || ''}"></div>
+            <div class="col-md-1">Región<input id="lreRegion" type="number" class="form-control form-control-sm bg-dark text-white" value="${(c.lre || {}).region ?? 13}"></div>
+            <div class="col-md-2">Comuna (cód.)<input id="lreComuna" type="number" class="form-control form-control-sm bg-dark text-white" value="${(c.lre || {}).comuna ?? 13102}"></div>
+            <div class="col-md-2">Jornada (cód.)<input id="lreJornada" type="number" class="form-control form-control-sm bg-dark text-white" value="${(c.lre || {}).jornada ?? 101}"></div>
+            <div class="col-md-2">Causal término<input id="lreCausal" type="number" class="form-control form-control-sm bg-dark text-white" value="${(c.lre || {}).causal ?? 7}"></div>
+            <div class="col-md-2">Valor UTM ($)<input id="lreUtm" type="number" class="form-control form-control-sm bg-dark text-white" value="${(c.lre || {}).utm ?? ''}"></div>
+            <div class="col-12 text-muted">Comuna 13102 = Cerrillos · Jornada 101 = Ordinaria Art. 22 · Causal 7 = Art. 159 N°5 Conclusión del trabajo o servicio (6 = Vencimiento del plazo). La UTM solo se usa para avisar si alguien supera 13,5 UTM (impuesto único).</div>
+        </div>
         <div class="text-end mt-3">
             <button class="btn btn-outline-info fw-bold" id="btnGuardarParamPrevired">💾 Guardar parámetros</button>
         </div>
@@ -4218,9 +4233,7 @@ function renderParametrosPrevired() {
 
 function leerParametrosPreviredDesdePantalla() {
     const c = JSON.parse(JSON.stringify(window.configPrevired));
-    document.querySelectorAll('.prev-afp-codigo').forEach(el => { c.afps[el.dataset.k].codigo = el.value.trim(); });
     document.querySelectorAll('.prev-afp-tasa').forEach(el => { c.afps[el.dataset.k].tasa = numPrevired(el.value); });
-    document.querySelectorAll('.prev-salud-codigo').forEach(el => { c.saludes[el.dataset.k].codigo = el.value.trim(); });
     c.salud = numPrevired(document.getElementById('prevSalud').value);
     c.sis = numPrevired(document.getElementById('prevSis').value);
     c.expectativaVida = numPrevired(document.getElementById('prevCev').value);
@@ -4233,13 +4246,21 @@ function leerParametrosPreviredDesdePantalla() {
     c.codigoMovimiento = parseInt(document.getElementById('prevMov').value, 10) || 0;
     c.tipoJornada = parseInt(document.getElementById('prevJornada').value, 10) === 2 ? 2 : 1;
     c.afpPorDefecto = document.getElementById('prevAfpDef').value;
+    c.lre = {
+        rutEmpresa: document.getElementById('lreRut').value.replace(/\./g, '').trim().toUpperCase(),
+        region: parseInt(document.getElementById('lreRegion').value, 10) || 13,
+        comuna: parseInt(document.getElementById('lreComuna').value, 10) || 13102,
+        jornada: parseInt(document.getElementById('lreJornada').value, 10) || 101,
+        causal: parseInt(document.getElementById('lreCausal').value, 10) || 7,
+        tipoImpuesto: 1,
+        utm: numPrevired(document.getElementById('lreUtm').value)
+    };
     return c;
 }
 
 async function guardarParametrosPrevired() {
     const c = leerParametrosPreviredDesdePantalla();
     for (const k in c.afps) {
-        if (!/^\d{2}$/.test(c.afps[k].codigo)) return alert(`El código de ${c.afps[k].nombre} debe tener 2 dígitos (ej: 05).`);
         if (c.afps[k].tasa <= 0 || c.afps[k].tasa >= 20) return alert(`Revisa el % de ${c.afps[k].nombre}.`);
     }
     if (c.salud <= 0 || c.salud >= 20) return alert("Revisa el % de salud.");
@@ -4297,6 +4318,7 @@ async function calcularPrevired(mes) {
     const btnRev = document.getElementById('btnDescargarRevisionPrevired');
     if (btnTxt) btnTxt.disabled = true;
     if (btnRev) btnRev.disabled = true;
+    if (document.getElementById('btnDescargarLRE')) document.getElementById('btnDescargarLRE').disabled = true;
     if (!mes) { if (cont) cont.innerHTML = ''; return; }
     if (cont) cont.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
@@ -4601,8 +4623,8 @@ function renderTablaPrevired() {
             <td>${inputEdit(f, 'inicio', 'date', fechaISOPrevired(f.inicio), `min="${minFecha}" max="${maxFecha}"`)}</td>
             <td>${fechaPrevired(f.termino)}</td>
             <td>${inputEdit(f, 'liquido', 'number', f.liquido, 'min="1"')}</td>
-            <td>${f.afpKey ? c.afps[f.afpKey].nombre + ' ' + c.afps[f.afpKey].tasa + '%' : '—'}</td>
-            <td>${f.saludKey ? c.saludes[f.saludKey].nombre : '—'}</td>
+            <td>${f.afpKey ? `${c.afps[f.afpKey].nombre} ${c.afps[f.afpKey].tasa}%<div class="small text-muted">Prev. ${c.afps[f.afpKey].codigo} · LRE ${c.afps[f.afpKey].lre}</div>` : '—'}</td>
+            <td>${f.saludKey ? `${c.saludes[f.saludKey].nombre}<div class="small text-muted">Prev. ${c.saludes[f.saludKey].codigo} · LRE ${c.saludes[f.saludKey].lre}</div>` : '—'}</td>
             <td class="fw-bold text-warning">${$(f.calc.bruto)}</td>
             <td>${$(f.calc.cotAfp)}</td>
             <td>${$(f.calc.salud)}</td>
@@ -4619,7 +4641,9 @@ function renderTablaPrevired() {
 
     const btnTxt = document.getElementById('btnDescargarPrevired');
     const btnRev = document.getElementById('btnDescargarRevisionPrevired');
+    const btnLre = document.getElementById('btnDescargarLRE');
     if (btnTxt) btnTxt.disabled = conError > 0;
+    if (btnLre) btnLre.disabled = conError > 0;
     if (btnRev) btnRev.disabled = false;
 }
 
@@ -4780,14 +4804,14 @@ function descargarTxtPrevired() {
 function descargarRevisionPrevired() {
     const filas = window.filasPrevired;
     const c = window.configPrevired;
-    let csv = "﻿RUT;DV;Apellido Paterno;Apellido Materno;Nombres;Sexo;Nacionalidad (0=CL 1=EXT);Días;Inicio;Término;Líquido;AFP;% AFP;Salud;Imponible (Bruto);Cotización AFP;SIS;Salud 7%;ISL;Expectativa Vida;Rentabilidad Protegida;Cesantía Trabajador;Cesantía Empleador;Contrato DT;Observaciones\n";
+    let csv = "﻿RUT;DV;Apellido Paterno;Apellido Materno;Nombres;Sexo;Nacionalidad (0=CL 1=EXT);Días;Inicio;Término;Líquido;AFP;Cód. AFP Previred;Cód. AFP LRE;% AFP;Salud;Cód. Salud Previred;Cód. Salud LRE;Imponible (Bruto);Cotización AFP;SIS;Salud 7%;ISL;Expectativa Vida;Rentabilidad Protegida;Cesantía Trabajador;Cesantía Empleador;Contrato DT;Observaciones\n";
     for (const f of filas) {
         const k = f.calc;
         csv += [
             f.rutOk ? f.rutOk.cuerpo : f.rut, f.rutOk ? f.rutOk.dv : '', f.paterno, f.materno, f.nombres, f.sexo, f.nacionalidad,
             f.dias, fechaPrevired(f.inicio), fechaPrevired(f.termino), f.liquido,
-            f.afpKey ? c.afps[f.afpKey].nombre : '', f.afpKey ? String(c.afps[f.afpKey].tasa).replace('.', ',') : '',
-            f.saludKey ? c.saludes[f.saludKey].nombre : '',
+            f.afpKey ? c.afps[f.afpKey].nombre : '', f.afpKey ? c.afps[f.afpKey].codigo : '', f.afpKey ? c.afps[f.afpKey].lre : '', f.afpKey ? String(c.afps[f.afpKey].tasa).replace('.', ',') : '',
+            f.saludKey ? c.saludes[f.saludKey].nombre : '', f.saludKey ? c.saludes[f.saludKey].codigo : '', f.saludKey ? c.saludes[f.saludKey].lre : '',
             k.bruto, k.cotAfp, k.sis, k.salud, k.isl, k.cev, k.crp, k.afcTrab, k.afcEmp,
             f.contratoDT ? 'Sí' : 'No', [
                 ...(f.anterior ? [`Incluye sistema anterior: ${f.anterior.dias} día(s) y $${f.anterior.liquido} desde ${f.anterior.inicio}`] : []),
@@ -5069,3 +5093,138 @@ if (document.getElementById('selectMesLimpieza')) document.getElementById('selec
 if (document.getElementById('inputClaveLimpiezaMes')) document.getElementById('inputClaveLimpiezaMes').addEventListener('input', actualizarBotonLimpiezaMes);
 if (document.getElementById('btnEjecutarLimpiezaMes')) document.getElementById('btnEjecutarLimpiezaMes').addEventListener('click', ejecutarLimpiezaMes);
 if (document.getElementById('mantenimiento-tab')) document.getElementById('mantenimiento-tab').addEventListener('click', cargarMesesLimpieza);
+
+
+// ==========================================
+// LIBRO DE REMUNERACIONES ELECTRÓNICO (LRE) - DIRECCIÓN DEL TRABAJO
+// Plantilla oficial de 147 columnas (manual DT v6). Usa EXACTAMENTE el mismo cálculo
+// por persona que Previred y el Contador (días, fechas, bruto, líquido).
+// ==========================================
+const COLUMNAS_LRE = [["Rut trabajador(1101)", "1101"], ["Fecha inicio contrato(1102)", "1102"], ["Fecha término de contrato(1103)", "1103"], ["Causal término de contrato(1104)", "1104"], ["Región prestación de servicios(1105)", "1105"], ["Comuna prestación de servicios(1106)", "1106"], ["Tipo impuesto a la renta(1170)", "1170"], ["Técnico extranjero exención cot. previsionales(1146)", "1146"], ["Código tipo de jornada(1107)", "1107"], ["Persona con Discapacidad - Pensionado por Invalidez(1108)", "1108"], ["Pensionado por vejez(1109)", "1109"], ["AFP(1141)", "1141"], ["IPS (ExINP)(1142)", "1142"], ["FONASA - ISAPRE(1143)", "1143"], ["AFC(1151)", "1151"], ["CCAF(1110)", "1110"], ["Org. administrador ley 16.744(1152)", "1152"], ["Nro cargas familiares legales autorizadas(1111)", "1111"], ["Nro de cargas familiares maternales(1112)", "1112"], ["Nro de cargas familiares invalidez(1113)", "1113"], ["Tramo asignación familiar(1114)", "1114"], ["Rut org sindical 1(1171)", "1171"], ["Rut org sindical 2(1172)", "1172"], ["Rut org sindical 3(1173)", "1173"], ["Rut org sindical 4(1174)", "1174"], ["Rut org sindical 5(1175)", "1175"], ["Rut org sindical 6(1176)", "1176"], ["Rut org sindical 7(1177)", "1177"], ["Rut org sindical 8(1178)", "1178"], ["Rut org sindical 9(1179)", "1179"], ["Rut org sindical 10(1180)", "1180"], ["Nro días trabajados en el mes(1115)", "1115"], ["Nro días de licencia médica en el mes(1116)", "1116"], ["Nro días de vacaciones en el mes(1117)", "1117"], ["Subsidio trabajador joven(1118)", "1118"], ["Puesto Trabajo Pesado(1154)", "1154"], ["APVI(1155)", "1155"], ["APVC(1157)", "1157"], ["Indemnización a todo evento(1131)", "1131"], ["Tasa indemnización a todo evento(1132)", "1132"], ["Sueldo(2101)", "2101"], ["Sobresueldo(2102)", "2102"], ["Comisiones(2103)", "2103"], ["Semana corrida(2104)", "2104"], ["Participación(2105)", "2105"], ["Gratificación(2106)", "2106"], ["Recargo 30% día domingo(2107)", "2107"], ["Remun. variable pagada en vacaciones(2108)", "2108"], ["Remun. variable pagada en clausura(2109)", "2109"], ["Aguinaldo(2110)", "2110"], ["Bonos u otras remun. fijas mensuales(2111)", "2111"], ["Tratos(2112)", "2112"], ["Bonos u otras remun. variables mensuales o superiores a un mes(2113)", "2113"], ["Ejercicio opción no pactada en contrato(2114)", "2114"], ["Beneficios en especie constitutivos de remun(2115)", "2115"], ["Remuneraciones bimestrales(2116)", "2116"], ["Remuneraciones trimestrales(2117)", "2117"], ["Remuneraciones cuatrimestral(2118)", "2118"], ["Remuneraciones semestrales(2119)", "2119"], ["Remuneraciones anuales(2120)", "2120"], ["Participación anual(2121)", "2121"], ["Gratificación anual(2122)", "2122"], ["Otras remuneraciones superiores a un mes(2123)", "2123"], ["Pago por horas de trabajo sindical(2124)", "2124"], ["Sueldo empresarial (2161)", "2161"], ["Subsidio por incapacidad laboral por licencia médica(2201)", "2201"], ["Beca de estudio(2202)", "2202"], ["Gratificaciones de zona(2203)", "2203"], ["Otros ingresos no constitutivos de renta(2204)", "2204"], ["Colación(2301)", "2301"], ["Movilización(2302)", "2302"], ["Viáticos(2303)", "2303"], ["Asignación de pérdida de caja(2304)", "2304"], ["Asignación de desgaste herramienta(2305)", "2305"], ["Asignación familiar legal(2311)", "2311"], ["Gastos por causa del trabajo(2306)", "2306"], ["Gastos por cambio de residencia(2307)", "2307"], ["Sala cuna(2308)", "2308"], ["Asignación trabajo a distancia o teletrabajo(2309)", "2309"], ["Depósito convenido hasta UF 900(2347)", "2347"], ["Alojamiento por razones de trabajo(2310)", "2310"], ["Asignación de traslación(2312)", "2312"], ["Indemnización por feriado legal(2313)", "2313"], ["Indemnización años de servicio(2314)", "2314"], ["Indemnización sustitutiva del aviso previo(2315)", "2315"], ["Indemnización fuero maternal(2316)", "2316"], ["Pago indemnización a todo evento(2331)", "2331"], ["Indemnizaciones voluntarias tributables(2417)", "2417"], ["Indemnizaciones contractuales tributables(2418)", "2418"], ["Cotización obligatoria previsional (AFP o IPS)(3141)", "3141"], ["Cotización obligatoria salud 7%(3143)", "3143"], ["Cotización voluntaria para salud(3144)", "3144"], ["Cotización AFC - trabajador(3151)", "3151"], ["Cotizaciones técnico extranjero para seguridad social fuera de Chile(3146)", "3146"], ["Descuento depósito convenido hasta UF 900 anual(3147)", "3147"], ["Cotización APVi Mod A(3155)", "3155"], ["Cotización APVi Mod B hasta UF50(3156)", "3156"], ["Cotización APVc Mod A(3157)", "3157"], ["Cotización APVc Mod B hasta UF50(3158)", "3158"], ["Impuesto retenido por remuneraciones(3161)", "3161"], ["Impuesto retenido por indemnizaciones(3162)", "3162"], ["Mayor retención de impuestos solicitada por el trabajador(3163)", "3163"], ["Impuesto retenido por reliquidación remun. devengadas otros períodos(3164)", "3164"], ["Diferencia impuesto reliquidación remun. devengadas en este período(3165)", "3165"], ["Retención préstamo clase media 2020 (Ley 21.252) (3166)", "3166"], ["Rebaja zona extrema DL 889 (3167)", "3167"], ["Cuota sindical 1(3171)", "3171"], ["Cuota sindical 2(3172)", "3172"], ["Cuota sindical 3(3173)", "3173"], ["Cuota sindical 4(3174)", "3174"], ["Cuota sindical 5(3175)", "3175"], ["Cuota sindical 6(3176)", "3176"], ["Cuota sindical 7(3177)", "3177"], ["Cuota sindical 8(3178)", "3178"], ["Cuota sindical 9(3179)", "3179"], ["Cuota sindical 10(3180)", "3180"], ["Crédito social CCAF(3110)", "3110"], ["Cuota vivienda o educación(3181)", "3181"], ["Crédito cooperativas de ahorro(3182)", "3182"], ["Otros descuentos autorizados y solicitados por el trabajador(3183)", "3183"], ["Cotización adicional trabajo pesado - trabajador(3154)", "3154"], ["Donaciones culturales y de reconstrucción(3184)", "3184"], ["Otros descuentos(3185)", "3185"], ["Pensiones de alimentos(3186)", "3186"], ["Descuento mujer casada(3187)", "3187"], ["Descuentos por anticipos y préstamos(3188)", "3188"], ["AFC - Aporte empleador(4151)", "4151"], ["Aporte empleador seguro accidentes del trabajo y Ley SANNA(4152)", "4152"], ["Aporte empleador indemnización a todo evento(4131)", "4131"], ["Aporte adicional trabajo pesado - empleador(4154)", "4154"], ["Aporte empleador seguro invalidez y sobrevivencia(4155)", "4155"], ["APVC - Aporte Empleador(4157)", "4157"], ["Total haberes(5201)", "5201"], ["Total haberes imponibles y tributables(5210)", "5210"], ["Total haberes imponibles no tributables(5220)", "5220"], ["Total haberes no imponibles y no tributables(5230)", "5230"], ["Total haberes no imponibles y tributables(5240)", "5240"], ["Total descuentos(5301)", "5301"], ["Total descuentos impuestos a las remuneraciones(5361)", "5361"], ["Total descuentos impuestos por indemnizaciones(5362)", "5362"], ["Total descuentos por cotizaciones del trabajador(5341)", "5341"], ["Total otros descuentos(5302)", "5302"], ["Total aportes empleador(5410)", "5410"], ["Total líquido(5501)", "5501"], ["Total indemnizaciones(5502)", "5502"], ["Total indemnizaciones tributables(5564)", "5564"], ["Total indemnizaciones no tributables(5565)", "5565"]];
+
+function bytesANSI(texto) {
+    // El LRE exige codificación ANSI (Windows-1252). Todo lo que usamos está en Latin-1.
+    const out = new Uint8Array(texto.length);
+    for (let i = 0; i < texto.length; i++) {
+        const c = texto.charCodeAt(i);
+        out[i] = c <= 255 ? c : 63; // '?' si hubiera un carácter fuera de rango
+    }
+    return out;
+}
+
+function fechaLRE(d) {
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function construirFilaLRE(f, c) {
+    const L = c.lre || {};
+    const afp = c.afps[f.afpKey];
+    const salud = c.saludes[f.saludKey];
+    const k = f.calc;
+    const bruto = k.bruto;
+    const cotSalud = Math.round(bruto * numPrevired(c.salud) / 100);              // 3143 = igual que Previred
+    const cotAfc = k.afcTrab;                                                       // 3151 (plazo fijo = 0)
+    const totalDescuentos = Math.max(0, bruto - f.liquido);                         // 5301 = bruto - líquido pagado
+    const cotAfp = Math.max(0, totalDescuentos - cotSalud - cotAfc);                // 3141 (absorbe el redondeo de $1)
+    const aportes = k.afcEmp + k.isl + k.sis;                                       // 5410
+
+    const v = {};
+    v['1101'] = `${f.rutOk.cuerpo}-${f.rutOk.dv}`;
+    v['1102'] = fechaLRE(f.inicio);
+    v['1103'] = fechaLRE(f.termino);
+    v['1104'] = String(L.causal ?? 7);
+    v['1105'] = String(L.region ?? 13);
+    v['1106'] = String(L.comuna ?? 13102);
+    v['1170'] = String(L.tipoImpuesto ?? 1);
+    v['1146'] = '0';
+    v['1107'] = String(L.jornada ?? 101);
+    v['1108'] = '0';
+    v['1109'] = '0';
+    v['1141'] = afp.lre;
+    v['1142'] = '0';
+    v['1143'] = salud.lre;
+    v['1151'] = '1';
+    v['1110'] = '0';
+    v['1152'] = '0';
+    v['1111'] = '0'; v['1112'] = '0'; v['1113'] = '0';
+    v['1114'] = 'D';
+    v['1115'] = String(f.dias);
+    v['1116'] = '0'; v['1117'] = '0'; v['1118'] = '0';
+    v['1155'] = '0'; v['1157'] = '0'; v['1131'] = '0';
+    v['2101'] = String(bruto);
+    v['3141'] = String(cotAfp);
+    v['3143'] = String(cotSalud);
+    v['3151'] = String(cotAfc);
+    v['3161'] = '0';
+    v['4151'] = String(k.afcEmp);
+    v['4152'] = String(k.isl);
+    v['4155'] = String(k.sis);
+    v['5201'] = String(bruto);
+    v['5210'] = String(bruto);
+    v['5220'] = '0'; v['5230'] = '0'; v['5240'] = '0';
+    v['5301'] = String(totalDescuentos);
+    v['5361'] = '0';
+    v['5341'] = String(cotAfp + cotSalud + cotAfc);
+    v['5302'] = '0';
+    v['5410'] = String(aportes);
+    v['5501'] = String(f.liquido);
+    v['5564'] = '0';
+
+    // Campos opcionales de texto/RUT que deben quedar vacíos si no aplican
+    const vacios = ['1171', '1172', '1173', '1174', '1175', '1176', '1177', '1178', '1179', '1180', '1154', '1132'];
+    return COLUMNAS_LRE.map(([, cod]) => (v[cod] !== undefined ? v[cod] : (vacios.includes(cod) ? '' : '0'))).join(';');
+}
+
+function avisosLRE(f, c) {
+    const L = c.lre || {};
+    const utm = numPrevired(L.utm);
+    const avisos = [];
+    if (utm > 0) {
+        const tributable = f.calc.bruto - Math.round(f.calc.bruto * numPrevired(c.salud) / 100) - Math.round(f.calc.bruto * numPrevired(c.afps[f.afpKey] ? c.afps[f.afpKey].tasa : 0) / 100);
+        if (tributable > 13.5 * utm) avisos.push(`${f.rut}: renta tributable $${tributable.toLocaleString('es-CL')} supera 13,5 UTM: revisar Impuesto Único (3161)`);
+    }
+    return avisos;
+}
+
+function descargarLRE() {
+    const filas = window.filasPrevired || [];
+    const c = window.configPrevired;
+    const conError = filas.filter(f => f.errores.length > 0);
+    if (!filas.length) return alert("No hay trabajadores en este mes.");
+    if (conError.length) return alert(`Hay ${conError.length} persona(s) con datos por corregir (en rojo). Corrígelos antes de generar el LRE.`);
+    const L = c.lre || {};
+    const rutEmp = String(L.rutEmpresa || '').replace(/\./g, '').trim().toUpperCase();
+    if (!validarRutPrevired(rutEmp)) return alert("Revisa el RUT de la empresa en los parámetros del LRE (ej: 76932592-1).");
+
+    const avisos = filas.flatMap(f => avisosLRE(f, c));
+    if (avisos.length && !confirm(`⚠️ Revisa antes de subir:\n\n${avisos.slice(0, 10).join('\n')}${avisos.length > 10 ? `\n... y ${avisos.length - 10} más` : ''}\n\n¿Generar el LRE de todas formas?`)) return;
+
+    const encabezado = COLUMNAS_LRE.map(([t]) => t).join(';');
+    const lineas = filas.map(f => construirFilaLRE(f, c));
+    if (lineas.some(l => l.split(';').length !== COLUMNAS_LRE.length)) return alert("Error interno: columnas incorrectas. No se generó el LRE.");
+
+    const contenido = encabezado + '\r\n' + lineas.join('\r\n') + '\r\n';
+    const periodo = filas[0].periodo; // mmaaaa
+    const nombre = `${rutEmp}_${periodo.substring(2)}${periodo.substring(0, 2)}.csv`; // rutempleador_aaaamm
+    const blob = new Blob([bytesANSI(contenido)], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// Botón LRE junto a los de Previred (se crea solo, sin tocar panel.html)
+(function crearBotonLRE() {
+    const btnTxt = document.getElementById('btnDescargarPrevired');
+    if (!btnTxt || document.getElementById('btnDescargarLRE')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'btnDescargarLRE';
+    b.className = 'btn btn-success fw-bold';
+    b.disabled = true;
+    b.innerText = '📘 Descargar LRE (Dirección del Trabajo)';
+    btnTxt.insertAdjacentElement('afterend', b);
+    b.addEventListener('click', descargarLRE);
+})();
