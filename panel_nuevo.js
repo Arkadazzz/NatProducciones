@@ -4708,7 +4708,7 @@ async function construirFilasMes(mes, ajustes, todas) {
         const afpDesconocida = !tr.afp || String(tr.afp).trim() === "No cotizo / No sé";
         if (!afpKey && afpDesconocida) {
             const edad = edadAlFinDelMesPrevired(tr.fechaNacimiento, mes);
-            if (edad === null) errores.push("Falta fecha de nacimiento");
+            if (edad === null) errores.push(tr.fechaNacimiento ? "Fecha de nacimiento inválida" : "Falta fecha de nacimiento");
             if (edad !== null && sexo) {
                 const noCotiza = (sexo === "F" && edad >= 60) || (sexo === "M" && edad >= 65);
                 const regla = noCotiza ? "NO_COTIZA" : "UNO";
