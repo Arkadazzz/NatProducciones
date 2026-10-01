@@ -78,7 +78,13 @@ reglas = {
             "invitadores": {".read": True},
             "pins_captador": {".write": STAFF},
         },
-        "0_estado_sistema": solo(True, STAFF),
+        "0_estado_sistema": {
+            # El formulario público solo necesita la lista de programas activos
+            "programas_activos": solo(True, STAFF),
+            # Tasas Previred y parámetros del LRE: solo admins (afectan cotizaciones)
+            "config_previred": solo(ADMIN, ADMIN),
+            "$otro": solo(STAFF, STAFF),
+        },
         "1_trabajadores": {
             ".read": STAFF,
             ".write": STAFF,
@@ -115,7 +121,7 @@ reglas = {
             ".write": STAFF,
             "$rut": {".read": True},
         },
-        "4_blacklist_programas": solo(STAFF, STAFF),
+        "4_blacklist_programas": solo(ADMIN, ADMIN),
         "5_historial_dt": solo(ADMIN, ADMIN),
         "6_sorteos_fechas_usadas": solo(STAFF, STAFF),
         "7_pagos_efectivo": solo(ADMIN, ADMIN),
@@ -124,7 +130,7 @@ reglas = {
             ".write": STAFF,
             "$fecha": {"$prog": {"$rut": {".write": "!data.exists() && newData.exists()", "$campo": TEXTO_SEGURO}}},
         },
-        "9_strikes": solo(STAFF, STAFF),
+        "9_strikes": solo(ADMIN, ADMIN),
         "10_firmas": solo(STAFF, STAFF),
         "11_previred_ajustes": solo(ADMIN, ADMIN),
     }

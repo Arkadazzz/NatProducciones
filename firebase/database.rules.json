@@ -18,8 +18,18 @@
       }
     },
     "0_estado_sistema": {
-      ".read": true,
-      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+      "programas_activos": {
+        ".read": true,
+        ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+      },
+      "config_previred": {
+        ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+        ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
+      },
+      "$otro": {
+        ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+        ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+      }
     },
     "1_trabajadores": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
@@ -86,8 +96,8 @@
       }
     },
     "4_blacklist_programas": {
-      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
-      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
     },
     "5_historial_dt": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
@@ -116,8 +126,8 @@
       }
     },
     "9_strikes": {
-      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
-      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
     },
     "10_firmas": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
