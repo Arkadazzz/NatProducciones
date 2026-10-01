@@ -1628,6 +1628,7 @@ window.verPerfil = async function(rut) {
                     <option value="PLANVITAL" ${p.afp==='PLANVITAL'?'selected':''}>PlanVital</option>
                     <option value="PROVIDA" ${p.afp==='PROVIDA'?'selected':''}>ProVida</option>
                     <option value="UNO" ${p.afp==='UNO'?'selected':''}>Uno</option>
+                    <option value="NO_COTIZA" ${p.afp==='NO_COTIZA'?'selected':''}>No cotiza (0%)</option>
                 </select>
             </div>
             <div class="col-6 mb-2"><label class="text-muted small">Salud</label>
@@ -4013,7 +4014,8 @@ const CONFIG_PREVIRED_BASE = {
         MODELO:    { nombre: "Modelo",    codigo: "34", lre: "103", tasa: 10.58 },
         PLANVITAL: { nombre: "PlanVital", codigo: "29", lre: "11",  tasa: 11.16 },
         PROVIDA:   { nombre: "ProVida",   codigo: "08", lre: "6",   tasa: 11.45 },
-        UNO:       { nombre: "Uno",       codigo: "35", lre: "19",  tasa: 10.46 }
+        UNO:       { nombre: "Uno",       codigo: "35", lre: "19",  tasa: 10.46 },
+        NO_COTIZA: { nombre: "No cotiza", codigo: "00", lre: "100", tasa: 0, sinAfp: true }
     },
     saludes: {
         FONASA:       { nombre: "Fonasa",        codigo: "07", lre: "102" },
@@ -4147,7 +4149,7 @@ async function cargarConfigPrevired() {
             const afps = {};
             for (const k in base.afps) {
                 const tasaGuardada = guardada.afps && guardada.afps[k] ? numPrevired(guardada.afps[k].tasa) : 0;
-                afps[k] = { ...base.afps[k], tasa: tasaGuardada > 0 ? tasaGuardada : base.afps[k].tasa }; // códigos fijos, % editable
+                afps[k] = { ...base.afps[k], tasa: base.afps[k].sinAfp ? 0 : (tasaGuardada > 0 ? tasaGuardada : base.afps[k].tasa) }; // códigos fijos, % editable (No cotiza = 0%)
             }
             window.configPrevired = { ...base, ...guardada, afps, saludes: JSON.parse(JSON.stringify(base.saludes)), lre: { ...base.lre, ...(guardada.lre || {}) } };
         } else {
@@ -4169,7 +4171,7 @@ function renderParametrosPrevired() {
         filasAfp += `<tr><td class="text-white">${c.afps[k].nombre}</td>
             <td class="text-center text-info fw-bold">${c.afps[k].codigo}</td>
             <td class="text-center text-info fw-bold">${c.afps[k].lre}</td>
-            <td><input type="number" step="0.01" class="form-control form-control-sm bg-dark text-white prev-afp-tasa" data-k="${k}" value="${c.afps[k].tasa}"></td></tr>`;
+            <td>${c.afps[k].sinAfp ? '<span class="text-info fw-bold">0% (fijo)</span>' : `<input type="number" step="0.01" class="form-control form-control-sm bg-dark text-white prev-afp-tasa" data-k="${k}" value="${c.afps[k].tasa}">`}</td></tr>`;
     }
     let filasSalud = '';
     for (const k in c.saludes) {
@@ -4261,7 +4263,7 @@ function leerParametrosPreviredDesdePantalla() {
 async function guardarParametrosPrevired() {
     const c = leerParametrosPreviredDesdePantalla();
     for (const k in c.afps) {
-        if (c.afps[k].tasa <= 0 || c.afps[k].tasa >= 20) return alert(`Revisa el % de ${c.afps[k].nombre}.`);
+        if (!c.afps[k].sinAfp && (c.afps[k].tasa <= 0 || c.afps[k].tasa >= 20)) return alert(`Revisa el % de ${c.afps[k].nombre}.`);
     }
     if (c.salud <= 0 || c.salud >= 20) return alert("Revisa el % de salud.");
     c.confirmado = true;
@@ -4435,14 +4437,15 @@ async function construirFilasMes(mes, ajustes, todas) {
         const pct = (base, tasa) => Math.round(base * numPrevired(tasa) / 100);
 
         const esFonasa = saludKey === "FONASA";
+        const sinAfp = !!(afp && afp.sinAfp);
         const calc = {
             bruto,
-            cotAfp: pct(bruto, tasaAfp + (c.sumarCuentaIndividualEnAFP ? numPrevired(c.cuentaIndividualEmpleador) : 0)),
-            sis: pct(bruto, c.sis),
+            cotAfp: sinAfp ? 0 : pct(bruto, tasaAfp + (c.sumarCuentaIndividualEnAFP ? numPrevired(c.cuentaIndividualEmpleador) : 0)),
+            sis: sinAfp ? 0 : pct(bruto, c.sis),
             salud: pct(bruto, c.salud),
             isl: pct(bruto, c.isl),
-            cev: pct(bruto, c.expectativaVida),
-            crp: pct(bruto, c.rentabilidadProtegida),
+            cev: sinAfp ? 0 : pct(bruto, c.expectativaVida),
+            crp: sinAfp ? 0 : pct(bruto, c.rentabilidadProtegida),
             afcTrab: pct(bruto, c.cesantiaTrabajador),
             afcEmp: pct(bruto, c.cesantiaEmpleador)
         };
@@ -4514,6 +4517,13 @@ function construirLineaPrevired(f) {
     campos[101] = String(k.afcTrab);        // Aporte trabajador Seguro de Cesantía
     campos[102] = String(k.afcEmp);         // Aporte empleador Seguro de Cesantía
 
+    if (afp.sinAfp) {
+        // Sin institución previsional: el formato rechaza montos AFP/SIS/Expectativa/Rentabilidad
+        campos[11] = "SIP";
+        campos[26] = "00";
+        campos[27] = "0"; campos[28] = "0"; campos[29] = "0";
+        campos[94] = "0"; campos[95] = "0";
+    }
     return campos.slice(1).join(';');
 }
 
@@ -5125,7 +5135,9 @@ function construirFilaLRE(f, c) {
     const cotSalud = Math.round(bruto * numPrevired(c.salud) / 100);              // 3143 = igual que Previred
     const cotAfc = k.afcTrab;                                                       // 3151 (plazo fijo = 0)
     const totalDescuentos = Math.max(0, bruto - f.liquido);                         // 5301 = bruto - líquido pagado
-    const cotAfp = Math.max(0, totalDescuentos - cotSalud - cotAfc);                // 3141 (absorbe el redondeo de $1)
+    let cotAfp = Math.max(0, totalDescuentos - cotSalud - cotAfc);                  // 3141 (absorbe el redondeo de $1)
+    let cotSaludFinal = cotSalud;
+    if (afp.sinAfp) { cotAfp = 0; cotSaludFinal = Math.max(0, totalDescuentos - cotAfc); } // No cotiza: el redondeo lo absorbe salud
     const aportes = k.afcEmp + k.isl + k.sis;                                       // 5410
 
     const v = {};
@@ -5153,7 +5165,7 @@ function construirFilaLRE(f, c) {
     v['1155'] = '0'; v['1157'] = '0'; v['1131'] = '0';
     v['2101'] = String(bruto);
     v['3141'] = String(cotAfp);
-    v['3143'] = String(cotSalud);
+    v['3143'] = String(cotSaludFinal);
     v['3151'] = String(cotAfc);
     v['3161'] = '0';
     v['4151'] = String(k.afcEmp);
@@ -5164,7 +5176,7 @@ function construirFilaLRE(f, c) {
     v['5220'] = '0'; v['5230'] = '0'; v['5240'] = '0';
     v['5301'] = String(totalDescuentos);
     v['5361'] = '0';
-    v['5341'] = String(cotAfp + cotSalud + cotAfc);
+    v['5341'] = String(cotAfp + cotSaludFinal + cotAfc);
     v['5302'] = '0';
     v['5410'] = String(aportes);
     v['5501'] = String(f.liquido);
