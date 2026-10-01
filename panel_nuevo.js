@@ -197,12 +197,17 @@ window.obtenerAsistencias = async function(forzar = false) {
         window.cacheAsistencias = diskCache;
         return new FakeSnapshot(diskCache);
     }
-    console.log("⬇️ Descargando Asistencias de Firebase...");
-    const snap = await get(ref(db, '2_asistencias'));
-    const val = snap.exists() ? snap.val() : null;
-    window.cacheAsistencias = val;
-    if (val) await setLocalCache('asistencias_nat', val);
-    return snap;
+    // Si otra pestaña ya está descargando el historial, se espera esa misma descarga (no se baja dos veces)
+    if (window._descargaAsistencias) return window._descargaAsistencias;
+    window._descargaAsistencias = (async () => {
+        console.log("⬇️ Descargando Asistencias de Firebase...");
+        const snap = await get(ref(db, '2_asistencias'));
+        const val = snap.exists() ? snap.val() : null;
+        window.cacheAsistencias = val;
+        if (val) await setLocalCache('asistencias_nat', val);
+        return snap;
+    })();
+    try { return await window._descargaAsistencias; } finally { window._descargaAsistencias = null; }
 };
 
 // Campos internos de la ficha privada que nunca se muestran ni se mezclan
@@ -232,17 +237,22 @@ window.obtenerTrabajadores = async function(forzar = false) {
         listaGlobalCRM = diskCache;
         return new FakeSnapshot(diskCache);
     }
-    console.log("⬇️ Descargando Trabajadores de Firebase...");
-    const snap = await get(ref(db, '1_trabajadores'));
-    let val = snap.exists() ? snap.val() : null;
-    if (val && window.esAdmin) {
-        const privSnap = await get(ref(db, '1p_privado'));
-        val = mezclarFichas(val, privSnap.exists() ? privSnap.val() : {});
-    }
-    window.cacheTrabajadores = val;
-    listaGlobalCRM = val || {};
-    if (val) await setLocalCache('trabajadores_nat', val);
-    return new FakeSnapshot(val);
+    // Si ya hay una descarga en curso, se reutiliza (varias pestañas piden la lista al mismo tiempo)
+    if (window._descargaTrabajadores) return window._descargaTrabajadores;
+    window._descargaTrabajadores = (async () => {
+        console.log("⬇️ Descargando Trabajadores de Firebase...");
+        const snap = await get(ref(db, '1_trabajadores'));
+        let val = snap.exists() ? snap.val() : null;
+        if (val && window.esAdmin) {
+            const privSnap = await get(ref(db, '1p_privado'));
+            val = mezclarFichas(val, privSnap.exists() ? privSnap.val() : {});
+        }
+        window.cacheTrabajadores = val;
+        listaGlobalCRM = val || {};
+        if (val) await setLocalCache('trabajadores_nat', val);
+        return new FakeSnapshot(val);
+    })();
+    try { return await window._descargaTrabajadores; } finally { window._descargaTrabajadores = null; }
 };
 
 // Lee la ficha de una persona (con sus datos privados si quien consulta es admin)
@@ -1315,7 +1325,8 @@ async function onScanSuccess(decodedText) {
         const snapshot = await get(ref(db, `1_trabajadores/${rutActual}`));
         
         if (snapshot.exists()) {
-            const datos = snapshot.val(); 
+            // Admin: ficha completa (con datos privados) para no perderlos en la lista en memoria (Excel canal, finanzas)
+            const datos = window.esAdmin ? await window.leerFichaCompleta(rutActual) : snapshot.val(); 
             listaGlobalCRM[rutActual] = datos; 
             if (document.getElementById('nombreAsistenteDisplay')) document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
             window.fichaEscaneada = datos;
