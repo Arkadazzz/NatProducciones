@@ -598,7 +598,7 @@ if (btnDescargarMesElegido) {
                 const parts = r.split('-');
                 const ap = separarApellidosOriginal(tr.apellidos);
                 const [y, m, d] = (tr.fechaNacimiento || "").split('-');
-                csv += `${r};${parts[0]};${parts[1] || ''};${tr.nombres || ''} ${tr.apellidos || ''};${ap.paterno};${ap.materno};${tr.nombres || ''};${d ? d + '-' + m + '-' + y : ''};${fechaPrevired(f.inicio)};${fechaPrevired(f.termino)};${tr.sexo || ''};extra publico (televisión);;${tr.direccion || ''};;Santiago;Pesos;${f.liquido};${tr.afp || ''};${tr.salud || ''};${tr.telefono || ''};${tr.email || ''};${f.afpKey ? cfgCodigos.afps[f.afpKey].lre : ''};${f.saludKey ? cfgCodigos.saludes[f.saludKey].lre : ''}\n`;
+                csv += `${r};${parts[0]};${parts[1] || ''};${tr.nombres || ''} ${tr.apellidos || ''};${ap.paterno};${ap.materno};${tr.nombres || ''};${d ? d + '-' + m + '-' + y : ''};${fechaPrevired(f.inicio)};${fechaPrevired(f.termino)};${tr.sexo || ''};extra publico (televisión);;${tr.direccion || ''};;Santiago;Pesos;${f.liquido};${f.afpPorRegla ? f.afpKey : (tr.afp || '')};${tr.salud || ''};${tr.telefono || ''};${tr.email || ''};${f.afpKey ? cfgCodigos.afps[f.afpKey].lre : ''};${f.saludKey ? cfgCodigos.saludes[f.saludKey].lre : ''}\n`;
             }
 
             const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -4627,6 +4627,19 @@ async function calcularPrevired(mes) {
 }
 
 // Cálculo ÚNICO por persona para un mes: lo usan Previred y el reporte del Contador
+// Edad cumplida al último día del mes "AAAA-MM" (null si la fecha no es válida)
+function edadAlFinDelMesPrevired(fechaNacimiento, mes) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(fechaNacimiento || '').trim());
+    if (!m) return null;
+    const [anio, mesNum] = mes.split('-').map(Number);
+    const fin = new Date(anio, mesNum, 0); // último día del mes
+    const nac = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    if (isNaN(nac.getTime()) || nac > fin) return null;
+    let edad = fin.getFullYear() - nac.getFullYear();
+    if (fin.getMonth() < nac.getMonth() || (fin.getMonth() === nac.getMonth() && fin.getDate() < nac.getDate())) edad--;
+    return edad;
+}
+
 async function construirFilasMes(mes, ajustes, todas) {
     const c = window.configPrevired;
     const trabSnap = await window.obtenerTrabajadores();
@@ -4689,6 +4702,23 @@ async function construirFilasMes(mes, ajustes, todas) {
 
         let afpKey = tr.afp && c.afps[tr.afp] ? tr.afp : "";
         let afpPorDefecto = false;
+        // Regla del contador para AFP desconocida (vacía o "No cotizo / No sé"). Solo se aplica al calcular;
+        // no se escribe en la ficha. Mujer >= 60 u hombre >= 65 al último día del mes: No cotiza; si no: AFP UNO.
+        let afpPorRegla = false;
+        const afpDesconocida = !tr.afp || String(tr.afp).trim() === "No cotizo / No sé";
+        if (!afpKey && afpDesconocida) {
+            const edad = edadAlFinDelMesPrevired(tr.fechaNacimiento, mes);
+            if (edad === null) errores.push("Falta fecha de nacimiento");
+            if (edad !== null && sexo) {
+                const noCotiza = (sexo === "F" && edad >= 60) || (sexo === "M" && edad >= 65);
+                const regla = noCotiza ? "NO_COTIZA" : "UNO";
+                if (c.afps[regla]) {
+                    afpKey = regla;
+                    afpPorRegla = true;
+                    avisos.push(noCotiza ? "No cotiza por edad" : `AFP asignada por regla: ${c.afps[regla].nombre.toUpperCase()}`);
+                }
+            }
+        }
         if (!afpKey && c.afpPorDefecto && c.afps[c.afpPorDefecto]) { afpKey = c.afpPorDefecto; afpPorDefecto = true; avisos.push(`AFP asignada por defecto (${c.afps[afpKey].nombre})`); }
         if (!afpKey) errores.push("Falta AFP");
         const afp = afpKey ? c.afps[afpKey] : null;
@@ -4746,7 +4776,7 @@ async function construirFilasMes(mes, ajustes, todas) {
 
         filas.push({
             rut, rutOk, paterno, materno, nombres, sexo, nacionalidad,
-            afpKey, afpPorDefecto, saludKey, esFonasa,
+            afpKey, afpPorDefecto, afpPorRegla, saludKey, esFonasa,
             dias, inicio, termino, liquido: liquidoCalc, contratoDT: d.contratoDT,
             enSistema: !d.soloManual, tr, pagado: d.pagado, pendiente: d.pendiente, detalle: d.detalle, anterior: aj.anterior || null, forzado: !!(aj.forzado && Object.keys(aj.forzado).length), personaManual: !!aj.persona,
             periodo, calc, errores, avisos,
@@ -5108,7 +5138,7 @@ function descargarTxtPrevired() {
 function descargarRevisionPrevired() {
     const filas = window.filasPrevired;
     const c = window.configPrevired;
-    let csv = "﻿RUT;DV;Apellido Paterno;Apellido Materno;Nombres;Sexo;Nacionalidad (0=CL 1=EXT);Días;Inicio;Término;Líquido;AFP;Cód. AFP Previred;Cód. AFP LRE;% AFP;Salud;Cód. Salud Previred;Cód. Salud LRE;Imponible (Bruto);Cotización AFP;SIS;Salud 7%;ISL;Expectativa Vida;Rentabilidad Protegida;Cesantía Trabajador;Cesantía Empleador;Contrato DT;Observaciones\n";
+    let csv = "﻿RUT;DV;Apellido Paterno;Apellido Materno;Nombres;Sexo;Nacionalidad (0=CL 1=EXT);Días;Inicio;Término;Líquido;AFP;Cód. AFP Previred;Cód. AFP LRE;% AFP;Salud;Cód. Salud Previred;Cód. Salud LRE;Imponible (Bruto);Cotización AFP;SIS;Salud 7%;ISL;Expectativa Vida;Rentabilidad Protegida;Cesantía Trabajador;Cesantía Empleador;Contrato DT;AFP asignada por regla (Sí/No);Observaciones\n";
     for (const f of filas) {
         const k = f.calc;
         csv += [
@@ -5117,7 +5147,7 @@ function descargarRevisionPrevired() {
             f.afpKey ? c.afps[f.afpKey].nombre : '', f.afpKey ? c.afps[f.afpKey].codigo : '', f.afpKey ? c.afps[f.afpKey].lre : '', f.afpKey ? String(c.afps[f.afpKey].tasa).replace('.', ',') : '',
             f.saludKey ? c.saludes[f.saludKey].nombre : '', f.saludKey ? c.saludes[f.saludKey].codigo : '', f.saludKey ? c.saludes[f.saludKey].lre : '',
             k.bruto, k.cotAfp, k.sis, k.salud, k.isl, k.cev, k.crp, k.afcTrab, k.afcEmp,
-            f.contratoDT ? 'Sí' : 'No', [
+            f.contratoDT ? 'Sí' : 'No', f.afpPorRegla ? 'Sí' : 'No', [
                 ...(f.anterior ? [`Incluye sistema anterior: ${f.anterior.dias} día(s) y $${f.anterior.liquido} desde ${f.anterior.inicio}`] : []),
                 ...(!f.enSistema ? ['Solo sistema anterior'] : []),
                 ...(f.forzado ? ['Editado a mano'] : []),
