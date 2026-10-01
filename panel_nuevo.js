@@ -812,10 +812,11 @@ function activarRadares() {
         tbody.innerHTML = "";
         
         let arrAsistentes = [];
+        completarFichasPuerta(Object.keys(asistenciasGlobales));
         
         for (const rut in asistenciasGlobales) {
             const asis = asistenciasGlobales[rut]; 
-            const trab = listaGlobalCRM[rut] || { nombres: "Desconocido", apellidos: "" };
+            const trab = fichaPuerta(rut);
             const num = parseInt(asis.numero_asignado) || 0; 
             
             if (num > maxNumero) { maxNumero = num; }
@@ -906,6 +907,57 @@ function activarRadares() {
     };
 }
 
+// ==========================================
+// FICHAS QUE FALTAN EN LA PUERTA
+// ==========================================
+// La lista de trabajadores se carga una vez (caché), pero reservas y asistencias llegan en vivo.
+// Si alguien se inscribe después de abrir el panel, se lee SOLO su ficha (1_trabajadores/{rut}),
+// una vez por RUT, y se vuelve a pintar. Nunca se descarga el nodo completo.
+const fichasEnCurso = new Map();   // rut -> promesa de lectura
+const rutsSinFicha = new Map();    // rut -> momento en que se supo que no existe (se reintenta en 1 minuto)
+
+window.asegurarFichas = function(ruts) {
+    const promesas = [];
+    for (const rut of ruts) {
+        if (!rut || listaGlobalCRM[rut]) continue;
+        const sinFichaDesde = rutsSinFicha.get(rut);
+        if (sinFichaDesde && Date.now() - sinFichaDesde < 60000) continue;
+        if (!fichasEnCurso.has(rut)) {
+            const lectura = get(ref(db, `1_trabajadores/${rut}`)).then(async (snap) => {
+                if (!snap.exists()) { rutsSinFicha.set(rut, Date.now()); return false; }
+                const ficha = snap.val();
+                listaGlobalCRM[rut] = ficha;
+                if (window.cacheTrabajadores) {
+                    window.cacheTrabajadores[rut] = ficha;
+                    await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
+                }
+                return true;
+            }).catch((e) => {
+                console.error("No se pudo leer la ficha", rut, e);
+                return false;
+            }).finally(() => fichasEnCurso.delete(rut));
+            fichasEnCurso.set(rut, lectura);
+        }
+        promesas.push(fichasEnCurso.get(rut));
+    }
+    return Promise.all(promesas);
+};
+
+// Pide las fichas que falten y, cuando termina alguna lectura (exista o no la ficha), vuelve a pintar la puerta
+function completarFichasPuerta(ruts) {
+    window.asegurarFichas(ruts).then((resultados) => {
+        if (resultados.length === 0) return;
+        actualizarTablero();
+        if (typeof window.renderTablaPuerta === "function") window.renderTablaPuerta();
+    });
+}
+
+// Ficha para mostrar: la real, o una etiqueta clara mientras carga / si no existe
+function fichaPuerta(rut) {
+    if (listaGlobalCRM[rut]) return listaGlobalCRM[rut];
+    return { nombres: fichasEnCurso.has(rut) ? "Cargando ficha…" : `Sin ficha (RUT ${rut})`, apellidos: "" };
+}
+
 function actualizarTablero() {
     try {
         faltanIPGlobal = 0;
@@ -914,11 +966,12 @@ function actualizarTablero() {
         
         // Coliseo también se comporta sin cortesías en el tablero principal
         let esDalePlay = nombrePrograma.includes("Dale Play") || nombrePrograma.includes("Coliseo");
+        completarFichasPuerta([...Object.keys(reservasGlobales), ...Object.keys(asistenciasGlobales)]);
 
         for (const rut in reservasGlobales) {
             if (!asistenciasGlobales[rut] || asistenciasGlobales[rut].tipo_ingreso === "Anulado") {
                 const res = reservasGlobales[rut];
-                const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
+                const tr = fichaPuerta(rut);
                 
                 const badge = esDalePlay ? '' : (res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`);
 
@@ -1058,19 +1111,25 @@ function actualizarTablero() {
     }
 }
 
-window.descargarListaCanal = function() {
+window.descargarListaCanal = async function() {
     if (!reservasGlobales || Object.keys(reservasGlobales).length === 0) {
         return alert("No hay personas inscritas en el formulario todavía.");
     }
-    let csv = "\uFEFFNOMBRES;APELLIDOS;RUT;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n";
+    // Antes de armar el archivo se leen las fichas que falten (nunca sale "No registrado")
+    await window.asegurarFichas(Object.keys(reservasGlobales));
+    const diaPrograma = (fechaPrograma || '').split('-')[2] || 'TICKET';
+    const limpiar = (v) => String(v ?? '').replace(/[;\r\n]+/g, ' ').trim();
+    let csv = `\uFEFF${diaPrograma};NOMBRE;RUT;TELÉFONO;CORREO;CONDICIÓN;CONTACTO EMERGENCIA (NOMBRE);CONTACTO EMERGENCIA (TELÉFONO);ENFERMEDADES DE BASE Y ALERGIAS\n`;
     
     for (const rut in reservasGlobales) {
         const res = reservasGlobales[rut];
-        const tr = listaGlobalCRM[rut] || { nombres: "No registrado", apellidos: "" };
+        const tr = fichaPuerta(rut);
         const cond = res.tipo === "Cortesía" ? `Cortesía (${res.invitado_por || ''})` : "I/P";
-        const estado = asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
+        const asis = asistenciasGlobales[rut];
+        const ticket = asis && asis.tipo_ingreso !== "Anulado" ? (asis.numero_asignado || '') : '';
+        const nombre = `${tr.nombres || ''} ${tr.apellidos || ''}`.trim().toUpperCase();
         
-        csv += `${tr.nombres || ''};${tr.apellidos || ''};${rut};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${tr.enfermedades || 'No indica'}\n`;
+        csv += [ticket, nombre, rut, tr.telefono || '', tr.email || '', cond, tr.emergenciaNombre || 'No indica', tr.emergenciaTelefono || 'No indica', tr.enfermedades || 'No indica'].map(limpiar).join(';') + "\n";
     }
     descargarCSV(csv, `Lista_Canal_${nombrePrograma.replace(/[ \/]/g, "_")}_${fechaPrograma}.csv`);
 }
@@ -1382,6 +1441,7 @@ window.anularAsistencia = async function(rut) {
 // CONTRATOS PDF 
 // ==========================================
 window.generarContratoPDF = async function(rut) {
+    await window.asegurarFichas([rut]); // puede haber ingresado desde otro iPad
     const trab = listaGlobalCRM[rut]; 
     const asisSnap = await get(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`));
     
