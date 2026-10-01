@@ -1,12 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getDatabase, ref, get, set, remove, child, onValue, update, query, orderByKey, startAt, endAt } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-
-// ==========================================
-// FIRMA LEGAL DE PRODUCCIÓN (CAMILA FEVRE)
-// ==========================================
-// Pega aquí adentro de las comillas tu código Base64 de la firma de Camila.
-const FIRMA_CAMILA_BASE64 = "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";
+import { CAMPOS_PRIVADOS, separarFicha, datosAutocompletar, hashPin, claveAutocompletar, nuevoVerif, pinValido, claveCorreo, escaparHTML, activarAppCheck } from "./seguridad.js?v=v16";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
@@ -18,37 +13,95 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+activarAppCheck(app);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-const CORREOS_ADMINISTRADORES = [
-    "cami.fevreseguel@gmail.com",
-    "pinoelgueta@gmail.com", 
-    "natalyseguel.va@gmail.com",
-    "Matijesus.pz@gmail.com",
-    "javier.rojas.fer@gmail.com",
-    "luisemilio.jorquera.avaria@gmail.com",
-].map(c => c.trim().toLowerCase()); // Se normalizan a minúsculas para que mayúsculas no bloqueen el acceso
+// ==========================================
+// ROLES (se leen desde la base: 0_roles/{correo} = "admin" | "staff")
+// ==========================================
+// La firma de producción y la lista de administradores ya NO viven en el código:
+// están en Firebase y las reglas de la base deciden quién puede leerlas.
+window.esAdmin = false;
+window.firmaProduccion = null;
+window.invitadoresNat = [];
+let resolverRol;
+window.rolListo = new Promise(r => { resolverRol = r; });
 
-onAuthStateChanged(auth, (user) => { 
+function mostrarSinAcceso(correo) {
+    document.body.innerHTML = `
+        <div class="container text-center" style="max-width: 520px; margin-top: 15vh; color: #fff;">
+            <h3 style="color: #b066ff;">🔒 Sin permisos</h3>
+            <p class="text-muted">Tu cuenta <b id="correoSinAcceso" class="text-white"></b> todavía no tiene acceso al panel.<br>Pídele a un administrador que te agregue en <b>Mantenimiento → Usuarios</b>.</p>
+            <button class="btn btn-outline-light mt-3" id="btnSalirSinAcceso">Cerrar sesión</button>
+        </div>`;
+    document.getElementById('correoSinAcceso').textContent = correo;
+    // Primera vez (todavía no hay usuarios cargados): el dueño del proyecto puede nombrarse admin.
+    // Las reglas de Firebase solo lo permiten si 0_roles está vacío y el correo es el del dueño.
+    const btnInicial = document.createElement('button');
+    btnInicial.className = 'btn btn-outline-info mt-3 ms-2';
+    btnInicial.textContent = 'Soy el primer administrador';
+    btnInicial.onclick = async () => {
+        try {
+            await set(ref(db, `0_roles/${claveCorreo(correo)}`), 'admin');
+            window.location.reload();
+        } catch (e) {
+            alert("No autorizado. Pide a un administrador que te agregue.");
+        }
+    };
+    document.getElementById('btnSalirSinAcceso').after(btnInicial);
+    document.getElementById('btnSalirSinAcceso').onclick = () => signOut(auth).then(() => window.location.href = "login.html");
+}
+
+onAuthStateChanged(auth, async (user) => { 
     if (!user) {
         window.location.href = "login.html"; 
-    } else {
-        const correoLimpio = user.email.trim().toLowerCase();
-        const esAdmin = CORREOS_ADMINISTRADORES.includes(correoLimpio);
-        window.localStorage.setItem('correoStaffNat', correoLimpio); // Guardamos para uso en tabs dinámicos
-        
-        if (!esAdmin) {
-            const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab', 'contador-tab', 'previred-tab'];
-            pestanasBloqueadas.forEach(id => {
-                const tab = document.getElementById(id);
-                if (tab && tab.parentElement) tab.parentElement.classList.add('d-none');
-            });
-        }
+        return;
     }
+    const correoLimpio = user.email.trim().toLowerCase();
+    window.localStorage.setItem('correoStaffNat', correoLimpio); // Guardamos para uso en tabs dinámicos
+
+    let rol = null;
+    try {
+        const rolSnap = await get(ref(db, `0_roles/${claveCorreo(correoLimpio)}`));
+        rol = rolSnap.exists() ? rolSnap.val() : null;
+    } catch (e) {
+        console.error("No se pudo leer el rol", e);
+    }
+    if (rol !== 'admin' && rol !== 'staff') return mostrarSinAcceso(correoLimpio);
+
+    // Si en este equipo antes entró alguien con otro rol, se borra la caché de trabajadores (puede tener datos privados)
+    if (window.localStorage.getItem('rolCacheNat') !== rol) {
+        await window.borrarCacheTrabajadores();
+        window.localStorage.setItem('rolCacheNat', rol);
+    }
+
+    window.esAdmin = rol === 'admin';
+    if (!window.esAdmin) {
+        const pestanasBloqueadas = ['crm-tab', 'finanzas-tab', 'efectivo-tab', 'seguridad-tab', 'mantenimiento-tab', 'contratos-dt-tab', 'contador-tab', 'previred-tab'];
+        pestanasBloqueadas.forEach(id => {
+            const tab = document.getElementById(id);
+            if (tab && tab.parentElement) tab.parentElement.classList.add('d-none');
+        });
+    }
+
+    try {
+        const [firmaSnap, invSnap] = await Promise.all([
+            get(ref(db, '0_config/firma_produccion')),
+            get(ref(db, '0_config/invitadores'))
+        ]);
+        window.firmaProduccion = firmaSnap.exists() ? firmaSnap.val() : null;
+        window.invitadoresNat = invSnap.exists() ? Object.values(invSnap.val()) : [];
+    } catch (e) {
+        console.error("No se pudo leer la configuración", e);
+    }
+    resolverRol(rol);
 });
 
-if (document.getElementById('btnCerrarSesion')) document.getElementById('btnCerrarSesion').addEventListener('click', () => { 
+if (document.getElementById('btnCerrarSesion')) document.getElementById('btnCerrarSesion').addEventListener('click', async () => { 
+    // No dejar datos de trabajadores en el equipo. La caché de asistencias se mantiene para no volver a descargarla.
+    await window.borrarCacheTrabajadores();
+    window.localStorage.removeItem('rolCacheNat');
     signOut(auth).then(() => { 
         window.localStorage.removeItem('correoStaffNat');
         window.location.href = "login.html"; 
@@ -152,7 +205,26 @@ window.obtenerAsistencias = async function(forzar = false) {
     return snap;
 };
 
+// Campos internos de la ficha privada que nunca se muestran ni se mezclan
+const CAMPOS_PIN_INTERNOS = ['pin_hash', 'verif', 'auto_key'];
+
+// Mezcla la ficha básica (1_trabajadores) con la privada (1p_privado, solo admins)
+function mezclarFichas(basicos, privados) {
+    const resultado = {};
+    for (const rut in (basicos || {})) {
+        resultado[rut] = { ...basicos[rut] };
+        const priv = (privados || {})[rut];
+        if (priv) {
+            for (const campo in priv) {
+                if (!CAMPOS_PIN_INTERNOS.includes(campo)) resultado[rut][campo] = priv[campo];
+            }
+        }
+    }
+    return resultado;
+}
+
 window.obtenerTrabajadores = async function(forzar = false) {
+    await window.rolListo;
     const diskCache = await getLocalCache('trabajadores_nat');
     if (diskCache && !forzar) {
         console.log("♻️ Usando caché de DISCO (0 bytes descargados)");
@@ -162,11 +234,54 @@ window.obtenerTrabajadores = async function(forzar = false) {
     }
     console.log("⬇️ Descargando Trabajadores de Firebase...");
     const snap = await get(ref(db, '1_trabajadores'));
-    const val = snap.exists() ? snap.val() : null;
+    let val = snap.exists() ? snap.val() : null;
+    if (val && window.esAdmin) {
+        const privSnap = await get(ref(db, '1p_privado'));
+        val = mezclarFichas(val, privSnap.exists() ? privSnap.val() : {});
+    }
     window.cacheTrabajadores = val;
     listaGlobalCRM = val || {};
     if (val) await setLocalCache('trabajadores_nat', val);
-    return snap;
+    return new FakeSnapshot(val);
+};
+
+// Lee la ficha de una persona (con sus datos privados si quien consulta es admin)
+window.leerFichaCompleta = async function(rut) {
+    const basica = (await get(ref(db, `1_trabajadores/${rut}`))).val();
+    if (!basica || !window.esAdmin) return basica;
+    const privada = (await get(ref(db, `1p_privado/${rut}`))).val() || {};
+    return mezclarFichas({ [rut]: basica }, { [rut]: privada })[rut];
+};
+
+// Guarda cambios de una ficha repartiéndolos entre la parte básica y la privada
+window.guardarCamposFicha = async function(rut, campos) {
+    const { basica, privada } = separarFicha(campos);
+    const updates = {};
+    for (const c in basica) updates[`1_trabajadores/${rut}/${c}`] = basica[c];
+    for (const c in privada) updates[`1p_privado/${rut}/${c}`] = privada[c];
+    // Si la persona tiene autocompletado, se actualiza para que no muestre datos viejos
+    if (Object.keys(basica).length > 0 && window.esAdmin) {
+        const autoKey = (await get(ref(db, `1p_privado/${rut}/auto_key`))).val();
+        if (autoKey) {
+            const actual = (await get(ref(db, `1_trabajadores/${rut}`))).val() || {};
+            updates[`1a_autocompletar/${autoKey}`] = datosAutocompletar(rut, { ...actual, ...basica });
+        }
+    }
+    await update(ref(db), updates);
+};
+
+// Borra solo la caché de trabajadores (la que puede tener datos bancarios/médicos si entró un admin)
+window.borrarCacheTrabajadores = async function() {
+    window.cacheTrabajadores = null;
+    try {
+        const ldb = await initLocalDB();
+        await new Promise((resolve) => {
+            const tx = ldb.transaction(storeName, 'readwrite');
+            tx.objectStore(storeName).delete('trabajadores_nat');
+            tx.oncomplete = resolve;
+            tx.onerror = resolve;
+        });
+    } catch(e) {}
 };
 
 window.limpiarCache = async function() {
@@ -510,16 +625,40 @@ if (btnDescargarMesElegido) {
     }
 }
 
-setTimeout(inicializarContador, 1000);
+// Ahorro de descargas: el historial de asistencias se baja solo al abrir Contador o Finanzas (no al entrar al panel)
 const tabFinanzas = document.getElementById('finanzas-tab');
 if (tabFinanzas) {
     tabFinanzas.addEventListener('click', inicializarContador);
+}
+const tabContador = document.getElementById('contador-tab');
+if (tabContador) {
+    tabContador.addEventListener('click', inicializarContador);
 }
 
 // ==========================================
 // CONTROL DE PROGRAMAS
 // ==========================================
+// El PIN de captador ya no viaja con el programa público: vive en 0_config/pins_captador/{fecha}/{nombre},
+// que solo puede leer el staff. Firebase lo valida por dentro cuando alguien se inscribe.
+window.pinsCaptador = {};
+window.programasActivosNat = null;
+const pinDePrograma = (p) => ((window.pinsCaptador[p.fecha] || {})[p.nombre]) || p.pin || "";
+
+window.rolListo.then(() => {
+    onValue(ref(db, '0_config/pins_captador'), (snap) => {
+        window.pinsCaptador = snap.exists() ? snap.val() : {};
+        renderProgramasActivos();
+    });
+});
+
 onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
+    window.programasActivosNat = snapshot;
+    renderProgramasActivos();
+});
+
+function renderProgramasActivos() {
+    const snapshot = window.programasActivosNat;
+    if (!snapshot) return;
     const container = document.getElementById('contenedorProgramasActivos'); 
     if(!container) return;
     container.innerHTML = "";
@@ -528,7 +667,8 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
         const programas = snapshot.val();
         for (const clave in programas) {
             const p = programas[clave];
-            let badgePin = p.pin ? `<span class="badge bg-warning text-dark ms-2 fw-bold fs-6">PIN I/P: ${p.pin}</span>` : "";
+            const pinP = pinDePrograma(p);
+            let badgePin = pinP ? `<span class="badge bg-warning text-dark ms-2 fw-bold fs-6">PIN I/P: ${pinP}</span>` : "";
             
             container.innerHTML += `
                 <div class="alert mb-2 d-flex justify-content-between align-items-center" style="background: #1c103f; border: 1px solid #b066ff;">
@@ -537,7 +677,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
                         <small style="color: #d6b3ff;">${p.fecha} | Citación: ${p.hora_citacion || 'N/A'} | Salida: ${p.hora_termino || 'N/A'} | H.Extra: $${p.valor_hora_extra || 0}</small>
                     </div>
                     <div>
-                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${p.pin}', '${p.hora_termino}', '${p.valor_hora_extra || 0}', '${p.hora_citacion || ''}', ${p.incluye_almuerzo || false})">🚪 Entrar</button>
+                        <button class="btn btn-success btn-sm fw-bold" onclick="window.unirseASala('${clave}', '${p.nombre}', '${p.fecha}', '${p.monto}', '${pinP}', '${p.hora_termino}', '${p.valor_hora_extra || 0}', '${p.hora_citacion || ''}', ${p.incluye_almuerzo || false})">🚪 Entrar</button>
                         <button class="btn btn-danger btn-sm fw-bold ms-1" onclick="window.cerrarProgramaGlobal('${clave}')">X</button>
                     </div>
                 </div>`;
@@ -546,7 +686,7 @@ onValue(ref(db, '0_estado_sistema/programas_activos'), (snapshot) => {
         container.innerHTML = "<p class='text-muted' style='font-size: 0.9em;'>No hay programas corriendo.</p>";
         salirDeSala();
     }
-});
+}
 
 if (document.getElementById('btnActivarWeb')) document.getElementById('btnActivarWeb').addEventListener('click', async () => {
     const nom = document.getElementById('nombrePrograma').value;
@@ -567,11 +707,12 @@ if (document.getElementById('btnActivarWeb')) document.getElementById('btnActiva
     
     const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
     
+    if (pinGenerado) await set(ref(db, `0_config/pins_captador/${fec}/${nom}`), pinGenerado);
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
         nombre: nom, 
         fecha: fec, 
         monto: mon, 
-        pin: pinGenerado, 
+        requiere_pin: !!pinGenerado, // El formulario solo sabe SI pide PIN, nunca cuál es
         hora_termino: horaSal, 
         valor_hora_extra: valorHE, 
         hora_citacion: horaCitacion,
@@ -879,11 +1020,11 @@ function activarRadares() {
                 btnSalidaContrato = `<button class="btn btn-outline-warning btn-sm" onclick="window.marcarSalida('${rut}', '${asis.tipo_ingreso}', ${asis.monto})">Marcar Salida</button>`; 
             }
             
-            const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}', ${asis.monto}, '${trab.nombres.replace(/['\"\`]/g, '')}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
+            const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}', ${asis.monto}, '${escaparHTML(String(trab.nombres || '').replace(/['\"\`]/g, ''))}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
 
             const tr = document.createElement('tr');
             tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td>
-                            <td>${trab.nombres} ${trab.apellidos}<br>${btnEditarPago}</td>
+                            <td>${escaparHTML(trab.nombres)} ${escaparHTML(trab.apellidos)}<br>${btnEditarPago}</td>
                             <td>${asis.hora_ingreso}</td>
                             <td>${badgeDT} ${btnPDFInstante}</td>
                             <td>${btnSalidaContrato}</td>
@@ -897,7 +1038,7 @@ function activarRadares() {
             if (document.getElementById('seccionConteoInvitados')) document.getElementById('seccionConteoInvitados').classList.remove('d-none');
             let htmlConteo = "";
             for(const staff in conteoStaff) {
-                htmlConteo += `<span class="badge bg-dark border border-warning fs-6 text-white">${staff}: <b class="text-warning fs-5 ms-1">${conteoStaff[staff]}</b></span>`;
+                htmlConteo += `<span class="badge bg-dark border border-warning fs-6 text-white">${escaparHTML(staff)}: <b class="text-warning fs-5 ms-1">${conteoStaff[staff]}</b></span>`;
             }
             if (document.getElementById('listaConteoInvitados')) document.getElementById('listaConteoInvitados').innerHTML = htmlConteo || "<small style='color: #aaaaaa;'>Nadie ha llegado.</small>";
         } else { 
@@ -920,11 +1061,11 @@ function actualizarTablero() {
                 const res = reservasGlobales[rut];
                 const tr = listaGlobalCRM[rut] || {nombres: "No registrado", apellidos: ""};
                 
-                const badge = esDalePlay ? '' : (res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${res.invitado_por || '-'})</span>` : `<span class="badge bg-secondary">I/P</span>`);
+                const badge = esDalePlay ? '' : (res.tipo === "Cortesía" ? `<span class="badge bg-warning text-dark">Cortesía (${escaparHTML(res.invitado_por || '-')})</span>` : `<span class="badge bg-secondary">I/P</span>`);
 
                 htmlFaltantes += `
                 <li class="list-group-item bg-dark text-white border-danger d-flex justify-content-between align-items-center" style="font-size: 0.9em; border-bottom: 1px solid #333;">
-                    <div><span class="text-muted" style="font-size: 0.8em;">${rut}</span><br><strong class="text-danger">${tr.nombres} ${tr.apellidos}</strong></div>
+                    <div><span class="text-muted" style="font-size: 0.8em;">${escaparHTML(rut)}</span><br><strong class="text-danger">${escaparHTML(tr.nombres)} ${escaparHTML(tr.apellidos)}</strong></div>
                     ${badge}
                 </li>`;
 
@@ -1070,7 +1211,7 @@ window.descargarListaCanal = function() {
         const cond = res.tipo === "Cortesía" ? `Cortesía (${res.invitado_por || ''})` : "I/P";
         const estado = asistenciasGlobales[rut] ? "ADENTRO" : "FALTA LLEGAR";
         
-        csv += `${tr.nombres || ''};${tr.apellidos || ''};${rut};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${tr.enfermedades || 'No indica'}\n`;
+        csv += `${tr.nombres || ''};${tr.apellidos || ''};${rut};${tr.telefono || ''};${tr.email || ''};${cond};${tr.emergenciaNombre || 'No indica'};${tr.emergenciaTelefono || 'No indica'};${window.esAdmin ? (tr.enfermedades || 'No indica') : 'Solo visible para admin'}\n`;
     }
     descargarCSV(csv, `Lista_Canal_${nombrePrograma.replace(/[ \/]/g, "_")}_${fechaPrograma}.csv`);
 }
@@ -1177,6 +1318,7 @@ async function onScanSuccess(decodedText) {
             const datos = snapshot.val(); 
             listaGlobalCRM[rutActual] = datos; 
             if (document.getElementById('nombreAsistenteDisplay')) document.getElementById('nombreAsistenteDisplay').innerText = `${datos.nombres} ${datos.apellidos}`;
+            window.fichaEscaneada = datos;
             const infoInvitado = document.getElementById('infoInvitado');
             
             let esCortesia = reservaSnap.exists() && reservaSnap.val().tipo === "Cortesía";
@@ -1198,7 +1340,7 @@ async function onScanSuccess(decodedText) {
 
             if (infoInvitado) {
                 if (esMenorCalculado) {
-                    infoInvitado.innerHTML = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por}) <span class="badge bg-danger ms-2">👶 MENOR DE EDAD</span>` : `✅ EXTRA CON PAGO ($${montoPago}) <span class="badge bg-danger ms-2">👶 MENOR DE EDAD</span>`;
+                    infoInvitado.innerHTML = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${escaparHTML(reservaSnap.val().invitado_por)}) <span class="badge bg-danger ms-2">👶 MENOR DE EDAD</span>` : `✅ EXTRA CON PAGO ($${montoPago}) <span class="badge bg-danger ms-2">👶 MENOR DE EDAD</span>`;
                 } else {
                     infoInvitado.innerText = esCortesia ? `⭐ INVITADO DE CORTESÍA (Por: ${reservaSnap.val().invitado_por})` : `✅ EXTRA CON PAGO ($${montoPago})`; 
                 }
@@ -1219,16 +1361,7 @@ async function onScanSuccess(decodedText) {
                 if (opcionesDiv) opcionesDiv.innerHTML = `
                     <label class="form-label text-warning mb-1">Corregir "Invitado Por":</label>
                     <select id="editInvitadoPor" class="form-select bg-dark text-white border-warning">
-                        <option value="Luis Jorquera" ${nombreActual==="Luis Jorquera"?'selected':''}>Luis Jorquera</option>
-                        <option value="Agustin Pino" ${nombreActual==="Agustin Pino"?'selected':''}>Agustin Pino</option>
-                        <option value="Martina Pino" ${nombreActual==="Martina Pino"?'selected':''}>Martina Pino</option>
-                        <option value="Ariela Rojas" ${nombreActual==="Ariela Rojas"?'selected':''}>Ariela Rojas</option>
-                        <option value="Javier Rojas" ${nombreActual==="Javier Rojas"?'selected':''}>Javier Rojas</option>
-                        <option value="Matias Puentes" ${nombreActual==="Matias Puentes"?'selected':''}>Matias Puentes</option>
-                        <option value="Mario Orbenes" ${nombreActual==="Mario Orbenes"?'selected':''}>Mario Orbenes</option>
-                        <option value="Hana Lizama" ${nombreActual==="Hana Lizama"?'selected':''}>Hana Lizama</option>
-                        <option value="Fakundo" ${nombreActual==="Fakundo"?'selected':''}>Fakundo</option>
-                        <option value="Karina Abstangen" ${nombreActual==="Karina Abstangen"?'selected':''}>Karina Abstangen</option>
+                        ${[...new Set([...window.invitadoresNat, nombreActual].filter(Boolean))].map(n => `<option value="${escaparHTML(n)}" ${n===nombreActual?'selected':''}>${escaparHTML(n)}</option>`).join('')}
                     </select>
                 `;
             } else {
@@ -1244,6 +1377,8 @@ async function onScanSuccess(decodedText) {
                     ${extraText}
                 `;
             }
+
+            mostrarBloquePinPersonal(opcionesDiv, datos);
 
             if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.remove('d-none'); 
             if (document.getElementById('numeroAsignado')) document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
@@ -1272,6 +1407,59 @@ async function onScanSuccess(decodedText) {
     }
 }
 
+// ==========================================
+// PIN PERSONAL DESDE EL IPAD
+// ==========================================
+// Si la persona todavía no tiene PIN (o un admin se lo reseteó), lo crea aquí al firmar.
+// Con su RUT + PIN podrá autocompletar sus datos en el formulario público.
+function mostrarBloquePinPersonal(opcionesDiv, datos) {
+    const anterior = document.getElementById('bloquePinPersonal');
+    if (anterior) anterior.remove();
+    if (!opcionesDiv || datos.tiene_pin === true) return;
+
+    const bloque = document.createElement('div');
+    bloque.id = 'bloquePinPersonal';
+    bloque.className = 'p-3 mt-3 rounded';
+    bloque.style.cssText = 'background: #0d1b2a; border: 1px solid #17a2b8;';
+    bloque.innerHTML = `
+        <strong class="text-info">🔑 Crea tu PIN personal</strong>
+        <p class="small text-white-50 mb-2">Con tu RUT y este PIN de 4 dígitos podrás autocompletar tus datos la próxima vez. Pide a la persona que lo escriba ella misma.</p>
+        <div class="row g-2">
+            <div class="col-6"><input type="password" inputmode="numeric" maxlength="4" id="pinPersonalNuevo" class="form-control text-center fs-4" placeholder="PIN"></div>
+            <div class="col-6"><input type="password" inputmode="numeric" maxlength="4" id="pinPersonalConfirmar" class="form-control text-center fs-4" placeholder="Repetir"></div>
+        </div>
+        <small class="text-muted">Opcional: si lo dejan en blanco, se puede crear en su próxima visita.</small>`;
+    opcionesDiv.after(bloque);
+}
+
+async function guardarPinPersonal(rut, ficha) {
+    const pinEl = document.getElementById('pinPersonalNuevo');
+    if (!pinEl) return;
+    const pin = pinEl.value.trim();
+    const confirmar = document.getElementById('pinPersonalConfirmar').value.trim();
+    if (!pin && !confirmar) return;
+    const pinHash = await hashPin(rut, pin);
+    const autoKey = await claveAutocompletar(rut, pin);
+    await update(ref(db), {
+        [`1p_privado/${rut}/pin_hash`]: pinHash,
+        [`1p_privado/${rut}/verif`]: nuevoVerif(pinHash),
+        [`1p_privado/${rut}/auto_key`]: autoKey,
+        [`1_trabajadores/${rut}/tiene_pin`]: true,
+        [`1a_autocompletar/${autoKey}`]: datosAutocompletar(rut, ficha || {})
+    });
+}
+
+function validarPinPersonalIngresado() {
+    const pinEl = document.getElementById('pinPersonalNuevo');
+    if (!pinEl) return true;
+    const pin = pinEl.value.trim();
+    const confirmar = document.getElementById('pinPersonalConfirmar').value.trim();
+    if (!pin && !confirmar) return true;
+    if (!pinValido(pin)) { alert("El PIN debe tener exactamente 4 números."); return false; }
+    if (pin !== confirmar) { alert("Los dos PIN no coinciden. Pídele que lo escriba de nuevo."); return false; }
+    return true;
+}
+
 if (document.getElementById('btnLimpiarFirma')) document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 
 if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnCancelarEscaneo').addEventListener('click', () => {
@@ -1285,6 +1473,7 @@ if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnC
 
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
+    if (!validarPinPersonalIngresado()) return;
     
     const firmaBase64 = window.comprimirFirma(signaturePad); 
     const now = new Date();
@@ -1354,6 +1543,15 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
             await set(ref(db, rutaAsistencia), datosClasicos);
         }
         
+        try {
+            await guardarPinPersonal(rutActual, window.fichaEscaneada || listaGlobalCRM[rutActual]);
+        } catch (errorPin) {
+            console.error("No se pudo guardar el PIN personal", errorPin);
+            alert("⚠️ La asistencia quedó guardada, pero no se pudo crear el PIN. Se puede crear en su próxima visita.");
+        }
+        const bloquePin = document.getElementById('bloquePinPersonal');
+        if (bloquePin) bloquePin.remove();
+
         if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.add('d-none'); 
         signaturePad.clear(); 
         try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
@@ -1480,9 +1678,10 @@ DUODÉCIMO. El trabajador autoriza expresamente a la Productora para que la firm
 
     
     // Dibujar firma de Camila
-    if (FIRMA_CAMILA_BASE64 && FIRMA_CAMILA_BASE64 !== "PEGAR_AQUI_TU_BASE64_DE_LA_CAMI") {
+    // La firma se carga desde Firebase (0_config/firma_produccion) al iniciar sesión
+    if (window.firmaProduccion) {
         try {
-            const firmaCamiLimpia = FIRMA_CAMILA_BASE64.replace(/\s/g, '');
+            const firmaCamiLimpia = window.firmaProduccion.replace(/\s/g, '');
             let formatoCami = firmaCamiLimpia.toUpperCase().includes("IMAGE/PNG") ? "PNG" : "JPEG";
             const firmaCamiSrc = firmaCamiLimpia.startsWith("data:") ? firmaCamiLimpia : "data:image/jpeg;base64," + firmaCamiLimpia;
             doc.addImage(firmaCamiSrc, formatoCami, 10, y - 25, 80, 25);
@@ -1536,9 +1735,9 @@ function renderCRM(datos) {
         
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${rut}</td>
-            <td>${p.nombres} ${p.apellidos}</td>
-            <td>${p.telefono || '-'}</td>
+            <td>${escaparHTML(rut)}</td>
+            <td>${escaparHTML(p.nombres)} ${escaparHTML(p.apellidos)}</td>
+            <td>${escaparHTML(p.telefono || '-')}</td>
             <td>${estadoBadge}</td>
             <td><button class="btn btn-outline-info btn-sm" onclick="window.verPerfil('${rut}')">Editar / Ficha</button></td>
         `;
@@ -1593,16 +1792,16 @@ window.verPerfil = async function(rut) {
     const contenido = document.getElementById('contenidoFicha');
     if (contenido) contenido.innerHTML = `
         <div class="row">
-            <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${p.nombres || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${p.apellidos || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">RUT</label><input type="text" class="form-control bg-secondary text-white" value="${p.rut || rut}" readonly></div>
-            <div class="col-6 mb-2"><label class="text-muted small">Fecha Nacimiento</label><input type="date" class="form-control bg-dark text-white" id="editNacimiento" value="${p.fechaNacimiento || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${p.telefono || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${p.email || ''}"></div>
-            <div class="col-12 mb-2"><label class="text-muted small">Dirección</label><input type="text" class="form-control bg-dark text-white" id="editDir" value="${p.direccion || ''}"></div>
-            <div class="col-6 mb-2"><label class="text-muted small text-warning">Contacto Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaNombre" value="${p.emergenciaNombre || ''}" placeholder="Nombre del contacto"></div>
-            <div class="col-6 mb-2"><label class="text-muted small text-warning">Tel. de Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaTelefono" value="${p.emergenciaTelefono || ''}" placeholder="Número"></div>
-            <div class="col-12 mb-3"><label class="text-muted small text-danger">Enfermedades Base / Alergias</label><input type="text" class="form-control bg-dark text-white border-danger" id="editEnfermedades" value="${p.enfermedades || ''}" placeholder="Indicar patologías o 'Ninguna'"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Nombres</label><input type="text" class="form-control bg-dark text-white" id="editNombres" value="${escaparHTML(p.nombres || '')}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Apellidos</label><input type="text" class="form-control bg-dark text-white" id="editApellidos" value="${escaparHTML(p.apellidos || '')}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">RUT</label><input type="text" class="form-control bg-secondary text-white" value="${escaparHTML(p.rut || rut)}" readonly></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Fecha Nacimiento</label><input type="date" class="form-control bg-dark text-white" id="editNacimiento" value="${escaparHTML(p.fechaNacimiento || '')}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Teléfono</label><input type="text" class="form-control bg-dark text-white" id="editTel" value="${escaparHTML(p.telefono || '')}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">Correo Electrónico</label><input type="email" class="form-control bg-dark text-white" id="editEmail" value="${escaparHTML(p.email || '')}"></div>
+            <div class="col-12 mb-2"><label class="text-muted small">Dirección</label><input type="text" class="form-control bg-dark text-white" id="editDir" value="${escaparHTML(p.direccion || '')}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small text-warning">Contacto Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaNombre" value="${escaparHTML(p.emergenciaNombre || '')}" placeholder="Nombre del contacto"></div>
+            <div class="col-6 mb-2"><label class="text-muted small text-warning">Tel. de Emergencia</label><input type="text" class="form-control bg-dark text-white border-warning" id="editEmergenciaTelefono" value="${escaparHTML(p.emergenciaTelefono || '')}" placeholder="Número"></div>
+            <div class="col-12 mb-3"><label class="text-muted small text-danger">Enfermedades Base / Alergias</label><input type="text" class="form-control bg-dark text-white border-danger" id="editEnfermedades" value="${escaparHTML(p.enfermedades || '')}" placeholder="Indicar patologías o 'Ninguna'"></div>
             
             <div class="col-6 mb-2"><label class="text-muted small text-success fw-bold">Menú Almuerzo</label>
                 <select class="form-select bg-dark text-white border-success" id="editEsVegetariano">
@@ -1665,7 +1864,7 @@ window.verPerfil = async function(rut) {
                     <option value="CUENTA_VISTA" ${p.tipoCuenta==='CUENTA_VISTA'?'selected':''}>Cuenta Vista / Ahorro</option>
                 </select>
             </div>
-            <div class="col-6 mb-2"><label class="text-muted small">N° Cuenta</label><input type="text" class="form-control bg-dark text-white" id="editCuenta" value="${p.numeroCuenta || ''}"></div>
+            <div class="col-6 mb-2"><label class="text-muted small">N° Cuenta</label><input type="text" class="form-control bg-dark text-white" id="editCuenta" value="${escaparHTML(p.numeroCuenta || '')}"></div>
             <div class="col-12 mt-4 pt-3 border-top border-secondary">
                 <h6 class="text-danger fw-bold mb-2">🛑 Sanciones y Bloqueos</h6>
                 <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-dark rounded border border-danger">
@@ -1694,6 +1893,14 @@ window.verPerfil = async function(rut) {
                     <div class="mt-2 text-muted small">
                         Bloqueos vigentes: ${programasBloqueados.length > 0 ? programasBloqueados.map(pr => `<span class="badge bg-danger me-1 mb-1">${pr} <span style="cursor:pointer;" onclick="window.desbloquearPrograma('${rut}', '${pr}')">✖</span></span>`).join('') : 'Ninguno'}
                     </div>
+                </div>
+            </div>
+
+            <div class="col-12 mt-4 pt-3 border-top border-secondary">
+                <h6 class="text-info fw-bold mb-2">🔑 PIN personal (autocompletado)</h6>
+                <div class="d-flex justify-content-between align-items-center p-2 bg-dark rounded border border-info">
+                    <span class="text-white">${p.tiene_pin ? '✅ Tiene PIN configurado' : '⚪ Sin PIN: lo creará en el iPad la próxima vez que firme'}</span>
+                    ${p.tiene_pin ? `<button class="btn btn-outline-warning btn-sm fw-bold" onclick="window.resetearPinPersonal('${rut}')">Resetear PIN</button>` : ''}
                 </div>
             </div>
 
@@ -1787,7 +1994,7 @@ window.forzarIngresoPasado = async function(rut, nombre) {
 if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGuardarEdicion').addEventListener('click', async () => {
     try {
         window.limpiarCache();
-        await update(ref(db, `1_trabajadores/${rutPerfilActual}`), {
+        await window.guardarCamposFicha(rutPerfilActual, {
             nombres: document.getElementById('editNombres').value, 
             apellidos: document.getElementById('editApellidos').value,
             fechaNacimiento: document.getElementById('editNacimiento').value,
@@ -1807,7 +2014,7 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
         });
         
         alert("Datos actualizados correctamente."); 
-        listaGlobalCRM[rutPerfilActual] = (await get(ref(db, `1_trabajadores/${rutPerfilActual}`))).val();
+        listaGlobalCRM[rutPerfilActual] = await window.leerFichaCompleta(rutPerfilActual);
         renderCRM(listaGlobalCRM); 
         modalFichaInstance.hide();
     } catch (e) { 
@@ -1817,7 +2024,13 @@ if (document.getElementById('btnGuardarEdicion')) document.getElementById('btnGu
 
 if (document.getElementById('btnEliminarTrabajador')) document.getElementById('btnEliminarTrabajador').addEventListener('click', async () => {
     if(confirm("🚨 ¿ESTÁS SEGURO? 🚨\nEsto borrará a la persona de la base de datos para siempre.")) {
-        await remove(ref(db, `1_trabajadores/${rutPerfilActual}`));
+        const autoKey = (await get(ref(db, `1p_privado/${rutPerfilActual}/auto_key`))).val();
+        const borrar = {
+            [`1_trabajadores/${rutPerfilActual}`]: null,
+            [`1p_privado/${rutPerfilActual}`]: null
+        };
+        if (autoKey) borrar[`1a_autocompletar/${autoKey}`] = null;
+        await update(ref(db), borrar);
         window.limpiarCache();
         delete listaGlobalCRM[rutPerfilActual]; 
         renderCRM(listaGlobalCRM); 
@@ -1849,6 +2062,29 @@ if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbl
     }
 });
 
+
+// "Olvidé mi PIN": el admin lo borra y la persona crea uno nuevo en el iPad al firmar
+window.resetearPinPersonal = async function(rut) {
+    if (!confirm("¿Resetear el PIN de esta persona?\n\nSu autocompletado dejará de funcionar hasta que cree un PIN nuevo en el iPad la próxima vez que firme.")) return;
+    try {
+        const autoKey = (await get(ref(db, `1p_privado/${rut}/auto_key`))).val();
+        const updates = {
+            [`1p_privado/${rut}/pin_hash`]: null,
+            [`1p_privado/${rut}/verif`]: null,
+            [`1p_privado/${rut}/auto_key`]: null,
+            [`1_trabajadores/${rut}/tiene_pin`]: false
+        };
+        if (autoKey) updates[`1a_autocompletar/${autoKey}`] = null;
+        await update(ref(db), updates);
+        if (listaGlobalCRM[rut]) listaGlobalCRM[rut].tiene_pin = false;
+        window.limpiarCache();
+        alert("✅ PIN reseteado.");
+        if (modalFichaInstance) modalFichaInstance.hide();
+    } catch (e) {
+        console.error(e);
+        alert("❌ No se pudo resetear el PIN.");
+    }
+};
 
 window.modificarStrikes = async function(rut, cant) {
     const strRef = ref(db, `9_strikes/${rut}/count`);
@@ -1966,7 +2202,7 @@ if (document.getElementById('btnLiquidarSemana')) document.getElementById('btnLi
     
     for (const r in window.deudasGlobales) {
         const deuda = window.deudasGlobales[r]; 
-        const tr = listaGlobalCRM[r] || (await get(ref(db, `1_trabajadores/${r}`))).val();
+        const tr = listaGlobalCRM[r] || await window.leerFichaCompleta(r);
         
         if (tr) { 
             const rutSin = r.replace(/[^0-9kK]/g, ''); 
@@ -2460,6 +2696,9 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
 if (tabEfectivo) tabEfectivo.addEventListener('click', renderPanelRecibosBatch);
 
 async function renderPanelRecibosBatch() {
+    // La bóveda de efectivo es solo para admins: el staff no la descarga
+    await window.rolListo;
+    if (!window.esAdmin) return;
     let container = document.getElementById('panelRecibosBatch');
     if (!container) {
         // Encontrar el contenedor correcto sin importar cómo se llame el ID en el HTML
@@ -2589,7 +2828,7 @@ async function renderPanelRecibosBatch() {
         console.error("Error", e);
     }
 }
-setTimeout(renderPanelRecibosBatch, 2500);
+// Ahorro de descargas: la bóveda de efectivo se carga solo al abrir la pestaña Efectivo
 
 // ==========================================
 // CONTRATOS DT
@@ -3982,7 +4221,7 @@ const tabMant = document.getElementById('mantenimiento-tab');
 if (tabMant) {
     tabMant.addEventListener('click', renderPanelMenoresBatch);
 }
-setTimeout(renderPanelMenoresBatch, 3000);
+// Ahorro de descargas: las autorizaciones de menores se cargan solo al abrir Mantenimiento
 
 
 // ==========================================
@@ -4775,7 +5014,7 @@ async function corregirDatoPrevired(e) {
             ajuste.persona[campo] = valor;
             await guardarAjustesPrevired();
         } else {
-            await update(ref(db, `1_trabajadores/${rut}`), { [campo]: valor });
+            await window.guardarCamposFicha(rut, { [campo]: valor });
             // Actualización quirúrgica del caché local (sin volver a descargar la base)
             if (window.cacheTrabajadores && window.cacheTrabajadores[rut]) {
                 window.cacheTrabajadores[rut][campo] = valor;
@@ -5240,3 +5479,174 @@ function descargarLRE() {
     btnTxt.insertAdjacentElement('afterend', b);
     b.addEventListener('click', descargarLRE);
 })();
+
+
+// ==========================================
+// MANTENIMIENTO - SEGURIDAD (usuarios, firma, invitadores, migración)
+// ==========================================
+// Lista que tenía el formulario público escrita en el código; solo se usa la primera vez
+// para llenar 0_config/invitadores. Después se edita desde esta misma pestaña.
+const INVITADORES_INICIALES = ["Luis Jorquera", "Agustin Pino", "Martina Pino", "Ariela Rojas", "Javier Rojas", "Matias Puentes", "Mario Orbenes", "Hana Lizama", "Fakundo", "Karina Abstangen"];
+
+async function cargarSeguridadNat() {
+    if (!window.esAdmin) return;
+    // Usuarios
+    const lista = document.getElementById('listaRolesNat');
+    if (lista) {
+        try {
+            const snap = await get(ref(db, '0_roles'));
+            const roles = snap.exists() ? snap.val() : {};
+            const miCorreo = window.localStorage.getItem('correoStaffNat') || '';
+            lista.innerHTML = '';
+            Object.keys(roles).sort().forEach(clave => {
+                const correo = clave.replace(/,/g, '.');
+                const fila = document.createElement('div');
+                fila.className = 'd-flex justify-content-between align-items-center border-bottom border-secondary py-1';
+                fila.innerHTML = `<span><span class="badge ${roles[clave] === 'admin' ? 'bg-danger' : 'bg-secondary'} me-2">${escaparHTML(roles[clave])}</span><span class="text-white"></span></span>`;
+                fila.querySelector('.text-white').textContent = correo;
+                if (correo !== miCorreo) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-outline-danger btn-sm py-0';
+                    btn.textContent = 'Quitar';
+                    btn.onclick = async () => {
+                        if (!confirm(`¿Quitar el acceso de ${correo}?`)) return;
+                        await remove(ref(db, `0_roles/${clave}`));
+                        cargarSeguridadNat();
+                    };
+                    fila.appendChild(btn);
+                }
+                lista.appendChild(fila);
+            });
+            if (!lista.children.length) lista.textContent = 'No hay usuarios cargados.';
+        } catch (e) {
+            lista.textContent = 'No se pudo leer la lista de usuarios.';
+        }
+    }
+    // Firma
+    const img = document.getElementById('previewFirmaProduccion');
+    const sinFirma = document.getElementById('sinFirmaProduccion');
+    if (img && sinFirma) {
+        img.classList.toggle('d-none', !window.firmaProduccion);
+        sinFirma.classList.toggle('d-none', !!window.firmaProduccion);
+        if (window.firmaProduccion) img.src = window.firmaProduccion.startsWith('data:') ? window.firmaProduccion : 'data:image/jpeg;base64,' + window.firmaProduccion;
+    }
+    // Invitadores
+    const txt = document.getElementById('textareaInvitadores');
+    if (txt) txt.value = window.invitadoresNat.join('\n');
+}
+
+if (document.getElementById('mantenimiento-tab')) document.getElementById('mantenimiento-tab').addEventListener('click', cargarSeguridadNat);
+
+if (document.getElementById('btnAgregarRol')) document.getElementById('btnAgregarRol').addEventListener('click', async () => {
+    const correo = document.getElementById('nuevoRolCorreo').value.trim().toLowerCase();
+    const tipo = document.getElementById('nuevoRolTipo').value;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) return alert("Escribe un correo válido.");
+    if (tipo === 'admin' && !confirm(`${correo} podrá ver datos bancarios y médicos de todos los trabajadores. ¿Continuar?`)) return;
+    try {
+        await set(ref(db, `0_roles/${claveCorreo(correo)}`), tipo);
+        document.getElementById('nuevoRolCorreo').value = '';
+        cargarSeguridadNat();
+    } catch (e) {
+        alert("❌ No se pudo guardar el usuario.");
+    }
+});
+
+if (document.getElementById('inputFirmaProduccion')) document.getElementById('inputFirmaProduccion').addEventListener('change', (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    if (archivo.size > 300 * 1024) return alert("La imagen es muy pesada (máximo 300 KB).");
+    const lector = new FileReader();
+    lector.onload = async () => {
+        if (!confirm("¿Usar esta imagen como firma de producción en todos los contratos nuevos?")) return;
+        try {
+            await set(ref(db, '0_config/firma_produccion'), lector.result);
+            window.firmaProduccion = lector.result;
+            cargarSeguridadNat();
+            alert("✅ Firma guardada.");
+        } catch (err) {
+            alert("❌ No se pudo guardar la firma.");
+        }
+    };
+    lector.readAsDataURL(archivo);
+    e.target.value = '';
+});
+
+if (document.getElementById('btnGuardarInvitadores')) document.getElementById('btnGuardarInvitadores').addEventListener('click', async () => {
+    const nombres = document.getElementById('textareaInvitadores').value.split('\n').map(n => n.trim()).filter(Boolean);
+    if (nombres.some(n => /[<>"`]/.test(n))) return alert("Los nombres no pueden tener los caracteres < > \" `");
+    try {
+        await set(ref(db, '0_config/invitadores'), nombres);
+        window.invitadoresNat = nombres;
+        alert("✅ Lista guardada. El formulario público ya la muestra.");
+    } catch (e) {
+        alert("❌ No se pudo guardar la lista.");
+    }
+});
+
+if (document.getElementById('btnMigrarSeguridad')) document.getElementById('btnMigrarSeguridad').addEventListener('click', async () => {
+    if (!window.esAdmin) return;
+    if (!confirm("🔒 MIGRACIÓN DE SEGURIDAD\n\n• Banco, AFP, salud y enfermedades pasan a la ficha privada (solo admins).\n• El PIN de captador sale de la web pública.\n• No se borra a ningún trabajador.\n\n¿Ejecutar?")) return;
+    const estado = document.getElementById('estadoMigracionSeguridad');
+    const pintar = (html) => { if (estado) estado.innerHTML = html; };
+    const btn = document.getElementById('btnMigrarSeguridad');
+    btn.disabled = true;
+    try {
+        pintar("⏳ Leyendo trabajadores...");
+        const [basSnap, privSnap] = await Promise.all([get(ref(db, '1_trabajadores')), get(ref(db, '1p_privado'))]);
+        const basicos = basSnap.exists() ? basSnap.val() : {};
+        const privados = privSnap.exists() ? privSnap.val() : {};
+        const ruts = Object.keys(basicos);
+        let movidos = 0;
+        const LOTE = 250;
+        for (let i = 0; i < ruts.length; i += LOTE) {
+            const updates = {};
+            for (const rut of ruts.slice(i, i + LOTE)) {
+                const ficha = basicos[rut] || {};
+                let tocado = false;
+                for (const campo of CAMPOS_PRIVADOS) {
+                    if (ficha[campo] === undefined) continue;
+                    // Si la ficha privada ya tiene ese dato (más nuevo), no se pisa
+                    if (!privados[rut] || privados[rut][campo] === undefined) updates[`1p_privado/${rut}/${campo}`] = ficha[campo];
+                    updates[`1_trabajadores/${rut}/${campo}`] = null;
+                    tocado = true;
+                }
+                if (ficha.tiene_pin === undefined) updates[`1_trabajadores/${rut}/tiene_pin`] = !!(privados[rut] && privados[rut].pin_hash);
+                if (tocado) movidos++;
+            }
+            if (Object.keys(updates).length) await update(ref(db), updates);
+            pintar(`⏳ Trabajadores revisados: ${Math.min(i + LOTE, ruts.length)} de ${ruts.length}...`);
+        }
+
+        pintar("⏳ Moviendo PIN de captador...");
+        const progSnap = await get(ref(db, '0_estado_sistema/programas_activos'));
+        let pinsMovidos = 0;
+        if (progSnap.exists()) {
+            const progs = progSnap.val();
+            const updates = {};
+            for (const clave in progs) {
+                const p = progs[clave];
+                if (p.pin) {
+                    updates[`0_config/pins_captador/${p.fecha}/${p.nombre}`] = String(p.pin);
+                    updates[`0_estado_sistema/programas_activos/${clave}/pin`] = null;
+                    updates[`0_estado_sistema/programas_activos/${clave}/requiere_pin`] = true;
+                    pinsMovidos++;
+                }
+            }
+            if (pinsMovidos) await update(ref(db), updates);
+        }
+
+        const invSnap = await get(ref(db, '0_config/invitadores'));
+        if (!invSnap.exists()) {
+            await set(ref(db, '0_config/invitadores'), INVITADORES_INICIALES);
+            window.invitadoresNat = [...INVITADORES_INICIALES];
+        }
+
+        await window.limpiarCache();
+        pintar(`<span class="text-success fw-bold">✅ Listo. ${movidos} ficha(s) migradas de ${ruts.length}. PIN de captador movidos: ${pinsMovidos}.</span>`);
+    } catch (e) {
+        console.error(e);
+        pintar(`<span class="text-danger fw-bold">⛔ Se detuvo: ${escaparHTML(e.message)}. Se puede volver a ejecutar sin problema.</span>`);
+    } finally {
+        btn.disabled = false;
+    }
+});

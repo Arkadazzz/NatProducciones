@@ -1,0 +1,26 @@
+{
+  "database": {
+    "rules": "firebase/database.rules.json"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": ["firebase.json", ".firebaserc", "firebase/**", "**/.*", "**/node_modules/**", "README*"],
+    "cleanUrls": false,
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          { "key": "Permissions-Policy", "value": "camera=(self), microphone=(), geolocation=()" },
+          { "key": "Strict-Transport-Security", "value": "max-age=31536000" }
+        ]
+      },
+      {
+        "source": "**/*.@(js|html)",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      }
+    ]
+  }
+}

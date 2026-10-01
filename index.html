@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Acreditación | Nat Producciones</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js" integrity="sha384-dPowQo9uxJU703klzvnG+vzLHQDNmO/zREXw6BhCMupB54CE70wj6SWOGVPySK3s" crossorigin="anonymous"></script>
     <style>
         body { background-color: #0a0a0a; color: #ffffff; font-family: 'Segoe UI', system-ui, sans-serif; padding-bottom: 50px; }
         .card-panel { background: #141414; border-radius: 15px; border: 1px solid #2a2a2a; padding: 25px; margin-top: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -58,16 +58,6 @@
                 <label class="form-label text-warning fw-bold">¿Quién te invitó?</label>
                 <select id="invitadoPor" class="form-select bg-dark text-white border-warning">
                     <option value="">-- Selecciona a quien te invitó --</option>
-                    <option value="Luis Jorquera">Luis Jorquera</option>
-                    <option value="Agustin Pino">Agustin Pino</option>
-                    <option value="Martina Pino">Martina Pino</option>
-                    <option value="Ariela Rojas">Ariela Rojas</option>
-                    <option value="Javier Rojas">Javier Rojas</option>
-                    <option value="Matias Puentes">Matias Puentes</option>
-                    <option value="Mario Orbenes">Mario Orbenes</option>
-                    <option value="Hana Lizama">Hana Lizama</option>
-                    <option value="Fakundo">Fakundo</option>
-                    <option value="Karina Abstangen">Karina Abstangen</option>
                 </select>
             </div>
 
@@ -91,8 +81,19 @@
             <h5 class="section-title">👤 Datos Personales</h5>
             <div class="row">
                 <div class="col-12 mb-3">
-                    <label class="form-label text-success fw-bold">RUT <small class="text-muted">(Ingresa tu RUT para auto-completar)</small></label>
+                    <label class="form-label text-success fw-bold">RUT</label>
                     <input type="text" id="rut" class="form-control border-success" required placeholder="12345678-9">
+                </div>
+                <div class="col-12 mb-3">
+                    <div class="p-3 rounded" style="background: #0d1b2a; border: 1px solid #17a2b8;">
+                        <label class="form-label text-info fw-bold mb-1">🔑 ¿Ya te registraste antes?</label>
+                        <p class="text-muted small mb-2">Escribe tu PIN personal de 4 dígitos para cargar tus datos.</p>
+                        <div class="input-group">
+                            <input type="password" inputmode="numeric" maxlength="4" id="pinPersonal" class="form-control text-center fs-5" placeholder="PIN">
+                            <button type="button" class="btn btn-info fw-bold" id="btnCargarDatos">Cargar mis datos</button>
+                        </div>
+                        <div id="estadoAutocompletar" class="small mt-2"></div>
+                    </div>
                 </div>
                 <div class="col-12 mb-3">
                     <label class="form-label">Nombres</label>
@@ -176,6 +177,7 @@
                 <div class="col-12 mb-3">
                     <label class="form-label text-danger">Enfermedades Base / Alergias</label>
                     <input type="text" id="enfermedades" class="form-control border-danger" placeholder="Ej: Asma, Alergias (o 'Ninguna')" required>
+                    <small id="avisoSaludGuardada" class="text-info d-none">✅ Ya tenemos tu información médica guardada. Escribe aquí solo si cambió.</small>
                 </div>
             </div>
 
@@ -184,6 +186,7 @@
             <!-- SECCIÓN 4: DATOS BANCARIOS -->
             <div id="seccionBancaria">
                 <h5 class="section-title text-success">💰 Datos Bancarios (Pago de Honorarios)</h5>
+                <div id="avisoBancoGuardado" class="alert alert-info small d-none">✅ Tus datos bancarios y previsionales ya están guardados. Completa esta sección <b>solo si cambiaron</b>.</div>
                 <div class="row">
                     <div class="col-6 mb-3">
                         <label class="form-label">AFP</label>
@@ -243,6 +246,16 @@
                         <label class="form-label">N° de Cuenta</label>
                         <input type="text" id="numeroCuenta" class="form-control" required>
                     </div>
+                </div>
+            </div>
+
+            <!-- PIN PERSONAL (solo personas nuevas) -->
+            <div id="seccionCrearPin" class="mb-4 p-3 rounded" style="background: #0d1b2a; border: 1px solid #17a2b8;">
+                <h6 class="text-info fw-bold mb-1">🔑 Crea tu PIN personal</h6>
+                <p class="text-muted small mb-2">Con tu RUT y este PIN podrás cargar tus datos la próxima vez sin escribirlos de nuevo. No lo compartas.</p>
+                <div class="row g-2">
+                    <div class="col-6"><input type="password" inputmode="numeric" maxlength="4" id="pinNuevo" class="form-control text-center fs-5" placeholder="PIN (4 números)"></div>
+                    <div class="col-6"><input type="password" inputmode="numeric" maxlength="4" id="pinNuevoConfirmar" class="form-control text-center fs-5" placeholder="Repetir PIN"></div>
                 </div>
             </div>
 
@@ -331,7 +344,8 @@
 <!-- FIREBASE & LOGIC -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, get, set, child, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    import { getDatabase, ref, get, update, child, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    import { separarFicha, datosAutocompletar, hashPin, claveAutocompletar, nuevoVerif, pinValido, escaparHTML, activarAppCheck } from "./seguridad.js?v=v16";
 
     const firebaseConfig = {
         apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
@@ -343,7 +357,22 @@
     };
 
     const app = initializeApp(firebaseConfig);
+    activarAppCheck(app);
     const db = getDatabase(app);
+
+    // Lista "¿Quién te invitó?" desde Firebase (se edita en el panel → Mantenimiento → Seguridad)
+    get(ref(db, '0_config/invitadores')).then(snap => {
+        const select = document.getElementById('invitadoPor');
+        (snap.exists() ? Object.values(snap.val()) : []).forEach(nombre => {
+            const op = document.createElement('option');
+            op.value = nombre;
+            op.textContent = nombre;
+            select.appendChild(op);
+        });
+    }).catch(e => console.error("No se pudo cargar la lista de invitadores", e));
+
+    // Si la persona cargó sus datos con RUT + PIN, aquí quedan las huellas de su PIN
+    let sesionPin = null;
 
     let programasDisponibles = {};
     const esMenorCheck = document.getElementById('esMenorEdad');
@@ -438,8 +467,8 @@
                     <div class="form-check mb-2" style="background: #1a1a1a; padding: 12px 15px 12px 40px; border: 1px solid #b066ff; border-radius: 8px;">
                         <input class="form-check-input" type="radio" name="programaRadio" id="prog_${clave}" value="${clave}" required style="transform: scale(1.4); margin-top: 5px; cursor: pointer;">
                         <label class="form-check-label text-white w-100" for="prog_${clave}" style="cursor: pointer;">
-                            <strong class="text-white">${p.nombre}</strong> <br>
-                            <small class="text-warning">${p.fecha}</small>
+                            <strong class="text-white">${escaparHTML(p.nombre)}</strong> <br>
+                            <small class="text-warning">${escaparHTML(p.fecha)}</small>
                         </label>
                     </div>
                 `;
@@ -497,7 +526,7 @@
             invitadoPorInput.required = false;
             
             seccionBancaria.classList.remove('d-none');
-            camposBancarios.forEach(id => document.getElementById(id).required = true);
+            camposBancarios.forEach(id => document.getElementById(id).required = !sesionPin);
             
             if (progClave && programasDisponibles[progClave] && programasDisponibles[progClave].incluye_almuerzo) {
                 document.getElementById('divVegetariano').classList.remove('d-none');
@@ -505,7 +534,7 @@
                 document.getElementById('divVegetariano').classList.add('d-none');
             }
             
-            if (progClave && programasDisponibles[progClave] && programasDisponibles[progClave].pin) {
+            if (progClave && programasDisponibles[progClave] && (programasDisponibles[progClave].requiere_pin || programasDisponibles[progClave].pin)) {
                 divPin.classList.remove('d-none');
                 pinInput.required = true;
             } else {
@@ -517,63 +546,80 @@
 
     tipoIngreso.addEventListener('change', actualizarFormulario);
 
-    // 3. AUTO RELLENAR DATOS
-    document.getElementById('rut').addEventListener('blur', async function(e) {
+    // Firebase rechaza textos con < > " ` (protección contra inyección de código): se quitan antes de enviar
+    function limpiarTextos(obj) {
+        for (const c in obj) if (typeof obj[c] === 'string') obj[c] = obj[c].replace(/[<>"`]/g, '');
+        return obj;
+    }
+
+    // 3. FORMATO DEL RUT Y AUTOCOMPLETADO CON RUT + PIN
+    document.getElementById('rut').addEventListener('blur', function() {
         let val = this.value.replace(/[^0-9kK]/g, '').toUpperCase();
-        if(val.length > 1) {
-            val = val.slice(0, -1) + '-' + val.slice(-1);
-        }
+        if (val.length > 1) val = val.slice(0, -1) + '-' + val.slice(-1);
         this.value = val;
+    });
 
-        if (val.length >= 8) {
-            try {
-                const snap = await get(child(ref(db), `1_trabajadores/${val}`));
-                if (snap.exists()) {
-                    const d = snap.val();
-                    document.getElementById('nombres').value = d.nombres || '';
-                    const apellidosArr = (d.apellidos || '').trim().split(' ');
-                    document.getElementById('apellidoPaterno').value = apellidosArr[0] || '';
-                    document.getElementById('apellidoMaterno').value = apellidosArr.slice(1).join(' ') || '';
-                    document.getElementById('fechaNac').value = d.fechaNacimiento || '';
-                    document.getElementById('fechaNac').dispatchEvent(new Event('change'));
-                    document.getElementById('telefono').value = d.telefono || '';
-                    document.getElementById('email').value = d.email || '';
-                    
-                    if (d.calle) {
-                        document.getElementById('calle').value = d.calle || '';
-                        document.getElementById('numero_dir').value = d.numero_dir || '';
-                        document.getElementById('comuna').value = d.comuna || '';
-                    } else if (d.direccion) {
-                        document.getElementById('calle').value = d.direccion || '';
-                    }
+    // Si cambian el RUT después de cargar datos, se vuelve al modo "persona nueva"
+    document.getElementById('rut').addEventListener('input', () => {
+        if (sesionPin) activarModoActualizacion(null);
+    });
 
-                    if (d.esVegetariano) document.getElementById('esVegetariano').value = d.esVegetariano;
-                    document.getElementById('emergenciaNombre').value = d.emergenciaNombre || '';
-                    document.getElementById('emergenciaTelefono').value = d.emergenciaTelefono || '';
-                    document.getElementById('enfermedades').value = d.enfermedades || '';
-                    document.getElementById('sexo').value = d.sexo || '';
-                    document.getElementById('nacionalidad').value = d.nacionalidad || '';
+    function activarModoActualizacion(sesion) {
+        sesionPin = sesion;
+        const actualizando = !!sesion;
+        document.getElementById('seccionCrearPin').classList.toggle('d-none', actualizando);
+        document.getElementById('avisoBancoGuardado').classList.toggle('d-none', !actualizando);
+        document.getElementById('avisoSaludGuardada').classList.toggle('d-none', !actualizando);
+        document.getElementById('enfermedades').required = !actualizando;
+        actualizarFormulario();
+    }
 
-                    if(d.afp) document.getElementById('afp').value = d.afp;
-                    if(d.salud) document.getElementById('salud').value = d.salud;
-                    if(d.banco) document.getElementById('banco').value = d.banco;
-                    if(d.tipoCuenta) document.getElementById('tipoCuenta').value = d.tipoCuenta;
-                    if(d.numeroCuenta) document.getElementById('numeroCuenta').value = d.numeroCuenta;
-                    
-                    const btn = document.getElementById('btnEnviar');
-                    const oldText = btn.innerText;
-                    btn.innerText = "✨ ¡Datos cargados automáticamente!";
-                    btn.style.background = "#00d26a";
-                    btn.style.color = "#000";
-                    setTimeout(() => { 
-                        btn.innerText = oldText; 
-                        btn.style.background = ""; 
-                        btn.style.color = "white";
-                    }, 3000);
-                }
-            } catch(err) {
-                console.error("Error autofill", err);
+    document.getElementById('btnCargarDatos').addEventListener('click', async () => {
+        const rutEl = document.getElementById('rut');
+        rutEl.dispatchEvent(new Event('blur'));
+        const rut = rutEl.value.trim();
+        const pin = document.getElementById('pinPersonal').value.trim();
+        const estado = document.getElementById('estadoAutocompletar');
+        if (!rut) return alert("Primero escribe tu RUT.");
+        if (!pinValido(pin)) return alert("El PIN tiene 4 números.");
+
+        estado.innerHTML = '<span class="text-warning">⏳ Buscando tus datos...</span>';
+        try {
+            const autoKey = await claveAutocompletar(rut, pin);
+            const snap = await get(ref(db, `1a_autocompletar/${autoKey}`));
+            if (!snap.exists()) {
+                activarModoActualizacion(null);
+                estado.innerHTML = '<span class="text-danger">No encontramos datos con ese RUT y PIN. Revisa que estén bien escritos. Si olvidaste tu PIN, pide al staff que lo resetee.</span>';
+                return;
             }
+            const d = snap.val();
+            const poner = (id, valor) => { if (valor !== undefined && valor !== null) document.getElementById(id).value = valor; };
+            poner('nombres', d.nombres);
+            const apellidosArr = (d.apellidos || '').trim().split(' ');
+            poner('apellidoPaterno', apellidosArr[0] || '');
+            poner('apellidoMaterno', apellidosArr.slice(1).join(' ') || '');
+            poner('fechaNac', d.fechaNacimiento);
+            document.getElementById('fechaNac').dispatchEvent(new Event('change'));
+            poner('telefono', d.telefono);
+            poner('email', d.email);
+            if (d.calle) {
+                poner('calle', d.calle);
+                poner('numero_dir', d.numero_dir);
+                poner('comuna', d.comuna);
+            } else if (d.direccion) {
+                poner('calle', d.direccion);
+            }
+            poner('esVegetariano', d.esVegetariano);
+            poner('emergenciaNombre', d.emergenciaNombre);
+            poner('emergenciaTelefono', d.emergenciaTelefono);
+            poner('sexo', d.sexo);
+            poner('nacionalidad', d.nacionalidad);
+
+            activarModoActualizacion({ pinHash: await hashPin(rut, pin), autoKey });
+            estado.innerHTML = '<span class="text-success fw-bold">✨ ¡Datos cargados! Revisa que estén al día.</span>';
+        } catch (err) {
+            console.error("Error autocompletar", err);
+            estado.innerHTML = '<span class="text-danger">No se pudo conectar. Intenta nuevamente.</span>';
         }
     });
 
@@ -616,11 +662,18 @@
             const rut = document.getElementById('rut').value.trim();
             const tipo = tipoIngreso.value;
 
-            if (tipo === "Pago" && prog.pin) {
-                if (pinInput.value !== prog.pin) {
-                    alert("❌ PIN INCORRECTO. Pídeselo a tu captador.");
-                    pinInput.value = "";
-                    throw new Error("PIN Incorrecto");
+            // El PIN de captador ya no se compara aquí: Firebase lo valida por dentro al guardar la inscripción.
+
+            // Personas nuevas: deben crear su PIN personal
+            const pinNuevo = document.getElementById('pinNuevo').value.trim();
+            if (!sesionPin) {
+                if (!pinValido(pinNuevo)) {
+                    alert("🔑 Crea tu PIN personal de 4 números (al final del formulario).");
+                    throw new Error("Falta PIN personal");
+                }
+                if (pinNuevo !== document.getElementById('pinNuevoConfirmar').value.trim()) {
+                    alert("🔑 Los dos PIN no coinciden.");
+                    throw new Error("PIN no coincide");
                 }
             }
 
@@ -669,29 +722,34 @@
                 enfermedades: document.getElementById('enfermedades').value
             };
 
-            if (tipo === "Pago") {
-                datosTrabajador.afp = document.getElementById('afp').value;
-                datosTrabajador.salud = document.getElementById('salud').value;
-                datosTrabajador.banco = document.getElementById('banco').value;
-                datosTrabajador.tipoCuenta = document.getElementById('tipoCuenta').value;
-                datosTrabajador.numeroCuenta = document.getElementById('numeroCuenta').value;
+            // Datos bancarios: obligatorios para personas nuevas; si ya están guardados, solo se envían si cambiaron
+            const camposBanco = ['afp', 'salud', 'banco', 'tipoCuenta', 'numeroCuenta'];
+            const bancoIngresado = camposBanco.some(id => document.getElementById(id).value.trim());
+            if (tipo === "Pago" && (!sesionPin || bancoIngresado)) {
+                if (sesionPin && camposBanco.some(id => !document.getElementById(id).value.trim())) {
+                    alert("💰 Si vas a cambiar tus datos bancarios, completa todos los campos de esa sección.");
+                    throw new Error("Banco incompleto");
+                }
+                camposBanco.forEach(id => datosTrabajador[id] = document.getElementById(id).value.trim());
             }
 
             if (datosTrabajador.tipoCuenta === "CUENTA_RUT" && !datosTrabajador.numeroCuenta) {
                 datosTrabajador.numeroCuenta = rut.split('-')[0];
             }
+            if (sesionPin && !datosTrabajador.enfermedades.trim()) delete datosTrabajador.enfermedades;
+            limpiarTextos(datosTrabajador);
 
-            await set(ref(db, `1_trabajadores/${rut}`), datosTrabajador);
+            const { basica, privada } = separarFicha(datosTrabajador);
 
-            await set(ref(db, `3_reservas/${prog.fecha}/${prog.nombre}/${rut}`), {
-                rut: rut,
-                tipo: tipo,
-                invitado_por: tipo === "Cortesía" ? invitadoPorInput.value : ""
-            });
+            // Inscripción al programa (+ autorización del menor). Se guarda junto con la ficha.
+            const inscripcion = {};
+            const reserva = { rut: rut, tipo: tipo, invitado_por: tipo === "Cortesía" ? invitadoPorInput.value : "" };
+            if (tipo === "Pago" && pinInput.value) reserva.pin = pinInput.value.trim();
+            inscripcion[`3_reservas/${prog.fecha}/${prog.nombre}/${rut}`] = reserva;
 
             if (esMenor) {
                 const firmaBase64 = signaturePadApoderado.toDataURL("image/jpeg");
-                const datosMenor = {
+                inscripcion[`8_autorizaciones_menores/${prog.fecha}/${prog.nombre}/${rut}`] = {
                     fecha_programa: prog.fecha,
                     nombre_programa: prog.nombre,
                     nombre_apoderado: document.getElementById('apoderadoNombre').value.toUpperCase(),
@@ -705,7 +763,41 @@
                     edad_menor: document.getElementById('edadMenor').value,
                     firma_apoderado: firmaBase64
                 };
-                await set(ref(db, `8_autorizaciones_menores/${prog.fecha}/${prog.nombre}/${rut}`), datosMenor);
+            }
+
+            Object.values(inscripcion).forEach(limpiarTextos);
+
+            const ficha = {};
+            if (sesionPin) {
+                // Actualización: Firebase exige que 'verif' cambie y empiece con el hash del PIN
+                for (const c in basica) ficha[`1_trabajadores/${rut}/${c}`] = basica[c];
+                for (const c in privada) ficha[`1p_privado/${rut}/${c}`] = privada[c];
+                ficha[`1p_privado/${rut}/pin_hash`] = sesionPin.pinHash;
+                ficha[`1p_privado/${rut}/verif`] = nuevoVerif(sesionPin.pinHash);
+                ficha[`1a_autocompletar/${sesionPin.autoKey}`] = datosAutocompletar(rut, basica);
+            } else {
+                // Persona nueva: se crean su ficha básica, la privada y su autocompletado
+                const pinHash = await hashPin(rut, pinNuevo);
+                const autoKey = await claveAutocompletar(rut, pinNuevo);
+                ficha[`1_trabajadores/${rut}`] = { ...basica, tiene_pin: true };
+                ficha[`1p_privado/${rut}`] = { ...privada, pin_hash: pinHash, verif: nuevoVerif(pinHash), auto_key: autoKey };
+                ficha[`1a_autocompletar/${autoKey}`] = datosAutocompletar(rut, basica);
+            }
+
+            try {
+                await update(ref(db), { ...ficha, ...inscripcion });
+            } catch (errFicha) {
+                // Puede que el RUT ya exista (y no se usó el PIN) o que falle la inscripción.
+                // Se intenta inscribir sin tocar la ficha guardada.
+                try {
+                    await update(ref(db), inscripcion);
+                } catch (errInscripcion) {
+                    alert("❌ No se pudo completar la inscripción.\n\n• Revisa el PIN que te dio tu captador (si corresponde).\n• Puede que ya estés inscrito/a en este programa.");
+                    throw errInscripcion;
+                }
+                if (!sesionPin) {
+                    alert("✅ Quedaste inscrito/a.\n\nYa tenías una ficha guardada, así que tus datos NO se modificaron. Para actualizarlos usa tu PIN personal; si no tienes uno, créalo con el staff al firmar tu ingreso.");
+                }
             }
 
             document.getElementById('form-container').classList.add('d-none');

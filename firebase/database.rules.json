@@ -1,0 +1,131 @@
+{
+  "rules": {
+    "0_roles": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "(auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin') || (auth != null && !root.child('0_roles').exists() && auth.token.email.toLowerCase() === 'pinoelgueta@gmail.com')",
+      "$email": {
+        ".read": "auth != null && $email === auth.token.email.toLowerCase().replace('.', ',')"
+      }
+    },
+    "0_config": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      "invitadores": {
+        ".read": true
+      },
+      "pins_captador": {
+        ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+      }
+    },
+    "0_estado_sistema": {
+      ".read": true,
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+    },
+    "1_trabajadores": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$rut": {
+        ".write": "(!data.exists() && newData.child('rut').val() === $rut) || (data.exists() && newData.exists() && newData.parent().parent().child('1p_privado').child($rut).child('verif').val() !== root.child('1p_privado').child($rut).child('verif').val())",
+        "$campo": {
+          ".validate": "!newData.isString() || !newData.val().matches(/[<>\"`]/)"
+        }
+      }
+    },
+    "1p_privado": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      "$rut": {
+        ".write": "(!data.exists() && !root.child('1_trabajadores').child($rut).exists() && newData.child('pin_hash').isString() && newData.child('pin_hash').val().length >= 32 && newData.child('verif').val().beginsWith(newData.child('pin_hash').val() + '_')) || (data.child('pin_hash').exists() && newData.child('pin_hash').val() === data.child('pin_hash').val() && newData.child('verif').val() !== data.child('verif').val() && newData.child('verif').val().beginsWith(data.child('pin_hash').val() + '_'))",
+        "pin_hash": {
+          ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !data.exists()"
+        },
+        "verif": {
+          ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !data.parent().child('pin_hash').exists()"
+        },
+        "auto_key": {
+          ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !data.parent().child('pin_hash').exists()"
+        },
+        "$campo": {
+          ".validate": "!newData.isString() || !newData.val().matches(/[<>\"`]/)"
+        }
+      }
+    },
+    "1a_autocompletar": {
+      "$k": {
+        ".read": true,
+        ".write": "(newData.exists() && newData.parent().parent().child('1p_privado').child(newData.child('rut').val()).child('auto_key').val() === $k) || (auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin')",
+        ".validate": "!newData.exists() || newData.hasChildren(['rut', 'nombres'])",
+        "$campo": {
+          ".validate": "!newData.isString() || !newData.val().matches(/[<>\"`]/)"
+        }
+      }
+    },
+    "2_asistencias": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+    },
+    "3_reservas": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$fecha": {
+        "$prog": {
+          "$rut": {
+            ".write": "!data.exists() && newData.exists() && (newData.child('tipo').val() === 'Cortesía' || !root.child('0_config').child('pins_captador').child($fecha).child($prog).exists() || newData.child('pin').val() === root.child('0_config').child('pins_captador').child($fecha).child($prog).val())",
+            "$campo": {
+              ".validate": "!newData.isString() || !newData.val().matches(/[<>\"`]/)"
+            }
+          }
+        }
+      }
+    },
+    "4_blacklist": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$rut": {
+        ".read": true
+      }
+    },
+    "4_blacklist_programas": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+    },
+    "5_historial_dt": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
+    },
+    "6_sorteos_fechas_usadas": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+    },
+    "7_pagos_efectivo": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
+    },
+    "8_autorizaciones_menores": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$fecha": {
+        "$prog": {
+          "$rut": {
+            ".write": "!data.exists() && newData.exists()",
+            "$campo": {
+              ".validate": "!newData.isString() || !newData.val().matches(/[<>\"`]/)"
+            }
+          }
+        }
+      }
+    },
+    "9_strikes": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+    },
+    "10_firmas": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+    },
+    "11_previred_ajustes": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
+    }
+  }
+}

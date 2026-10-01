@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { activarAppCheck } from "./seguridad.js?v=v16";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
@@ -11,6 +12,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+activarAppCheck(app);
 const auth = getAuth(app);
 
 document.getElementById('formularioLogin').addEventListener('submit', async (e) => {
