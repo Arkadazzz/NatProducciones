@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getDatabase, ref, get, set, remove, child, onValue, update, query, orderByKey, startAt, endAt } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+import { getDatabase, ref, get, set, remove, child, onValue, update, query, orderByKey, startAt, endAt, startAfter, limitToFirst } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 import { CAMPOS_PRIVADOS, separarFicha, datosAutocompletar, hashPin, claveAutocompletar, nuevoVerif, pinValido, claveCorreo, escaparHTML, activarAppCheck } from "./seguridad.js?v=v16";
 
 const firebaseConfig = {
@@ -351,6 +351,22 @@ window.obtenerFirma = async function(fecha, prog, rut, asis) {
         return s.exists() ? s.val() : null;
     } catch (e) {
         console.error("Error leyendo firma", e);
+        return null;
+    }
+};
+
+// Firmas de los recibos de efectivo: nodo aparte (12_firmas_recibos/{idRecibo}).
+// Los recibos antiguos que aún traen "firma" dentro se siguen leyendo igual.
+const NODO_FIRMAS_RECIBOS = '12_firmas_recibos';
+
+window.obtenerFirmaRecibo = async function(id, rec) {
+    if (rec && rec.firma) return rec.firma; // Formato antiguo
+    if (!rec || !rec.tiene_firma) return null;
+    try {
+        const s = await get(ref(db, `${NODO_FIRMAS_RECIBOS}/${id}`));
+        return s.exists() ? s.val() : null;
+    } catch (e) {
+        console.error("Error leyendo firma del recibo", e);
         return null;
     }
 };
@@ -2670,14 +2686,25 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
         const nombresProgramas = seleccionados.map(s => s.nombreStr);
         const rutasActualizar = seleccionados.map(s => s.ruta);
         
-        // Guardar el recibo usando la firma reciclada
-        await set(ref(db, `7_pagos_efectivo/${idRecibo}`), {
+        // Guardar el recibo usando la firma reciclada. La firma va en su propio nodo (12_firmas_recibos)
+        // para que abrir la pestaña Efectivo no descargue todas las imágenes.
+        const firmaRecibo = firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" ? window.comprimirFirma(signaturePadEfectivo) : "");
+        const datosRecibo = {
             rut: rutEfectivoActual,
             monto: deudaEfectivoActual.montoCalculado,
             fecha: nowIso,
-            firma: firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" ? window.comprimirFirma(signaturePadEfectivo) : ""),
             programas: nombresProgramas
-        });
+        };
+        try {
+            await update(ref(db), {
+                [`7_pagos_efectivo/${idRecibo}`]: { ...datosRecibo, tiene_firma: !!firmaRecibo },
+                [`${NODO_FIRMAS_RECIBOS}/${idRecibo}`]: firmaRecibo || null
+            });
+        } catch (errorNodoFirmas) {
+            // Respaldo: si el nodo de firmas no está permitido, se guarda como antes (firma dentro del recibo)
+            console.warn("No se pudo usar el nodo de firmas de recibos, se guarda en formato clásico", errorNodoFirmas);
+            await set(ref(db, `7_pagos_efectivo/${idRecibo}`), { ...datosRecibo, firma: firmaRecibo });
+        }
         
         let updates = {};
         rutasActualizar.forEach(r => updates[`${r}/estado_pago`] = "Pagado (Efectivo)");
@@ -2768,6 +2795,16 @@ async function renderPanelRecibosBatch() {
                 const trabSnap = await window.obtenerTrabajadores();
                 const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
                 
+                // Las firmas se leen recién aquí, en grupos de 20 (no al abrir la pestaña)
+                const firmasRecibos = {};
+                const idsRecibos = Object.keys(recibos);
+                for (let i = 0; i < idsRecibos.length; i += 20) {
+                    const grupo = idsRecibos.slice(i, i + 20);
+                    const leidas = await Promise.all(grupo.map(id => window.obtenerFirmaRecibo(id, recibos[id])));
+                    grupo.forEach((id, k) => { firmasRecibos[id] = leidas[k]; });
+                    btn.innerText = `⏳ Leyendo firmas... ${Math.min(i + 20, idsRecibos.length)} de ${idsRecibos.length}`;
+                }
+                
                 for (const id in recibos) {
                     const rec = recibos[id];
                     const tr = trabajadores[rec.rut] || { nombres: "Desconocido", apellidos: "" };
@@ -2786,8 +2823,9 @@ async function renderPanelRecibosBatch() {
                     const lineas = doc.splitTextToSize(textoCentral, 170);
                     doc.text(lineas, 20, 40);
                     
-                    if (rec.firma) {
-                        try { doc.addImage(rec.firma, 'JPEG', 65, 130, 80, 25); } catch(e) {}
+                    const firmaRec = firmasRecibos[id];
+                    if (firmaRec) {
+                        try { doc.addImage(firmaRec, 'JPEG', 65, 130, 80, 25); } catch(e) {}
                     }
                     
                     doc.setFont("helvetica", "bold");
@@ -2830,7 +2868,13 @@ async function renderPanelRecibosBatch() {
         
         if (document.getElementById('btnVaciarRecibos')) document.getElementById('btnVaciarRecibos').addEventListener('click', async () => {
             if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los recibos están guardados en tu dispositivo?\n\nSi aceptas, todos estos registros se esfumarán de la base de datos para no repetirse el próximo mes.`)) {
-                await remove(ref(db, '7_pagos_efectivo'));
+                // Se borran solo los recibos incluidos en el ZIP (y sus firmas), no los que hayan llegado después
+                const borrar = {};
+                Object.keys(recibos).forEach(id => {
+                    borrar[`7_pagos_efectivo/${id}`] = null;
+                    borrar[`${NODO_FIRMAS_RECIBOS}/${id}`] = null;
+                });
+                await update(ref(db), borrar);
                 alert("✅ La Bóveda de Recibos de Efectivo ha sido vaciada.");
                 renderPanelRecibosBatch();
             }
@@ -5661,3 +5705,55 @@ if (document.getElementById('btnMigrarSeguridad')) document.getElementById('btnM
         btn.disabled = false;
     }
 });
+
+
+// ==========================================
+// MANTENIMIENTO - MOVER FIRMAS DE RECIBOS DE EFECTIVO (7_pagos_efectivo -> 12_firmas_recibos)
+// ==========================================
+// Por lotes y reanudable: copia la firma, la relee y la compara; solo si coincide la quita del recibo.
+// Si se corta a mitad, al volver a presionar sigue donde quedó. Nunca borra un recibo.
+async function moverFirmasRecibos() {
+    if (!window.esAdmin) return;
+    const estado = document.getElementById('estadoMoverFirmasRecibos');
+    const pintar = (html) => { if (estado) estado.innerHTML = html; };
+    if (!confirm("📦 MOVER FIRMAS DE RECIBOS\n\nLas firmas de los recibos de efectivo pasarán a su propia carpeta (12_firmas_recibos).\n\n• NO se borra ningún recibo.\n• Cada firma se copia, se verifica y recién ahí se quita del recibo.\n• Si se corta, se puede volver a presionar y sigue donde quedó.\n\n¿Continuar?")) return;
+    const btn = document.getElementById('btnMoverFirmasRecibos');
+    if (btn) btn.disabled = true;
+    const LOTE = 25;
+    let ultimo = null, revisados = 0, movidas = 0, yaMovidas = 0, sinFirma = 0, fallidas = 0;
+    try {
+        while (true) {
+            const q = ultimo === null
+                ? query(ref(db, '7_pagos_efectivo'), orderByKey(), limitToFirst(LOTE))
+                : query(ref(db, '7_pagos_efectivo'), orderByKey(), startAfter(ultimo), limitToFirst(LOTE));
+            const snap = await get(q);
+            if (!snap.exists()) break;
+            const lote = snap.val();
+            const ids = Object.keys(lote).sort();
+            if (ids.length === 0) break;
+            for (const id of ids) {
+                const rec = lote[id];
+                revisados++;
+                if (!rec.firma) { if (rec.tiene_firma) yaMovidas++; else sinFirma++; continue; }
+                // 1) Copiar
+                await set(ref(db, `${NODO_FIRMAS_RECIBOS}/${id}`), rec.firma);
+                // 2) Verificar leyendo la copia
+                const copia = (await get(ref(db, `${NODO_FIRMAS_RECIBOS}/${id}`))).val();
+                if (copia !== rec.firma) { fallidas++; continue; }
+                // 3) Recién ahora se quita la firma del recibo
+                await update(ref(db, `7_pagos_efectivo/${id}`), { firma: null, tiene_firma: true });
+                movidas++;
+            }
+            ultimo = ids[ids.length - 1];
+            pintar(`⏳ Revisados ${revisados} recibos · movidas ${movidas} · ya estaban ${yaMovidas}`);
+            if (ids.length < LOTE) break;
+        }
+        pintar(`<span class='${fallidas ? "text-warning" : "text-success"} fw-bold'>${fallidas ? "⚠️" : "✅"} Listo: ${movidas} firmas movidas, ${yaMovidas} ya estaban movidas, ${sinFirma} recibos sin firma${fallidas ? `, ${fallidas} no se pudieron verificar (siguen intactas en su recibo; vuelve a presionar)` : ""}.</span>`);
+    } catch (e) {
+        console.error(e);
+        pintar(`<span class='text-danger fw-bold'>⛔ Se detuvo tras ${revisados} recibos (${movidas} movidas). No se perdió nada: vuelve a presionar para continuar.</span>`);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+if (document.getElementById('btnMoverFirmasRecibos')) document.getElementById('btnMoverFirmasRecibos').addEventListener('click', moverFirmasRecibos);

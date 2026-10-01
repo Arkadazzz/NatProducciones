@@ -133,6 +133,8 @@ reglas = {
         "9_strikes": solo(ADMIN, ADMIN),
         "10_firmas": solo(STAFF, STAFF),
         "11_previred_ajustes": solo(ADMIN, ADMIN),
+        # Firmas de los recibos de efectivo (separadas de 7_pagos_efectivo para no descargarlas al abrir la pestaña)
+        "12_firmas_recibos": solo(ADMIN, ADMIN),
     }
 }
 

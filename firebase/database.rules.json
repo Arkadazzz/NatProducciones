@@ -136,6 +136,10 @@
     "11_previred_ajustes": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
       ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
+    },
+    "12_firmas_recibos": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
     }
   }
 }
