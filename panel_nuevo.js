@@ -3877,7 +3877,7 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
 // ==========================================
 // MANTENIMIENTO - AUTORIZACIONES MENORES
 // ==========================================
-async function renderPanelMenoresBatch() {
+async function renderPanelMenoresBatch(cargar) {
     let mantTab = document.getElementById('mantenimiento-tab');
     if(!mantTab) return;
     
@@ -3918,6 +3918,19 @@ async function renderPanelMenoresBatch() {
         } else {
             return;
         }
+    }
+    
+    // Ahorro de descargas: los permisos traen la firma del apoderado y pesan bastante;
+    // se bajan solo cuando se piden con el botón (el clic en la pestaña no los descarga).
+    if (cargar !== true) {
+        container.innerHTML = `
+            <div class="text-center">
+                <h4 class="text-warning mb-2">🚸 Permisos Notariales Menores</h4>
+                <p class="text-muted mb-3" style="font-size: 0.95em;">Se cargan solo cuando los necesites (incluyen la firma del apoderado).</p>
+                <button class="btn btn-warning fw-bold py-3 shadow w-100 fs-5 text-dark" id="btnVerPermisosMenores" style="border-radius: 10px;">🚸 Ver permisos de menores</button>
+            </div>`;
+        document.getElementById('btnVerPermisosMenores').addEventListener('click', () => renderPanelMenoresBatch(true));
+        return;
     }
     
     container.innerHTML = '<div class="text-warning fs-5 text-center">⏳ Revisando Permisos de Menores...</div>';
@@ -4049,7 +4062,7 @@ La presente autorización es válida para la temporada de primavera-verano 2026-
             if(confirm(`⚠️ ALERTA DE BORRADO ⚠️\n\n¿Confirmas que abriste el archivo ZIP y los permisos están guardados?\n\nSi aceptas, estos registros se eliminarán de la base de datos para no mezclarse con los de mañana.`)) {
                 await remove(ref(db, '8_autorizaciones_menores'));
                 alert("✅ Carpeta de permisos de menores ha sido vaciada.");
-                renderPanelMenoresBatch();
+                renderPanelMenoresBatch(true);
             }
         });
         
