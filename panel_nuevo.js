@@ -2132,7 +2132,11 @@ if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear
     if(!motivo) return alert("Debes escribir un motivo.");
     
     if(confirm("¿Bloquear permanentemente a este usuario?")) {
-        await set(ref(db, `4_blacklist/${rutPerfilActual}`), { fecha: new Date().toISOString(), motivo: motivo });
+        // Motivo y fecha (solo staff/admin) + marca pública sí/no para el formulario, en una sola operación
+        await update(ref(db), {
+            [`4_blacklist/${rutPerfilActual}`]: { fecha: new Date().toISOString(), motivo: motivo },
+            [`4_bloqueados/${rutPerfilActual}`]: true
+        });
         blacklistGlobal[rutPerfilActual] = { motivo: motivo }; 
         modalFichaInstance.hide(); 
         renderCRM(listaGlobalCRM); 
@@ -2142,7 +2146,7 @@ if (document.getElementById('btnBloquear')) document.getElementById('btnBloquear
 
 if (document.getElementById('btnDesbloquear')) document.getElementById('btnDesbloquear').addEventListener('click', async () => {
     if(confirm("¿Quitar de la lista negra?")) {
-        await remove(ref(db, `4_blacklist/${rutPerfilActual}`)); 
+        await update(ref(db), { [`4_blacklist/${rutPerfilActual}`]: null, [`4_bloqueados/${rutPerfilActual}`]: null }); 
         delete blacklistGlobal[rutPerfilActual]; 
         modalFichaInstance.hide(); 
         renderCRM(listaGlobalCRM); 
@@ -2189,7 +2193,10 @@ window.modificarStrikes = async function(rut, cant) {
     }
     if (nuevo >= 3) {
         if(confirm(`Esta persona ha alcanzado ${nuevo} strikes. ¿Deseas bloquearla GLOBALMENTE (Blacklist)?`)) {
-            await set(ref(db, `4_blacklist/${rut}`), { fecha: new Date().toISOString(), motivo: "Alcanzó 3 strikes manualmente." });
+            await update(ref(db), {
+                [`4_blacklist/${rut}`]: { fecha: new Date().toISOString(), motivo: "Alcanzó 3 strikes manualmente." },
+                [`4_bloqueados/${rut}`]: true
+            });
         }
     }
     const display = document.getElementById('displayStrikes');
@@ -5731,7 +5738,7 @@ if (document.getElementById('btnGuardarInvitadores')) document.getElementById('b
 
 if (document.getElementById('btnMigrarSeguridad')) document.getElementById('btnMigrarSeguridad').addEventListener('click', async () => {
     if (!window.esAdmin) return;
-    if (!confirm("🔒 MIGRACIÓN DE SEGURIDAD\n\n• Banco, AFP, salud y enfermedades pasan a la ficha privada (solo admins).\n• El PIN de captador sale de la web pública.\n• No se borra a ningún trabajador.\n\n¿Ejecutar?")) return;
+    if (!confirm("🔒 MIGRACIÓN DE SEGURIDAD\n\n• Banco, AFP, salud y enfermedades pasan a la ficha privada (solo admins).\n• El PIN de captador sale de la web pública.\n• El público solo podrá saber si un RUT está bloqueado (sin motivo ni fecha).\n• No se borra a ningún trabajador.\n\n¿Ejecutar?")) return;
     const estado = document.getElementById('estadoMigracionSeguridad');
     const pintar = (html) => { if (estado) estado.innerHTML = html; };
     const btn = document.getElementById('btnMigrarSeguridad');
@@ -5781,6 +5788,15 @@ if (document.getElementById('btnMigrarSeguridad')) document.getElementById('btnM
             if (pinsMovidos) await update(ref(db), updates);
         }
 
+        pintar("⏳ Separando el motivo de la lista negra...");
+        const negraSnap = await get(ref(db, '4_blacklist'));
+        let bloqueados = 0;
+        if (negraSnap.exists()) {
+            const marcas = {};
+            Object.keys(negraSnap.val()).forEach(rut => { marcas[`4_bloqueados/${rut}`] = true; bloqueados++; });
+            await update(ref(db), marcas);
+        }
+
         const invSnap = await get(ref(db, '0_config/invitadores'));
         if (!invSnap.exists()) {
             await set(ref(db, '0_config/invitadores'), INVITADORES_INICIALES);
@@ -5788,7 +5804,7 @@ if (document.getElementById('btnMigrarSeguridad')) document.getElementById('btnM
         }
 
         await window.limpiarCache();
-        pintar(`<span class="text-success fw-bold">✅ Listo. ${movidos} ficha(s) migradas de ${ruts.length}. PIN de captador movidos: ${pinsMovidos}.</span>`);
+        pintar(`<span class="text-success fw-bold">✅ Listo. ${movidos} ficha(s) migradas de ${ruts.length}. PIN de captador movidos: ${pinsMovidos}. RUT bloqueados publicados (sin motivo): ${bloqueados}.</span>`);
     } catch (e) {
         console.error(e);
         pintar(`<span class="text-danger fw-bold">⛔ Se detuvo: ${escaparHTML(e.message)}. Se puede volver a ejecutar sin problema.</span>`);

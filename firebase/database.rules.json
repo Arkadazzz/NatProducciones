@@ -90,9 +90,14 @@
     },
     "4_blacklist": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
+    },
+    "4_bloqueados": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       "$rut": {
-        ".read": true
+        ".read": true,
+        ".validate": "!newData.exists() || newData.val() === true"
       }
     },
     "4_blacklist_programas": {

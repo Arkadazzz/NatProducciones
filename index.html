@@ -689,7 +689,7 @@
                 }
             }
 
-            const blacklistSnap = await get(child(ref(db), `4_blacklist/${rut}`));
+            const blacklistSnap = await get(child(ref(db), `4_bloqueados/${rut}`)); // solo sí/no, sin motivo
 
             if (blacklistSnap.exists()) {
                 alert("⛔ No puedes registrarte. Tu RUT está bloqueado en el sistema.");

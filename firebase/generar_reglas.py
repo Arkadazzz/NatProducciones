@@ -116,10 +116,13 @@ reglas = {
             ".write": STAFF,
             "$fecha": {"$prog": {"$rut": {".write": RESERVA_PUBLICO, "$campo": TEXTO_SEGURO}}},
         },
-        "4_blacklist": {
+        # Motivo y fecha del bloqueo: solo staff y admin
+        "4_blacklist": solo(STAFF, STAFF),
+        # Lo único que ve el público: si un RUT puntual está bloqueado (true). No se puede listar.
+        "4_bloqueados": {
             ".read": STAFF,
             ".write": STAFF,
-            "$rut": {".read": True},
+            "$rut": {".read": True, ".validate": "!newData.exists() || newData.val() === true"},
         },
         "4_blacklist_programas": solo(ADMIN, ADMIN),
         "5_historial_dt": solo(ADMIN, ADMIN),
