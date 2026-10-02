@@ -345,7 +345,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getDatabase, ref, get, update, child, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-    import { separarFicha, datosAutocompletar, hashPin, claveAutocompletar, nuevoVerif, pinValido, escaparHTML, activarAppCheck } from "./seguridad.js?v=v16";
+    import { separarFicha, datosAutocompletar, resumenBancario, hashPin, claveAutocompletar, nuevoVerif, pinValido, escaparHTML, activarAppCheck } from "./seguridad.js?v=v21";
 
     const firebaseConfig = {
         apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
@@ -564,6 +564,14 @@
         if (sesionPin) activarModoActualizacion(null);
     });
 
+    // Muestra banco, tipo y últimos 2 dígitos guardados (para que la persona sepa que sus datos existen)
+    function mostrarResumenBanco(r) {
+        const aviso = document.getElementById('avisoBancoGuardado');
+        if (!r) { aviso.innerHTML = '✅ Tus datos bancarios y previsionales ya están guardados. Completa esta sección <b>solo si cambiaron</b>.'; return; }
+        const texto = (id, v) => { const op = document.querySelector(`#${id} option[value="${CSS.escape(v || '')}"]`); return op ? op.textContent.trim() : (v || ''); };
+        aviso.textContent = `✅ Tus datos bancarios ya están guardados: ${texto('banco', r.banco)} · ${texto('tipoCuenta', r.tipoCuenta)}${r.ultimos ? ` terminada en ••${r.ultimos}` : ''}. Completa esta sección solo si cambiaron.`;
+    }
+
     function activarModoActualizacion(sesion) {
         sesionPin = sesion;
         const actualizando = !!sesion;
@@ -615,7 +623,8 @@
             poner('sexo', d.sexo);
             poner('nacionalidad', d.nacionalidad);
 
-            activarModoActualizacion({ pinHash: await hashPin(rut, pin), autoKey });
+            activarModoActualizacion({ pinHash: await hashPin(rut, pin), autoKey, resumenBanco: d.resumenBanco || null });
+            mostrarResumenBanco(d.resumenBanco);
             estado.innerHTML = '<span class="text-success fw-bold">✨ ¡Datos cargados! Revisa que estén al día.</span>';
         } catch (err) {
             console.error("Error autocompletar", err);
@@ -774,14 +783,14 @@
                 for (const c in privada) ficha[`1p_privado/${rut}/${c}`] = privada[c];
                 ficha[`1p_privado/${rut}/pin_hash`] = sesionPin.pinHash;
                 ficha[`1p_privado/${rut}/verif`] = nuevoVerif(sesionPin.pinHash);
-                ficha[`1a_autocompletar/${sesionPin.autoKey}`] = datosAutocompletar(rut, basica);
+                ficha[`1a_autocompletar/${sesionPin.autoKey}`] = datosAutocompletar(rut, basica, resumenBancario(privada) || sesionPin.resumenBanco);
             } else {
                 // Persona nueva: se crean su ficha básica, la privada y su autocompletado
                 const pinHash = await hashPin(rut, pinNuevo);
                 const autoKey = await claveAutocompletar(rut, pinNuevo);
                 ficha[`1_trabajadores/${rut}`] = { ...basica, tiene_pin: true };
                 ficha[`1p_privado/${rut}`] = { ...privada, pin_hash: pinHash, verif: nuevoVerif(pinHash), auto_key: autoKey };
-                ficha[`1a_autocompletar/${autoKey}`] = datosAutocompletar(rut, basica);
+                ficha[`1a_autocompletar/${autoKey}`] = datosAutocompletar(rut, basica, resumenBancario(privada));
             }
 
             try {

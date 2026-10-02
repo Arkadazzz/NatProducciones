@@ -1,7 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { getDatabase, ref, get, set, remove, child, onValue, update, query, orderByKey, startAt, endAt, startAfter, limitToFirst } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
-import { CAMPOS_PRIVADOS, separarFicha, datosAutocompletar, hashPin, claveAutocompletar, nuevoVerif, pinValido, claveCorreo, escaparHTML, activarAppCheck } from "./seguridad.js?v=v16";
+import { CAMPOS_PRIVADOS, separarFicha, datosAutocompletar, resumenBancario, hashPin, claveAutocompletar, nuevoVerif, pinValido, claveCorreo, escaparHTML, activarAppCheck } from "./seguridad.js?v=v21";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC5M5p6deAJu4qPeLxy1FdKDNLic5LoVpE",
@@ -270,11 +270,13 @@ window.guardarCamposFicha = async function(rut, campos) {
     for (const c in basica) updates[`1_trabajadores/${rut}/${c}`] = basica[c];
     for (const c in privada) updates[`1p_privado/${rut}/${c}`] = privada[c];
     // Si la persona tiene autocompletado, se actualiza para que no muestre datos viejos
-    if (Object.keys(basica).length > 0 && window.esAdmin) {
-        const autoKey = (await get(ref(db, `1p_privado/${rut}/auto_key`))).val();
+    // (incluye el resumen bancario: banco, tipo y últimos 2 dígitos, nunca el número completo)
+    if (window.esAdmin) {
+        const privActual = (await get(ref(db, `1p_privado/${rut}`))).val() || {};
+        const autoKey = privActual.auto_key;
         if (autoKey) {
             const actual = (await get(ref(db, `1_trabajadores/${rut}`))).val() || {};
-            updates[`1a_autocompletar/${autoKey}`] = datosAutocompletar(rut, { ...actual, ...basica });
+            updates[`1a_autocompletar/${autoKey}`] = datosAutocompletar(rut, { ...actual, ...basica }, resumenBancario({ ...privActual, ...privada }));
         }
     }
     await update(ref(db), updates);
@@ -1532,7 +1534,8 @@ async function guardarPinPersonal(rut, ficha) {
         [`1p_privado/${rut}/verif`]: nuevoVerif(pinHash),
         [`1p_privado/${rut}/auto_key`]: autoKey,
         [`1_trabajadores/${rut}/tiene_pin`]: true,
-        [`1a_autocompletar/${autoKey}`]: datosAutocompletar(rut, ficha || {})
+        // Si quien crea el PIN es admin, la ficha trae el banco y se incluye el resumen; el staff no lo ve
+        [`1a_autocompletar/${autoKey}`]: datosAutocompletar(rut, ficha || {}, resumenBancario(ficha))
     });
 }
 

@@ -68,10 +68,18 @@ export function separarFicha(ficha) {
     return { basica, privada };
 }
 
-// Arma los datos de autocompletado a partir de la ficha básica
-export function datosAutocompletar(rut, basica) {
+// Resumen para reconocer la cuenta sin exponerla: banco, tipo y SOLO los 2 últimos dígitos
+export function resumenBancario(privada) {
+    if (!privada || !privada.banco) return null;
+    const digitos = String(privada.numeroCuenta || '').replace(/\D/g, '');
+    return { banco: privada.banco, tipoCuenta: privada.tipoCuenta || '', ultimos: digitos.slice(-2) };
+}
+
+// Arma los datos de autocompletado a partir de la ficha básica (+ resumen bancario, si se conoce)
+export function datosAutocompletar(rut, basica, resumenBanco = null) {
     const datos = { rut: normalizarRut(rut) };
     CAMPOS_AUTOCOMPLETAR.forEach(c => { if (basica[c] !== undefined && basica[c] !== null) datos[c] = basica[c]; });
+    if (resumenBanco) datos.resumenBanco = resumenBanco;
     return datos;
 }
 
