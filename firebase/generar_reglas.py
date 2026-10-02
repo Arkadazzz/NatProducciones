@@ -111,6 +111,8 @@ reglas = {
             }
         },
         "2_asistencias": solo(STAFF, STAFF),
+        # Contador de tickets por sala: se incrementa con transacciones para que dos iPads no repitan número
+        "2_tickets": {".read": STAFF, ".write": STAFF, "$fecha": {"$prog": {".validate": "newData.isNumber() && newData.val() >= 1"}}},
         "3_reservas": {
             ".read": STAFF,
             ".write": STAFF,

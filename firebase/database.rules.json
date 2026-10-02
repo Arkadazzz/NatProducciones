@@ -74,6 +74,15 @@
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
     },
+    "2_tickets": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$fecha": {
+        "$prog": {
+          ".validate": "newData.isNumber() && newData.val() >= 1"
+        }
+      }
+    },
     "3_reservas": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",

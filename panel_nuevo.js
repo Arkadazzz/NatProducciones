@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getDatabase, ref, get, set, remove, child, onValue, update, query, orderByKey, startAt, endAt, startAfter, limitToFirst } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+import { getDatabase, ref, get, set, remove, child, onValue, update, query, orderByKey, startAt, endAt, startAfter, limitToFirst, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
 import { CAMPOS_PRIVADOS, separarFicha, datosAutocompletar, resumenBancario, hashPin, claveAutocompletar, nuevoVerif, pinValido, claveCorreo, escaparHTML, activarAppCheck } from "./seguridad.js?v=v21";
 
 const firebaseConfig = {
@@ -1550,6 +1550,43 @@ function validarPinPersonalIngresado() {
     return true;
 }
 
+// ==========================================
+// TICKETS ÚNICOS CON VARIOS IPADS
+// ==========================================
+// El número se pide al guardar a un contador compartido (2_tickets/{fecha}/{programa}) con una transacción:
+// dos iPads que confirman al mismo tiempo nunca reciben el mismo número.
+// Nunca entrega un número menor al más alto ya usado en la sala (salas abiertas antes de este cambio).
+async function asignarTicket(rut) {
+    const previo = asistenciasGlobales[rut];
+    if (previo && previo.tipo_ingreso !== "Anulado" && previo.numero_asignado) return String(previo.numero_asignado); // ya había entrado: conserva su ticket
+    const maxLocal = Math.max(0, (parseInt(window.siguienteTicketAutomatico, 10) || 1) - 1);
+    try {
+        const r = await runTransaction(ref(db, `2_tickets/${fechaPrograma}/${nombrePrograma}`), (actual) => Math.max(Number(actual) || 0, maxLocal) + 1);
+        if (r.committed && r.snapshot.exists()) return String(r.snapshot.val());
+    } catch (e) {
+        console.error("No se pudo usar el contador de tickets; se usa el número local", e);
+    }
+    return String(maxLocal + 1);
+}
+
+// Muestra en grande el ticket definitivo mientras ya se escanea a la siguiente persona
+function mostrarTicketAsignado(numero, nombre) {
+    const escaner = document.getElementById('seccionEscaner');
+    if (!escaner) return;
+    let aviso = document.getElementById('avisoTicketAsignado');
+    if (!aviso) {
+        aviso = document.createElement('div');
+        aviso.id = 'avisoTicketAsignado';
+        aviso.className = 'alert text-center fw-bold mb-3';
+        aviso.style.cssText = 'background: #0a2a12; border: 2px solid #00d26a; color: #fff; font-size: 1.3em;';
+        escaner.prepend(aviso);
+    }
+    aviso.textContent = `🎟️ Ticket N° ${numero}${nombre ? ' — ' + nombre : ''}`;
+    aviso.classList.remove('d-none');
+    clearTimeout(window.__ocultarAvisoTicket);
+    window.__ocultarAvisoTicket = setTimeout(() => aviso.classList.add('d-none'), 10000);
+}
+
 if (document.getElementById('btnLimpiarFirma')) document.getElementById('btnLimpiarFirma').addEventListener('click', () => signaturePad.clear());
 
 if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnCancelarEscaneo').addEventListener('click', () => {
@@ -1568,7 +1605,7 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
     const firmaBase64 = window.comprimirFirma(signaturePad); 
     const now = new Date();
     const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-    const numeroFinal = document.getElementById('numeroAsignado').value;
+    let numeroFinal = document.getElementById('numeroAsignado').value; // estimado; el definitivo lo entrega el contador al guardar
     
     const textoInfo = document.getElementById('infoInvitado').innerText; 
     const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
@@ -1606,6 +1643,7 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
         window.limpiarCache();
         window.limpiarCache();
         const rutaAsistencia = `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`;
+        numeroFinal = await asignarTicket(rutActual);
         const datosAsistencia = { 
             rut: rutActual, 
             nombre_programa: nombrePrograma, 
@@ -1642,6 +1680,7 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
         const bloquePin = document.getElementById('bloquePinPersonal');
         if (bloquePin) bloquePin.remove();
 
+        mostrarTicketAsignado(numeroFinal, document.getElementById('nombreAsistenteDisplay') ? document.getElementById('nombreAsistenteDisplay').innerText : '');
         if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.add('d-none'); 
         signaturePad.clear(); 
         try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
@@ -1680,10 +1719,7 @@ window.generarContratoPDF = async function(rut) {
     if (!asis.firma_digital && asis.tiene_firma) {
         asis.firma_digital = await window.obtenerFirma(fechaPrograma, nombrePrograma, rut, asis);
     }
-    const { jsPDF } = window.jspdf; 
-    const doc = new jsPDF({ format: 'legal' });
-    
-    dibujarContratoEnPDF(doc, rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
+    const doc = window.crearDocumentoIngreso(rut, trab, asis, fechaPrograma, nombrePrograma.replace(" - ", " / "));
     
     const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
     const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
@@ -1697,6 +1733,118 @@ window.generarContratoPDF = async function(rut) {
     
     doc.save(nombreArchivo);
 }
+
+// ==========================================
+// CESIÓN Y AUTORIZACIÓN MEGAMEDIA (formato oficial, mayor de edad)
+// ==========================================
+// Texto literal del documento "Cesión y Autorización Imagen Tipo (Mayor Edad) MEGAMEDIA".
+// Las partes entre ** van en negrita, igual que en el documento oficial.
+const PARRAFOS_CESION_MEGAMEDIA = [
+    "En Santiago de Chile, quien suscribe la presente autorización, declara y deja expresa constancia de lo siguiente:",
+    "**PRIMERO**: Por el presente instrumento y, en este acto, autorizo a **MEGAMEDIA S.A.**, en adelante **MEGAMEDIA**, y a los terceros que ésta designe, para que utilicen mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad, en adelante “mi imagen” (i) en los programas de televisión o casting de estos, en que haya intervenido, participado o haya tenido alguna presencia; (ii) en aquellos productos, bienes, servicios y/o negocios que se comercialicen y/o desarrollen por **MEGAMEDIA** o por los terceros que designe, que incluyan mi imagen; y (iii) en la publicidad o promoción de (i) y (ii) anteriores. La autorización de que da cuenta este instrumento se presta en forma exclusiva; sin cargo adicional alguno; en forma irrevocable; ilimitada; por el plazo durante el cual se transmitan los programas de televisión en los cuales participe o haya participado o aparecido, en forma individual o en conjunto, y/o durante el plazo en que se comercialicen los productos, bienes, servicios y/o negocios en los que se utilice mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad – ya sea en forma individual o en conjunto con otros – y en Chile y el Extranjero; y tanto para sistemas de televisión de libre recepción, servicios limitados de televisión, televisión satelital, televisión digital, internet, radio o en cualquier otro medio o sistema de comunicación como para cualquier otro soporte material; y/o de audio; y/o audiovisual que se utilicen para estos efectos por **MEGAMEDIA** o por los terceros que **MEGAMEDIA** determine. Todos los soportes materiales; y/o de audio; y/o de audio y video en que se incluya o aparezca mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material de mi imagen o personalidad, es y será de propiedad exclusiva de **MEGAMEDIA**. En consecuencia, podrán proceder, personalmente o a través de terceros, a la elaboración y comercialización de cuantos productos considere oportunos y sin que esta enumeración se considere taxativa: discos compactos con obras musicales ejecutadas o interpretadas por mi, en forma individual o en conjunto con otros, dvds, u otros soportes de audio, video y/o de audio y video, entre otros, en los que aparezca, por ejemplo, mi imagen o nombre, así como expresiones que se hayan podido popularizar durante la emisión del programa de televisión. Asimismo y sin perjuicio de los derechos de televisión que corresponden a **MEGAMEDIA**, en forma exclusiva, podrán proceder a la grabación, publicación y copia de actuaciones, ejecuciones o interpretaciones, en cualquier tipo de forma o soporte; la reproducción y adaptación de la actuación como cantante, solista o como parte de un grupo musical o de mi intervención en el programa de televisión, el muestreo, la representación mímica, la mezcla y el doblaje de la actuación o intervención, la reproducción y comunicación pública mediante la utilización de cualquier soporte, así como, en general, cualquier otro medio. También y sin perjuicio de los derechos de televisión y de los derechos musicales que corresponden a **MEGAMEDIA**, en forma exclusiva, podrá difundir, en cualquier otra forma, información respecto mi persona mediante imágenes y/o sonido, incluyéndose los pases o transmisiones mediante sistemas de comunicación de libre recepción, sistemas de comunicación por satélite, sistemas de comunicación por cable (por ejemplo; como parte de una suscripción o abono a una cadena de televisión de pago o a través de la modalidad de “pay per view” o a través de un circuito cerrado de televisión e incluso como parte de un paquete o compilación de programas), internet, radio, música y cualquier otro medio actualmente conocido o que se conozca en el futuro. Sin perjuicio de lo ya señalado, autorizo la cesión, en este mismo acto, a **MEGAMEDIA** por lo que respecta a los derechos de televisión y musicales, la totalidad de los derechos de explotación y, en especial, los de reproducción, distribución y/o comunicación pública que me pudieren corresponder sobre mi intervención o participación o presencia en el programa de televisión de acuerdo con la legislación vigente en la República de Chile en materia de propiedad intelectual, efectuándose dicha cesión por el plazo máximo de protección legal, en forma ilimitada, por un número ilimitado de veces, en Chile y el extranjero. Por último, **MEGAMEDIA**, por lo que respecta a los derechos de televisión y musicales, gozará del derecho a explotar el programa de televisión y las obras musicales en que cante o ejecute, en cualquier forma y a través de cualquier medio, actualmente conocido o que se conozca en el futuro, pudiendo hacerlo, directamente, o a través de cualquier tercero al que, a su vez, ceda, total o parcialmente, los derechos de explotación cuya titularidad ostenta. Asimismo, reconozco y acepto que **MEGAMEDIA** podrá, directamente o a través de un tercero, producir discos, álbumes musicales u otros soportes materiales conteniendo fonogramas interpretados por mi, en forma individual o en conjunto con otros, en el programa de televisión y que podrá o no – a criterio de **MEGAMEDIA** – contener fonogramas interpretados por mi. En tal sentido, en conformidad a la presente autorización, otorgo a **MEGAMEDIA** el derecho exclusivo para efectuar grabaciones fonográficas de las interpretaciones efectuadas por mi, sea como solista y/o en conjunto con otro u otros participantes del programa de televisión y/o artistas, con o sin imágenes, efectuadas por cualquier medio creado o crearse en el futuro y el derecho exclusivo para fabricar, producir, licenciar, promover y/o de cualquier otra forma explotar fonogramas y/o álbumes y/o videogramas conteniendo dichas grabaciones sin límite de tiempo, ni de territorios, pudiendo ceder este derecho a terceros, sin limitación alguna. Durante toda la vigencia de la presente autorización, ya sea como solista o en conjunto, otorgo a **MEGAMEDIA** la plena y absoluta exclusividad de mis interpretaciones para fijaciones sonoras y audiovisuales, que se realicen por cualquier medio o tecnología creada o a crearse, comprometiéndome a no grabarlas para mí mismo ni para terceros, ya sea actuando como solista o como integrante de un conjunto y aun sin mención de mi nombre o seudónimo. Asimismo, me obligo a no re-grabar ningún trabajo musical contenido en las grabaciones y/o en los videogramas y/o álbumes y/o fonogramas en los que se incluyan interpretaciones y/o grabaciones, durante un período de 2 años contados desde la finalización del periodo de vigencia de la presente autorización",
+    "**SEGUNDO**: Sin perjuicio de lo señalado en la cláusula anterior, en particular y sin que ello importe limitación alguna, y sólo a título ejemplar, MEGAMEDIA estará autorizada y será titular de todos los derechos de:",
+    "1) Transmisión televisiva, en directo o diferido, por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro del programa de televisión y de mi imagen, en Chile y en el extranjero, a través de los sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro que MEGAMEDIA designe.",
+    "2) Grabación, reproducción, adaptación y/o edición del programa de televisión y de mi imagen en cualesquiera soportes materiales que permitan la retransmisión televisiva del programa de televisión y de mi imagen o de sus adaptaciones y/o ediciones, por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro. Todo el material de fijación de imágenes y/o sonidos sobre cualquier base material del programa de televisión y de mi imagen es y será única y exclusivamente de propiedad de MEGAMEDIA.",
+    "3) La retransmisión televisiva por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro de las grabaciones, adaptaciones y/o ediciones de las imágenes, referidas en el Nº 2 anterior, en Chile y en el extranjero, a través de los sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro que MEGA designe, por un número ilimitado de veces y por el plazo máximo de protección legal del programa de televisión y de mi imagen.",
+    "Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representante."
+];
+
+// Escribe un párrafo justificado admitiendo negritas (**texto**). Devuelve la nueva posición vertical.
+function escribirParrafoJustificado(doc, texto, x, y, ancho, interlinea, limiteY, margenSuperior) {
+    const palabras = [];
+    let actual = [];
+    texto.split(/(\*\*[^*]+\*\*)/).filter(Boolean).forEach(seg => {
+        const negrita = seg.startsWith('**');
+        const contenido = negrita ? seg.slice(2, -2) : seg;
+        contenido.split(' ').forEach((parte, i) => {
+            if (i > 0 && actual.length) { palabras.push(actual); actual = []; }
+            if (parte) actual.push({ t: parte, b: negrita });
+        });
+    });
+    if (actual.length) palabras.push(actual);
+    const ancho_ = (p) => p.reduce((s, r) => { doc.setFont("helvetica", r.b ? "bold" : "normal"); return s + doc.getTextWidth(r.t); }, 0);
+    doc.setFont("helvetica", "normal");
+    const espacio = doc.getTextWidth(' ');
+    const lineas = [];
+    let linea = [], anchoLinea = 0;
+    palabras.forEach(p => {
+        const w = ancho_(p);
+        if (linea.length && anchoLinea + espacio + w > ancho) { lineas.push(linea); linea = []; anchoLinea = 0; }
+        anchoLinea += (linea.length ? espacio : 0) + w; linea.push({ p, w });
+    });
+    if (linea.length) lineas.push(linea);
+    lineas.forEach((l, i) => {
+        if (y > limiteY) { doc.addPage(); y = margenSuperior; }
+        const ultima = i === lineas.length - 1;
+        const sumaPalabras = l.reduce((s, e) => s + e.w, 0);
+        const separacion = (!ultima && l.length > 1) ? (ancho - sumaPalabras) / (l.length - 1) : espacio;
+        let cx = x;
+        l.forEach(e => {
+            let px = cx;
+            e.p.forEach(r => { doc.setFont("helvetica", r.b ? "bold" : "normal"); doc.text(r.t, px, y); px += doc.getTextWidth(r.t); });
+            cx += e.w + separacion;
+        });
+        y += interlinea;
+    });
+    doc.setFont("helvetica", "normal");
+    return y;
+}
+
+// Dibuja la cesión MEGAMEDIA en un PDF tamaño carta (igual al documento oficial digitalizado).
+window.dibujarCesionMegamedia = function(doc, { fecha, nombre, rut, telefono, firma }) {
+    const X = 30, ANCHO = 156, INTERLINEA = 3.9, LIMITE = 262, MARGEN_SUP = 22;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+    doc.text("CESION Y AUTORIZACION", X + ANCHO / 2, 27, null, null, "center");
+    doc.setFontSize(9.5);
+    let y = 38;
+    PARRAFOS_CESION_MEGAMEDIA.forEach((p, i) => {
+        y = escribirParrafoJustificado(doc, p, X, y, ANCHO, INTERLINEA, LIMITE, MARGEN_SUP);
+        y += (i >= 2 && i <= 4) ? 3.5 : 2.2;
+    });
+    // Tabla final de datos y firma
+    y += 8;
+    if (y + 6 * 6.2 + 10 + 6.2 + 14 + 5 > 272) { doc.addPage(); y = MARGEN_SUP + 10; } // la tabla de firma no se corta entre páginas
+    const fechaTexto = String(fecha || '').split('-').reverse().join('-');
+    const filas = [["Fecha", fechaTexto], ["Nombre", nombre], ["RUT", rut], ["Empresa (si aplica)", ""], ["RUT (si aplica)", ""], ["Teléfono", telefono], ["Firma", ""]];
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+    filas.forEach(([etiqueta, valor]) => {
+        if (etiqueta === "Firma") y += 10; // espacio para que la firma quede sobre su línea sin tapar las filas de arriba
+        doc.text(etiqueta, X, y);
+        doc.text(":", X + 40, y);
+        if (valor) { doc.setFont("helvetica", "bold"); doc.text(String(valor), X + 43, y); doc.setFont("helvetica", "normal"); }
+        else doc.text("……………………………………………………………………", X + 43, y);
+        if (etiqueta === "Firma" && firma) {
+            try { doc.addImage(firma, 'JPEG', X + 48, y - 13.5, 44, 13); } catch (e) { console.error("Firma de cesión", e); }
+        }
+        y += 6.2;
+    });
+    // pp. MEGAMEDIA S.A.
+    y += 14;
+    doc.setLineWidth(0.3);
+    doc.line(X + 85, y, X + 130, y);
+    doc.text("pp. MEGAMEDIA S.A.", X + 107.5, y + 4.5, null, null, "center");
+};
+
+// Documento del botón PDF / respaldo: cesión MEGAMEDIA para cortesías o sin contrato (mayores de edad);
+// contrato de trabajo en los demás casos. Los menores mantienen el documento anterior.
+window.crearDocumentoIngreso = function(rut, trab, asis, fechaProg, nombreProg) {
+    const { jsPDF } = window.jspdf;
+    const esCesion = asis.tipo_ingreso === "Cortesía" || asis.aplica_contrato === false;
+    let esMenor = false;
+    if (trab && trab.fechaNacimiento) {
+        const [a, m, d] = trab.fechaNacimiento.split('-').map(Number), [fa, fm, fd] = String(fechaProg).split('-').map(Number);
+        let edad = fa - a; if (fm < m || (fm === m && fd < d)) edad--;
+        esMenor = edad < 18;
+    }
+    if (esCesion && !esMenor) {
+        const doc = new jsPDF({ format: 'letter' });
+        window.dibujarCesionMegamedia(doc, { fecha: fechaProg, nombre: `${trab.nombres || ''} ${trab.apellidos || ''}`.trim().toUpperCase(), rut, telefono: trab.telefono || '', firma: asis.firma_digital });
+        return doc;
+    }
+    const doc = new jsPDF({ format: 'legal' });
+    dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg);
+    return doc;
+};
 
 function dibujarContratoEnPDF(doc, rut, trab, asis, fechaProg, nombreProg) {
     let y = 15; 
@@ -3673,8 +3821,7 @@ if (document.getElementById('btnRespaldoPDFs')) document.getElementById('btnResp
                     }
                     
                     if (firmaZip) {
-                        const doc = new jsPDF({ format: 'legal' }); 
-                        dibujarContratoEnPDF(doc, r, trab, { ...asis, firma_digital: firmaZip }, fecha, prog.replace(" - ", " / "));
+                        const doc = window.crearDocumentoIngreso(r, trab, { ...asis, firma_digital: firmaZip }, fecha, prog.replace(" - ", " / "));
                         
                         const nombreCompletoLimpio = `${trab.nombres || ''}_${trab.apellidos || ''}`.replace(/[^a-zA-Z0-9_]/g, "");
                         const ticketStr = asis.numero_asignado ? `Ticket${asis.numero_asignado}` : `SinTicket`;
@@ -4262,63 +4409,9 @@ window.descargarZIPCesionesSemana = async function(event, prog, weekLabel, fecha
                 }
                 
                 if (firmaCesion) {
-                    const doc = new jsPDF({ format: 'legal' });
-                    
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(14);
-                    doc.text("CESION Y AUTORIZACION", 105, 20, null, null, "center");
-                    
-                    doc.setFont("helvetica", "normal");
-                    doc.setFontSize(8);
-
-                    const textoCesion = `En Santiago de Chile, quien suscribe la presente autorización, declara y deja expresa constancia de lo siguiente:
-
-PRIMERO: Por el presente instrumento y, en este acto, autorizo a MEGAMEDIA S.A., en adelante MEGAMEDIA, y a los terceros que ésta designe, para que utilicen mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad, en adelante "mi imagen" (i) en los programas de televisión o casting de estos, en que haya intervenido, participado o haya tenido alguna presencia; (ii) en aquellos productos, bienes, servicios y/o negocios que se comercialicen y/o desarrollen por MEGAMEDIA o por los terceros que designe, que incluyan mi imagen; y (iii) en la publicidad o promoción de (i) y (ii) anteriores. La autorización de que da cuenta este instrumento se presta en forma exclusiva; sin cargo adicional alguno; en forma irrevocable; ilimitada; por el plazo durante el cual se transmitan los programas de televisión en los cuales participe o haya participado o aparecido, en forma individual o en conjunto, y/o durante el plazo en que se comercialicen los productos, bienes, servicios y/o negocios en los que se utilice mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material o externa de mi imagen o personalidad ya sea en forma individual o en conjunto con otros - y en Chile y el Extranjero; y tanto para sistemas de televisión de libre recepción, servicios limitados de televisión, televisión satelital, televisión digital, internet, radio o en cualquier otro medio o sistema de comunicación como para cualquier otro soporte material; y/o de audio; y/o audiovisual que se utilicen para estos efectos por MEGAMEDIA o por los terceros que MEGAMEDIA determine. Todos los soportes materiales; y/o de audio; y/o de audio y video en que se incluya o aparezca mi imagen personal y/o artística, nombre, seudónimo, fotografías, voz y/o, en general, cualquier otra manifestación material de mi imagen o personalidad, es y será de propiedad exclusiva de MEGAMEDIA. En consecuencia, podrán proceder, personalmente o a través de terceros, a la elaboración y comercialización de cuantos productos considere oportunos y sin que esta enumeración se considere taxativa: discos compactos con obras musicales ejecutadas o interpretadas por mi, en forma individual o en conjunto con otros, dvds, u otros soportes de audio, video y/o de audio y video, entre otros, en los que aparezca, por ejemplo, mi imagen o nombre, así como expresiones que se hayan podido popularizar durante la emisión del programa de televisión. Asimismo y sin perjuicio de los derechos de televisión que corresponden a MEGAMEDIA, en forma exclusiva, podrán proceder a la grabación, publicación y copia de actuaciones, ejecuciones o interpretaciones, en cualquier tipo de forma o soporte; la reproducción y adaptación de la actuación como cantante, solista o como parte de un grupo musical o de mi intervención en el programa de televisión, el muestreo, la representación mímica, la mezcla y el doblaje de la actuación o intervención, la reproducción y comunicación pública mediante la utilización de cualquier soporte, así como, en general, cualquier otro medio. También y sin perjuicio de los derechos de televisión y de los derechos musicales que corresponden a MEGAMEDIA, en forma exclusiva, podrá difundir, en cualquier otra forma, información respecto mi persona mediante imágenes y/o sonido, incluyéndose los pases o transmisiones mediante sistemas de comunicación de libre recepción, sistemas de comunicación por satélite, sistemas de comunicación por cable (por ejemplo; como parte de una suscripción o abono a una cadena de televisión de pago o a través de la modalidad de "pay per view" o a través de un circuito cerrado de televisión e incluso como parte de un paquete o compilación de programas), internet, radio, música y cualquier otro medio actualmente conocido o que se conozca en el futuro. Sin perjuicio de lo ya señalado, autorizo la cesión, en este mismo acto, a MEGAMEDIA por lo que respecta a los derechos de televisión y musicales, la totalidad de los derechos de explotación y, en especial, los de reproducción, distribución y/o comunicación pública que me pudieren corresponder sobre mi intervención o participación o presencia en el programa de televisión de acuerdo con la legislación vigente en la República de Chile en materia de propiedad intelectual, efectuándose dicha cesión por el plazo máximo de protección legal, en forma ilimitada, por un número ilimitado de veces, en Chile y el extranjero. Por último, MEGAMEDIA, por lo que respecta a los derechos de televisión y musicales, gozará del derecho a explotar el programa de televisión y las obras musicales en que cante o ejecute, en cualquier forma y a través de cualquier medio, actualmente conocido o que se conozca en el futuro, pudiendo hacerlo, directamente, o a través de cualquier tercero al que, a su vez, ceda, total o parcialmente, los derechos de explotación cuya titularidad ostenta. Asimismo, reconozco y acepto que MEGAMEDIA podrá, directamente o a través de un tercero, producir discos, álbumes musicales u otros soportes materiales conteniendo fonogramas interpretados por mi, en forma individual o en conjunto con otros, en el programa de televisión y que podrá o no a criterio de MEGAMEDIA contener fonogramas interpretados por mi. En tal sentido, en conformidad a la presente autorización, otorgo a MEGAMEDIA el derecho exclusivo para efectuar grabaciones fonográficas de las interpretaciones efectuadas por mi, sea como solista y/o en conjunto con otro u otros participantes del programa de televisión y/o artistas, con o sin images, efectuadas por cualquier medio creado o crearse en el futuro y el derecho exclusivo para fabricar, producir, licenciar, promover y/o de cualquier otra forma explotar fonogramas y/o álbumes y/o videogramas conteniendo dichas grabaciones sin límite de tiempo, ni de territorios, pudiendo ceder este derecho a terceros, sin limitación alguna. Durante toda la vigencia de la presente autorización, ya sea como solista o en conjunto, otorgo a MEGAMEDIA la plena y absoluta exclusividad de mis interpretaciones para fijaciones sonoras y audiovisuales, que se realicen por cualquier medio o tecnología creada o a crearse, comprometiéndome a no grabarlas para mí mismo ni para terceros, ya sea actuando como solista o como integrante de un conjunto y aun sin mención de mi nombre o seudónimo. Asimismo, me obligo a no re-grabar ningún trabajo musical contenido en las grabaciones y/o en los videogramas y/o álbumes y/o fonogramas en los que se incluyan interpretaciones y/o grabaciones, durante un período de 2 años contados desde la finalización del periodo de vigencia de la presente autorización.
-
-SEGUNDO: Sin perjuicio de lo señalado en la cláusula anterior, en particular y sin que ello importe limitación alguna, y sólo a título ejemplar, MEGAMEDIA estará autorizada y será titular de todos los derechos de:
-1) Transmisión televisiva, en directo o diferido, por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro del programa de televisión y de mi imagen, en Chile y en el extranjero, a través de los sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro que MEGAMEDIA designe.
-2) Grabación, reproducción, adaptación y/o edición del programa de televisión y de mi imagen en cualesquiera soportes materiales que permitan la retransmisión televisiva del programa de televisión y de mi imagen o de sus adaptaciones y/o ediciones, por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro. Todo el material de fijación de imágenes y/o sonidos sobre cualquier base material del programa de televisión y de mi imagen es y será única y exclusivamente de propiedad de MEGAMEDIA.
-3) La retransmisión televisiva por sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro de las grabaciones, adaptaciones y/o ediciones de las imágenes, referidas en el N° 2 anterior, en Chile y en el extranjero, a través de los sistemas de televisión de libre recepción, servicios limitados de televisión, televisión digital, televisión satelital, internet o por cualquier otro medio conocido o que se conozca en el futuro que MEGA designe, por un número ilimitado de veces y por el plazo máximo de protección legal del programa de televisión y de mi imagen.
-
-Lo anteriormente declarado, es aceptado por MEGAMEDIA a través de su representante.`;
-
-                    const lineas = doc.splitTextToSize(textoCesion, 175);
-                    doc.text(lineas, 20, 30);
-                    
-                    let yFinalText = 30 + (lineas.length * 3.5);
-                    
                     const nombreCompleto = `${trab.nombres || ''} ${trab.apellidos || ''}`.toUpperCase();
-                    
-                    if (yFinalText > 270) {
-                        doc.addPage();
-                        yFinalText = 30;
-                    }
-
-                    yFinalText += 10;
-                    
-                    doc.setFontSize(10);
-                    doc.text(`Fecha: ${fecha.split('-').reverse().join('-')}`, 20, yFinalText); yFinalText += 6;
-                    doc.text(`Nombre: ${nombreCompleto}`, 20, yFinalText); yFinalText += 6;
-                    doc.text(`RUT: ${rut}`, 20, yFinalText); yFinalText += 6;
-                    doc.text(`Empresa (si aplica): `, 20, yFinalText); yFinalText += 6;
-                    doc.text(`RUT (si aplica): `, 20, yFinalText); yFinalText += 6;
-                    doc.text(`Teléfono: ${trab.telefono || '-'}`, 20, yFinalText); yFinalText += 15;
-                    
-                    if (yFinalText > 300) {
-                        doc.addPage();
-                        yFinalText = 40;
-                    }
-                    
-                    doc.setFont("helvetica", "bold");
-                    doc.text("_________________________________", 20, yFinalText + 20); 
-                    doc.text("Firma", 40, yFinalText + 25); 
-                    
-                    try {
-                        doc.addImage(firmaCesion, 'JPEG', 30, yFinalText - 10, 60, 20); 
-                    } catch(e) {}
-                    
-                    doc.text("_________________________________", 120, yFinalText + 20); 
-                    doc.text("pp. MEGAMEDIA S.A.", 130, yFinalText + 25); 
+                    const doc = new jsPDF({ format: 'letter' });
+                    window.dibujarCesionMegamedia(doc, { fecha, nombre: nombreCompleto.trim(), rut, telefono: trab.telefono || '', firma: firmaCesion });
 
                     const nombreCompletoLimpio = nombreCompleto.replace(/[^a-zA-Z0-9_]/g, "");
                     const pdfBlob = doc.output('blob');
