@@ -792,7 +792,7 @@
                 try {
                     await update(ref(db), inscripcion);
                 } catch (errInscripcion) {
-                    alert("❌ No se pudo completar la inscripción.\n\n• Revisa el PIN que te dio tu captador (si corresponde).\n• Puede que ya estés inscrito/a en este programa.");
+                    alert("❌ No se pudo completar la inscripción.\n\nLo más probable es que YA ESTÉS INSCRITO/A en este programa (no hace falta inscribirse dos veces).\n\nSi no es así, revisa el PIN que te dio tu captador.");
                     throw errInscripcion;
                 }
                 if (!sesionPin) {
