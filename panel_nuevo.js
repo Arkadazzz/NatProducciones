@@ -26,6 +26,7 @@ const CORREOS_ADMINISTRADORES = [
     "pinoelgueta@gmail.com", 
     "natalyseguel.va@gmail.com",
     "Matijesus.pz@gmail.com",
+    "macarenaflizamaa@gmail.com",
     "javier.rojas.fer@gmail.com",
     "luisemilio.jorquera.avaria@gmail.com",
 ].map(c => c.trim().toLowerCase()); // Se normalizan a minúsculas para que mayúsculas no bloqueen el acceso
