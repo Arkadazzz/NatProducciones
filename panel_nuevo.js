@@ -591,8 +591,7 @@ if (btnDescargarMesElegido) {
         try {
             // Datos frescos en el momento de descargar
             const { filas } = await filasContadorMes(mesElegido);
-            let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico;Código AFP LRE;Código Salud LRE\n";
-            const cfgCodigos = window.configPrevired;
+            let csv = "﻿RUT (completo);(*) RUT sin DV;(*) DV;Nombre (Completo);(*) Apellido Paterno;(*) Apellido Materno;(*) Nombres;Fec. Nacimiento;Fec. Ingreso;Fec. Contrato;Sexo;Cargo(30);Región;Dirección(40);Comuna;Ciudad;Tipo S.Base;Valor S.Base;AFP;FONASA / ISAPRE;Teléfono;Correo Electrónico\n";
 
             for (const f of filas) {
                 const tr = f.tr || {};
@@ -600,7 +599,7 @@ if (btnDescargarMesElegido) {
                 const parts = r.split('-');
                 const ap = separarApellidosOriginal(tr.apellidos);
                 const [y, m, d] = (tr.fechaNacimiento || "").split('-');
-                csv += `${r};${parts[0]};${parts[1] || ''};${tr.nombres || ''} ${tr.apellidos || ''};${ap.paterno};${ap.materno};${tr.nombres || ''};${d ? d + '-' + m + '-' + y : ''};${fechaPrevired(f.inicio)};${fechaPrevired(f.termino)};${tr.sexo || ''};extra publico (televisión);;${tr.direccion || ''};;Santiago;Pesos;${f.liquido};${f.afpPorRegla ? f.afpKey : (tr.afp || '')};${tr.salud || ''};${tr.telefono || ''};${tr.email || ''};${f.afpKey ? cfgCodigos.afps[f.afpKey].lre : ''};${f.saludKey ? cfgCodigos.saludes[f.saludKey].lre : ''}\n`;
+                csv += `${r};${parts[0]};${parts[1] || ''};${tr.nombres || ''} ${tr.apellidos || ''};${ap.paterno};${ap.materno};${tr.nombres || ''};${d ? d + '-' + m + '-' + y : ''};${fechaPrevired(f.inicio)};${fechaPrevired(f.termino)};${tr.sexo || ''};extra publico (televisión);;${tr.direccion || ''};;Santiago;Pesos;${f.liquido};${f.afpPorRegla ? f.afpKey : (tr.afp || '')};${tr.salud || ''};${tr.telefono || ''};${tr.email || ''}\n`;
             }
 
             const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
