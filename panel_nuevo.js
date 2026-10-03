@@ -4304,22 +4304,21 @@ async function cargarPanelCesiones(forzar = false) {
         }
 
         const todas = asisSnap.val();
+        const MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+        const hoy = new Date();
+        const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`;
         let agrupacionCesiones = {};
 
-        // Agrupar por Programa -> Semana -> Fechas y Cantidad Total
+        // Agrupar por Mes -> Programa -> Semana. Una semana que cruza de mes se parte: cada mes lleva solo sus días.
         for (const fecha in todas) {
+            const mes = fecha.slice(0, 7);
             const weekInfo = getWeekIdentifier(fecha);
             for (const prog in todas[fecha]) {
-                if (!agrupacionCesiones[prog]) agrupacionCesiones[prog] = {};
-                if (!agrupacionCesiones[prog][weekInfo.sortKey]) {
-                    agrupacionCesiones[prog][weekInfo.sortKey] = {
-                        label: weekInfo.label,
-                        fechas: [],
-                        total: 0
-                    };
-                }
-                agrupacionCesiones[prog][weekInfo.sortKey].fechas.push(fecha);
-                agrupacionCesiones[prog][weekInfo.sortKey].total += Object.keys(todas[fecha][prog]).length;
+                const porMes = agrupacionCesiones[mes] = agrupacionCesiones[mes] || {};
+                const porProg = porMes[prog] = porMes[prog] || {};
+                if (!porProg[weekInfo.sortKey]) porProg[weekInfo.sortKey] = { label: weekInfo.label, fechas: [], total: 0 };
+                porProg[weekInfo.sortKey].fechas.push(fecha);
+                porProg[weekInfo.sortKey].total += Object.keys(todas[fecha][prog]).length;
             }
         }
 
@@ -4328,46 +4327,79 @@ async function cargarPanelCesiones(forzar = false) {
             return;
         }
 
-        let html = '<div class="accordion" id="accCesiones">';
+        // Si la semana quedó partida, la etiqueta muestra solo los días de este mes (y el ZIP no repite nombre)
+        const etiquetaSemana = (dataWeek, mes) => {
+            const [, mm] = mes.split('-');
+            const lunes = dataWeek.label.match(/del (\d{2})\/(\d{2}) al (\d{2})\/(\d{2})/);
+            if (!lunes || (lunes[2] === mm && lunes[4] === mm)) return dataWeek.label;
+            const primero = lunes[2] === mm ? `${lunes[1]}/${mm}` : `01/${mm}`;
+            const ultimo = lunes[4] === mm ? `${lunes[3]}/${mm}` : `${new Date(+mes.slice(0, 4), +mm, 0).getDate()}/${mm}`;
+            return `Semana del ${primero} al ${ultimo}`;
+        };
+
         let pIdx = 0;
-        
-        for (const prog of Object.keys(agrupacionCesiones).sort()) {
-            pIdx++;
-            html += `
+        const htmlProgramas = (mes, idAcordeon) => {
+            let h = `<div class="accordion" id="${idAcordeon}">`;
+            for (const prog of Object.keys(agrupacionCesiones[mes]).sort()) {
+                pIdx++;
+                h += `
             <div class="accordion-item" style="border: 1px solid #ff9900; margin-bottom: 10px; background: #1a1a1a;">
                 <h2 class="accordion-header">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cesProg_${pIdx}" style="background: #331a00; color: #ff9900; font-size: 1.1em; font-weight:bold;">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cesProg_${pIdx}" style="background: #331a00; color: #ff9900; font-size: 1.1em; font-weight: bold;">
                         📺 ${prog.replace(" - ", " / ")}
                     </button>
                 </h2>
-                <div id="cesProg_${pIdx}" class="accordion-collapse collapse" data-bs-parent="#accCesiones">
+                <div id="cesProg_${pIdx}" class="accordion-collapse collapse" data-bs-parent="#${idAcordeon}">
                     <div class="accordion-body p-0" style="background: #141414;">
                         <ul class="list-group list-group-flush">`;
-            
-            const weeksDesc = Object.keys(agrupacionCesiones[prog]).sort().reverse();
-            for (const wk of weeksDesc) {
-                const dataWeek = agrupacionCesiones[prog][wk];
-                const fechasStr = dataWeek.fechas.join(',');
-                
-                html += `
+                for (const wk of Object.keys(agrupacionCesiones[mes][prog]).sort().reverse()) {
+                    const dataWeek = agrupacionCesiones[mes][prog][wk];
+                    const etiqueta = etiquetaSemana(dataWeek, mes);
+                    h += `
                             <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-md-center" style="background: transparent; color: white; border-bottom: 1px solid #333;">
                                 <div class="mb-2 mb-md-0">
-                                    <strong class="text-white fs-5">📅 ${dataWeek.label}</strong><br>
+                                    <strong class="text-white fs-5">📅 ${etiqueta}</strong><br>
                                     <span class="badge bg-secondary">${dataWeek.total} personas en ${dataWeek.fechas.length} día(s)</span>
                                     <p class="mb-0 mt-1 small text-muted">Fechas: ${dataWeek.fechas.sort().reverse().map(f => f.split('-').reverse().join('-')).join(', ')}</p>
                                 </div>
-                                <button class="btn btn-warning fw-bold text-dark shadow-sm" onclick="window.descargarZIPCesionesSemana(event, '${prog}', '${dataWeek.label}', '${fechasStr}')">
+                                <button class="btn btn-warning fw-bold text-dark shadow-sm" onclick="window.descargarZIPCesionesSemana(event, '${prog}', '${etiqueta}', '${dataWeek.fechas.join(',')}')">
                                     📥 Descargar ZIP Semanal
                                 </button>
                             </li>`;
-            }
-            
-            html += `   </ul>
+                }
+                h += `   </ul>
                     </div>
                 </div>
             </div>`;
+            }
+            return h + '</div>';
+        };
+        const nombreMes = (mes) => `${MESES[parseInt(mes.slice(5, 7), 10) - 1]} ${mes.slice(0, 4)}`;
+
+        // Mes actual arriba (abierto), meses anteriores en acordeones cerrados, del más reciente al más antiguo
+        let html = `<h5 class="fw-bold mb-3" style="color: #ff9900;">📅 ${nombreMes(mesActual)} <span class="small text-muted fw-normal">(mes actual)</span></h5>`;
+        html += agrupacionCesiones[mesActual] ? htmlProgramas(mesActual, 'accCesiones') : "<div class='alert alert-secondary text-center small'>Aún no hay cesiones este mes.</div>";
+
+        const anteriores = Object.keys(agrupacionCesiones).filter(m => m < mesActual).sort().reverse();
+        if (anteriores.length) {
+            html += '<div class="accordion mt-4" id="accCesionesMeses">';
+            anteriores.forEach((mes, i) => {
+                const progs = Object.keys(agrupacionCesiones[mes]);
+                const personas = progs.reduce((s, p) => s + Object.values(agrupacionCesiones[mes][p]).reduce((a, w) => a + w.total, 0), 0);
+                html += `
+            <div class="accordion-item" style="border: 1px solid #666; margin-bottom: 10px; background: #111;">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cesMes_${i}" style="background: #222; color: #ddd; font-weight: bold;">
+                        🗂️ ${nombreMes(mes)} <span class="small text-muted fw-normal ms-2">(${progs.length} programa${progs.length === 1 ? '' : 's'} · ${personas.toLocaleString('es-CL')} personas)</span>
+                    </button>
+                </h2>
+                <div id="cesMes_${i}" class="accordion-collapse collapse">
+                    <div class="accordion-body" style="background: #141414;">${htmlProgramas(mes, `accCesionesMes_${i}`)}</div>
+                </div>
+            </div>`;
+            });
+            html += '</div>';
         }
-        html += '</div>';
         contenedor.innerHTML = html;
 
     } catch (e) {
