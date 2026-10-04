@@ -45,6 +45,15 @@ RESERVA_PUBLICO = (
     f" || newData.child('pin').val() === {PIN_CAPTADOR}.val())"
 )
 
+# PIN creado en el formulario por una persona ya registrada que aún no tiene PIN.
+# Queda "pendiente": solo se activa cuando la persona lo vuelve a escribir en el iPad al firmar.
+# Nadie lo puede leer desde afuera; si alguien escribe uno falso, nunca se activa.
+PIN_PENDIENTE_PUBLICO = (
+    "newData.exists()"
+    " && root.child('1_trabajadores').child($rut).exists()"
+    " && root.child('1_trabajadores').child($rut).child('tiene_pin').val() !== true"
+)
+
 AUTOCOMPLETAR_ESCRITURA = (
     "(newData.exists() && newData.parent().parent().child('1p_privado')"
     ".child(newData.child('rut').val()).child('auto_key').val() === $k)"
@@ -88,7 +97,12 @@ reglas = {
         "1_trabajadores": {
             ".read": STAFF,
             ".write": STAFF,
-            "$rut": {".write": BASICA_PUBLICO, "$campo": TEXTO_SEGURO},
+            "$rut": {
+                ".write": BASICA_PUBLICO,
+                # El formulario solo puede saber si un RUT ya está registrado y si tiene PIN (true/false), nada más
+                "tiene_pin": {".read": True, ".validate": "newData.isBoolean()"},
+                "$campo": TEXTO_SEGURO,
+            },
         },
         "1p_privado": {
             ".read": ADMIN,
@@ -109,6 +123,19 @@ reglas = {
                 ".validate": "!newData.exists() || newData.hasChildren(['rut', 'nombres'])",
                 "$campo": TEXTO_SEGURO,
             }
+        },
+        "1q_pin_pendiente": {
+            ".read": STAFF,
+            ".write": STAFF,
+            "$rut": {
+                ".write": PIN_PENDIENTE_PUBLICO,
+                ".validate": "!newData.exists() || (newData.hasChildren(['pin_hash', 'creado'])"
+                             " && newData.child('pin_hash').isString() && newData.child('pin_hash').val().length >= 32"
+                             " && newData.child('pin_hash').val().length <= 128 && newData.child('creado').val() === now)",
+                "pin_hash": {},
+                "creado": {},
+                "$otro": {".validate": False},
+            },
         },
         "2_asistencias": solo(STAFF, STAFF),
         # Contador de tickets por sala: se incrementa con transacciones para que dos iPads no repitan número
