@@ -4389,7 +4389,10 @@ async function calcularPrevired(mes) {
     if (!window.__datosMesPrevired || window.__datosMesPrevired.mes !== mes) {
         window.__datosMesPrevired = { mes, datos: await window.leerAsistenciasMes(mes) };
     }
-    window.filasPrevired = await construirFilasMes(mes, window.ajustesPrevired || {}, window.__datosMesPrevired.datos);
+    const todasFilas = await construirFilasMes(mes, window.ajustesPrevired || {}, window.__datosMesPrevired.datos);
+    // Excluidos a mano (ej: RUT mal escrito, sin contrato): no van al archivo Previred ni al LRE
+    window.filasPreviredExcluidas = todasFilas.filter(f => f.excluido);
+    window.filasPrevired = todasFilas.filter(f => !f.excluido);
     renderTablaPrevired();
 }
 
@@ -4546,7 +4549,7 @@ async function construirFilasMes(mes, ajustes, todas) {
             afpKey, afpPorDefecto, afpPorRegla, saludKey, esFonasa,
             dias, inicio, termino, liquido: liquidoCalc, contratoDT: d.contratoDT,
             enSistema: !d.soloManual, tr, pagado: d.pagado, pendiente: d.pendiente, detalle: d.detalle, anterior: aj.anterior || null, forzado: !!(aj.forzado && Object.keys(aj.forzado).length), personaManual: !!aj.persona,
-            periodo, calc, errores, avisos,
+            periodo, calc, errores, avisos, excluido: aj.excluido || null,
             afpActual: tr.afp || "", saludActual: tr.salud || "", sexoActual: tr.sexo || "", nacActual: tr.nacionalidad || ""
         });
     }
@@ -4618,6 +4621,8 @@ function construirLineaPrevired(f) {
     return campos.slice(1).join(';');
 }
 
+const escPrevired = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
 function renderTablaPrevired() {
     const cont = document.getElementById('tablaPrevired');
     if (!cont) return;
@@ -4658,9 +4663,26 @@ function renderTablaPrevired() {
             </div>
         </div>`;
 
+    const excluidas = window.filasPreviredExcluidas || [];
+    const htmlExcluidas = excluidas.length ? `
+        <div class="p-3 rounded mt-3" style="background: #111; border: 1px solid #666;">
+            <div class="fw-bold text-white mb-2">🚫 Excluidos de Previred este mes (${excluidas.length}) <span class="small text-muted fw-normal">— no van en el archivo Previred ni en el LRE</span></div>
+            <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;"><tbody>
+            ${excluidas.map(f => `<tr>
+                <td class="fw-bold">${escPrevired(f.rut)}</td>
+                <td>${escPrevired(`${f.nombres} ${f.paterno} ${f.materno}`)}</td>
+                <td class="text-muted">${escPrevired(f.excluido.motivo || '')}</td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-light py-0 prev-accion" data-rut="${escPrevired(f.rut)}" data-accion="incluir">↩️ Volver a incluir</button></td>
+            </tr>`).join('')}
+            </tbody></table>
+        </div>` : '';
+
     if (filas.length === 0) {
-        cont.innerHTML = html + "<div class='alert alert-secondary text-center'>No hay trabajadores con pago en este mes.</div>";
+        cont.innerHTML = html + "<div class='alert alert-secondary text-center'>No hay trabajadores con pago en este mes.</div>" + htmlExcluidas;
+        document.querySelectorAll('.prev-accion').forEach(btn => btn.addEventListener('click', accionFilaPrevired));
         conectarFormularioAgregarPrevired();
+        const btnRev = document.getElementById('btnDescargarRevisionPrevired');
+        if (btnRev) btnRev.disabled = false;
         return;
     }
 
@@ -4714,7 +4736,8 @@ function renderTablaPrevired() {
         ].filter(Boolean).join(' ');
         const botones = [
             f.forzado ? `<button class="btn btn-sm btn-outline-light py-0 prev-accion" data-rut="${f.rut}" data-accion="deshacer" title="Volver a los valores calculados">↩️ Deshacer edición</button>` : '',
-            f.anterior ? `<button class="btn btn-sm btn-outline-danger py-0 prev-accion" data-rut="${f.rut}" data-accion="quitarAnterior">🗑️ Quitar sist. anterior</button>` : ''
+            f.anterior ? `<button class="btn btn-sm btn-outline-danger py-0 prev-accion" data-rut="${f.rut}" data-accion="quitarAnterior">🗑️ Quitar sist. anterior</button>` : '',
+            `<button class="btn btn-sm btn-outline-secondary py-0 prev-accion" data-rut="${escPrevired(f.rut)}" data-accion="excluir" title="No incluir a esta persona en Previred ni en el LRE de este mes">🚫 Excluir de Previred</button>`
         ].filter(Boolean).join(' ');
 
         html += `<tr class="${ok ? '' : 'table-danger'}">
@@ -4732,7 +4755,7 @@ function renderTablaPrevired() {
             <td style="min-width: 170px;">${ok ? '✅' : ''}${correcciones ? `<div class="d-flex flex-column gap-1">${correcciones}</div>` : ''}${otrosErrores.map(e => `<div class="small text-danger fw-bold">${e}</div>`).join('')}${f.avisos.map(a => `<div class="small text-warning">${a}</div>`).join('')}</td>
         </tr>`;
     }
-    html += `</tbody></table></div>`;
+    html += `</tbody></table></div>` + htmlExcluidas;
     cont.innerHTML = html;
 
     document.querySelectorAll('.prev-fix').forEach(sel => sel.addEventListener('change', corregirDatoPrevired));
@@ -4839,8 +4862,16 @@ async function editarValorPrevired(e) {
 async function accionFilaPrevired(e) {
     const btn = e.currentTarget;
     const rut = btn.dataset.rut, accion = btn.dataset.accion;
+    if (accion === 'excluir') {
+        const motivo = prompt(`¿Excluir ${rut} de Previred y del LRE de este mes?\n\nMotivo (queda anotado):`, "RUT mal ingresado, sin contrato");
+        if (motivo === null) return;
+        window.ajustesPrevired[rut] = { ...(window.ajustesPrevired[rut] || {}), excluido: { motivo: motivo.trim().substring(0, 200), fecha: new Date().toISOString().slice(0, 10) } };
+        await guardarAjustesPrevired();
+        return calcularPrevired(mesPreviredActual);
+    }
     const ajuste = window.ajustesPrevired[rut];
     if (!ajuste) return;
+    if (accion === 'incluir') delete ajuste.excluido;
     if (accion === 'deshacer') {
         delete ajuste.forzado;
     } else if (accion === 'quitarAnterior') {
@@ -4848,7 +4879,7 @@ async function accionFilaPrevired(e) {
         delete ajuste.anterior;
         if (!ajuste.forzado) delete ajuste.persona;
     }
-    if (!ajuste.anterior && !ajuste.forzado && !ajuste.persona) delete window.ajustesPrevired[rut];
+    if (!ajuste.anterior && !ajuste.forzado && !ajuste.persona && !ajuste.excluido) delete window.ajustesPrevired[rut];
     await guardarAjustesPrevired();
     await calcularPrevired(mesPreviredActual);
 }
