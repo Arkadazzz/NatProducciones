@@ -5362,3 +5362,156 @@ function descargarLRE() {
     btnTxt.insertAdjacentElement('afterend', b);
     b.addEventListener('click', descargarLRE);
 })();
+
+// ============================================================================
+// CARGAR RESULTADO DE PREVIRED: lee el CSV de errores que devuelve Previred y
+// corrige la AFP en la ficha de cada persona (queda bien para los meses siguientes)
+// ============================================================================
+function claveAfpDesdeTextoPrevired(texto) {
+    const c = window.configPrevired || {};
+    const limpio = String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/^\s*AFP\s+/, '').replace(/[^A-Z]/g, '');
+    if (!limpio) return '';
+    return Object.keys(c.afps || {}).find(k => k !== 'NO_COTIZA' && k.replace(/[^A-Z]/g, '') === limpio) || '';
+}
+
+function leerCsvResultadoPrevired(texto) {
+    const lineas = texto.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+    if (!lineas.length || !/Descripci/i.test(lineas[0]) || !/Dato desde AFP/i.test(lineas[0])) return null;
+    return lineas.slice(1).map(l => {
+        const [rut, error, nomina, afp] = l.split(';').map(x => (x || '').trim());
+        return { rut: rut.replace(/\./g, '').toUpperCase(), error, nomina, afp };
+    }).filter(r => r.rut && r.error);
+}
+
+async function prepararResultadoPrevired(archivo) {
+    const texto = await new Promise((ok, mal) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = mal; fr.readAsText(archivo, 'ISO-8859-1'); });
+    const filas = leerCsvResultadoPrevired(texto);
+    if (!filas) return alert("Este archivo no parece el resultado de Previred.\nDebe ser el CSV con las columnas: RUT; Descripción Error; Dato desde su Nómina; Dato desde AFP.");
+    const c = window.configPrevired;
+    const trabSnap = await window.obtenerTrabajadores();
+    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+    const ajustes = window.ajustesPrevired || {};
+
+    const cambios = {}, yaBien = new Set(), noEncontrados = [], nombres = [], otros = [];
+    for (const f of filas) {
+        if (/AFP|afiliaci/i.test(f.error)) {
+            const clave = claveAfpDesdeTextoPrevired(f.afp);
+            if (!clave) { otros.push(f); continue; }
+            const tr = trabajadores[f.rut];
+            const persona = ajustes[f.rut] && ajustes[f.rut].persona;
+            if (!tr && !persona) { noEncontrados.push(f); continue; }
+            const actual = String((persona && !tr ? persona.afp : tr.afp) || '');
+            if (actual === clave) { yaBien.add(f.rut); continue; }
+            const nombre = tr ? `${tr.nombres || ''} ${tr.apellidos || ''}` : `${persona.nombres || ''} ${persona.apellidos || ''}`;
+            cambios[f.rut] = { rut: f.rut, nombre: nombre.trim(), actual, clave, manual: !tr, motivo: f.error };
+        } else if (/corresponde/i.test(f.error)) nombres.push(f);
+        else otros.push(f);
+    }
+    window.__resultadoPrevired = cambios;
+    mostrarResultadoPrevired(Object.values(cambios), yaBien.size, noEncontrados, nombres, otros);
+}
+
+function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros) {
+    const c = window.configPrevired;
+    const nombreAfp = (k) => k && c.afps[k] ? c.afps[k].nombre : (k || 'Sin AFP / No sé');
+    let cont = document.getElementById('panelResultadoPrevired');
+    if (!cont) {
+        cont = document.createElement('div');
+        cont.id = 'panelResultadoPrevired';
+        document.getElementById('tablaPrevired').insertAdjacentElement('beforebegin', cont);
+    }
+    const filaTabla = (cols) => `<tr>${cols.map(x => `<td>${escPrevired(x)}</td>`).join('')}</tr>`;
+    cont.innerHTML = `
+        <div class="p-3 rounded mb-3" style="background: #0d1a26; border: 2px solid #0dcaf0;">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="fw-bold fs-5 text-info">📂 Resultado de Previred</span>
+                <button class="btn btn-sm btn-outline-light" id="btnCerrarResultadoPrev">Cerrar</button>
+            </div>
+            <div class="small text-white mt-2">
+                ✏️ <b>${cambios.length}</b> persona(s) con la AFP por corregir en su ficha ·
+                ✅ <b>${yaBien}</b> ya tienen la AFP correcta ·
+                👤 <b>${nombres.length}</b> aviso(s) de nombre/apellido para revisar a mano
+                ${noEncontrados.length ? ` · ⚠️ <b>${noEncontrados.length}</b> RUT no encontrados en la base` : ''}
+            </div>
+            ${cambios.length ? `
+            <div class="table-responsive mt-3" style="max-height: 40vh;">
+                <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;">
+                    <thead style="position: sticky; top: 0;"><tr><th><input type="checkbox" id="chkTodosResultadoPrev" checked></th><th>RUT</th><th>Nombre</th><th>AFP en la ficha</th><th></th><th>AFP según Previred</th></tr></thead>
+                    <tbody>${cambios.map(x => `<tr>
+                        <td><input type="checkbox" class="chk-resultado-prev" data-rut="${escPrevired(x.rut)}" checked></td>
+                        <td class="fw-bold">${escPrevired(x.rut)}</td><td>${escPrevired(x.nombre)}${x.manual ? ' <span class="badge bg-info text-dark">agregada a mano</span>' : ''}</td>
+                        <td class="text-danger">${escPrevired(nombreAfp(x.actual))}</td><td>→</td><td class="text-success fw-bold">${escPrevired(nombreAfp(x.clave))}</td></tr>`).join('')}</tbody>
+                </table>
+            </div>
+            <div class="text-end mt-2"><button class="btn btn-info fw-bold" id="btnAplicarResultadoPrev">✅ Aplicar correcciones de AFP</button></div>` : '<div class="alert alert-success small mt-3 mb-0">No hay AFP por corregir: todas las fichas ya coinciden con Previred.</div>'}
+            ${nombres.length ? `
+            <details class="mt-3"><summary class="text-warning fw-bold" style="cursor: pointer;">👤 Nombres y apellidos distintos (${nombres.length}) — revisar a mano en BD & Edición</summary>
+                <div class="small text-muted my-1">No se corrigen solos: Previred los muestra sin tildes ni Ñ. Corrige solo los que estén realmente mal escritos.</div>
+                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><thead><tr><th>RUT</th><th>Aviso</th><th>En la ficha</th><th>Según Previred</th></tr></thead>
+                <tbody>${nombres.map(f => filaTabla([f.rut, f.error, f.nomina, f.afp])).join('')}</tbody></table>
+            </details>` : ''}
+            ${noEncontrados.length || otros.length ? `
+            <details class="mt-2"><summary class="text-secondary" style="cursor: pointer;">Otros avisos (${noEncontrados.length + otros.length})</summary>
+                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><tbody>${[...noEncontrados, ...otros].map(f => filaTabla([f.rut, f.error, f.nomina, f.afp])).join('')}</tbody></table>
+            </details>` : ''}
+        </div>`;
+    document.getElementById('btnCerrarResultadoPrev').addEventListener('click', () => cont.remove());
+    const todos = document.getElementById('chkTodosResultadoPrev');
+    if (todos) todos.addEventListener('change', () => document.querySelectorAll('.chk-resultado-prev').forEach(ch => { ch.checked = todos.checked; }));
+    const btn = document.getElementById('btnAplicarResultadoPrev');
+    if (btn) btn.addEventListener('click', aplicarResultadoPrevired);
+    cont.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function aplicarResultadoPrevired() {
+    const cambios = window.__resultadoPrevired || {};
+    const elegidos = [...document.querySelectorAll('.chk-resultado-prev:checked')].map(ch => cambios[ch.dataset.rut]).filter(Boolean);
+    if (!elegidos.length) return alert("No hay correcciones seleccionadas.");
+    if (!confirm(`¿Corregir la AFP de ${elegidos.length} persona(s) en su ficha?\n\nQueda guardado para los meses siguientes.`)) return;
+    const btn = document.getElementById('btnAplicarResultadoPrev');
+    btn.disabled = true; btn.innerText = '⏳ Guardando...';
+    try {
+        const enFicha = elegidos.filter(x => !x.manual);
+        const actualizacion = {};
+        enFicha.forEach(x => { actualizacion[`1_trabajadores/${x.rut}/afp`] = x.clave; });
+        if (enFicha.length) await update(ref(db), actualizacion);
+        // Caché local: solo el campo cambiado (sin volver a descargar la base)
+        let tocoCache = false;
+        enFicha.forEach(x => {
+            if (window.cacheTrabajadores && window.cacheTrabajadores[x.rut]) { window.cacheTrabajadores[x.rut].afp = x.clave; tocoCache = true; }
+            if (listaGlobalCRM && listaGlobalCRM[x.rut]) listaGlobalCRM[x.rut].afp = x.clave;
+        });
+        if (tocoCache) await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
+        const manuales = elegidos.filter(x => x.manual);
+        if (manuales.length) {
+            manuales.forEach(x => { window.ajustesPrevired[x.rut].persona.afp = x.clave; });
+            await guardarAjustesPrevired();
+        }
+        document.getElementById('panelResultadoPrevired').remove();
+        await calcularPrevired(mesPreviredActual);
+        alert(`✅ Listo: ${elegidos.length} AFP corregida(s).\n\nDescarga de nuevo el TXT Previred y vuelve a subirlo.`);
+    } catch (e) {
+        console.error(e);
+        btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de AFP';
+        alert("❌ No se pudieron guardar las correcciones. No se cambió nada; inténtalo de nuevo.");
+    }
+}
+
+// Botón "Cargar resultado de Previred" junto a los de Previred (se crea solo, sin tocar panel.html)
+(function crearBotonResultadoPrevired() {
+    const btnRev = document.getElementById('btnDescargarRevisionPrevired');
+    if (!btnRev || document.getElementById('btnCargarResultadoPrevired')) return;
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.csv,text/csv'; input.className = 'd-none'; input.id = 'inputResultadoPrevired';
+    const b = document.createElement('button');
+    b.type = 'button'; b.id = 'btnCargarResultadoPrevired'; b.className = 'btn btn-outline-warning fw-bold';
+    b.innerText = '📂 Cargar resultado de Previred';
+    b.title = 'Sube el CSV de errores que devuelve Previred: corrige la AFP de cada persona en su ficha';
+    btnRev.insertAdjacentElement('beforebegin', b);
+    b.insertAdjacentElement('afterend', input);
+    b.addEventListener('click', () => {
+        if (!mesPreviredActual) return alert("Primero elige el mes a declarar.");
+        input.value = ''; input.click();
+    });
+    input.addEventListener('change', () => { if (input.files[0]) prepararResultadoPrevired(input.files[0]).catch(e => { console.error(e); alert("❌ No se pudo leer el archivo."); }); });
+})();
