@@ -4830,7 +4830,10 @@ async function calcularPrevired(mes) {
     if (!window.__datosMesPrevired || window.__datosMesPrevired.mes !== mes) {
         window.__datosMesPrevired = { mes, datos: await window.leerAsistenciasMes(mes) };
     }
-    window.filasPrevired = await construirFilasMes(mes, window.ajustesPrevired || {}, window.__datosMesPrevired.datos);
+    const todasFilas = await construirFilasMes(mes, window.ajustesPrevired || {}, window.__datosMesPrevired.datos);
+    // Excluidos a mano (ej: RUT mal escrito, sin contrato): no van al archivo Previred ni al LRE
+    window.filasPreviredExcluidas = todasFilas.filter(f => f.excluido);
+    window.filasPrevired = todasFilas.filter(f => !f.excluido);
     renderTablaPrevired();
 }
 
@@ -4987,7 +4990,7 @@ async function construirFilasMes(mes, ajustes, todas) {
             afpKey, afpPorDefecto, afpPorRegla, saludKey, esFonasa,
             dias, inicio, termino, liquido: liquidoCalc, contratoDT: d.contratoDT,
             enSistema: !d.soloManual, tr, pagado: d.pagado, pendiente: d.pendiente, detalle: d.detalle, anterior: aj.anterior || null, forzado: !!(aj.forzado && Object.keys(aj.forzado).length), personaManual: !!aj.persona,
-            periodo, calc, errores, avisos,
+            periodo, calc, errores, avisos, excluido: aj.excluido || null,
             afpActual: tr.afp || "", saludActual: tr.salud || "", sexoActual: tr.sexo || "", nacActual: tr.nacionalidad || ""
         });
     }
@@ -5059,6 +5062,8 @@ function construirLineaPrevired(f) {
     return campos.slice(1).join(';');
 }
 
+const escPrevired = (s) => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
 function renderTablaPrevired() {
     const cont = document.getElementById('tablaPrevired');
     if (!cont) return;
@@ -5099,9 +5104,26 @@ function renderTablaPrevired() {
             </div>
         </div>`;
 
+    const excluidas = window.filasPreviredExcluidas || [];
+    const htmlExcluidas = excluidas.length ? `
+        <div class="p-3 rounded mt-3" style="background: #111; border: 1px solid #666;">
+            <div class="fw-bold text-white mb-2">🚫 Excluidos de Previred este mes (${excluidas.length}) <span class="small text-muted fw-normal">— no van en el archivo Previred ni en el LRE</span></div>
+            <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;"><tbody>
+            ${excluidas.map(f => `<tr>
+                <td class="fw-bold">${escPrevired(f.rut)}</td>
+                <td>${escPrevired(`${f.nombres} ${f.paterno} ${f.materno}`)}</td>
+                <td class="text-muted">${escPrevired(f.excluido.motivo || '')}</td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-light py-0 prev-accion" data-rut="${escPrevired(f.rut)}" data-accion="incluir">↩️ Volver a incluir</button></td>
+            </tr>`).join('')}
+            </tbody></table>
+        </div>` : '';
+
     if (filas.length === 0) {
-        cont.innerHTML = html + "<div class='alert alert-secondary text-center'>No hay trabajadores con pago en este mes.</div>";
+        cont.innerHTML = html + "<div class='alert alert-secondary text-center'>No hay trabajadores con pago en este mes.</div>" + htmlExcluidas;
+        document.querySelectorAll('.prev-accion').forEach(btn => btn.addEventListener('click', accionFilaPrevired));
         conectarFormularioAgregarPrevired();
+        const btnRev = document.getElementById('btnDescargarRevisionPrevired');
+        if (btnRev) btnRev.disabled = false;
         return;
     }
 
@@ -5155,7 +5177,8 @@ function renderTablaPrevired() {
         ].filter(Boolean).join(' ');
         const botones = [
             f.forzado ? `<button class="btn btn-sm btn-outline-light py-0 prev-accion" data-rut="${f.rut}" data-accion="deshacer" title="Volver a los valores calculados">↩️ Deshacer edición</button>` : '',
-            f.anterior ? `<button class="btn btn-sm btn-outline-danger py-0 prev-accion" data-rut="${f.rut}" data-accion="quitarAnterior">🗑️ Quitar sist. anterior</button>` : ''
+            f.anterior ? `<button class="btn btn-sm btn-outline-danger py-0 prev-accion" data-rut="${f.rut}" data-accion="quitarAnterior">🗑️ Quitar sist. anterior</button>` : '',
+            `<button class="btn btn-sm btn-outline-secondary py-0 prev-accion" data-rut="${escPrevired(f.rut)}" data-accion="excluir" title="No incluir a esta persona en Previred ni en el LRE de este mes">🚫 Excluir de Previred</button>`
         ].filter(Boolean).join(' ');
 
         html += `<tr class="${ok ? '' : 'table-danger'}">
@@ -5173,7 +5196,7 @@ function renderTablaPrevired() {
             <td style="min-width: 170px;">${ok ? '✅' : ''}${correcciones ? `<div class="d-flex flex-column gap-1">${correcciones}</div>` : ''}${otrosErrores.map(e => `<div class="small text-danger fw-bold">${e}</div>`).join('')}${f.avisos.map(a => `<div class="small text-warning">${a}</div>`).join('')}</td>
         </tr>`;
     }
-    html += `</tbody></table></div>`;
+    html += `</tbody></table></div>` + htmlExcluidas;
     cont.innerHTML = html;
 
     document.querySelectorAll('.prev-fix').forEach(sel => sel.addEventListener('change', corregirDatoPrevired));
@@ -5280,8 +5303,16 @@ async function editarValorPrevired(e) {
 async function accionFilaPrevired(e) {
     const btn = e.currentTarget;
     const rut = btn.dataset.rut, accion = btn.dataset.accion;
+    if (accion === 'excluir') {
+        const motivo = prompt(`¿Excluir ${rut} de Previred y del LRE de este mes?\n\nMotivo (queda anotado):`, "RUT mal ingresado, sin contrato");
+        if (motivo === null) return;
+        window.ajustesPrevired[rut] = { ...(window.ajustesPrevired[rut] || {}), excluido: { motivo: motivo.trim().substring(0, 200), fecha: new Date().toISOString().slice(0, 10) } };
+        await guardarAjustesPrevired();
+        return calcularPrevired(mesPreviredActual);
+    }
     const ajuste = window.ajustesPrevired[rut];
     if (!ajuste) return;
+    if (accion === 'incluir') delete ajuste.excluido;
     if (accion === 'deshacer') {
         delete ajuste.forzado;
     } else if (accion === 'quitarAnterior') {
@@ -5289,7 +5320,7 @@ async function accionFilaPrevired(e) {
         delete ajuste.anterior;
         if (!ajuste.forzado) delete ajuste.persona;
     }
-    if (!ajuste.anterior && !ajuste.forzado && !ajuste.persona) delete window.ajustesPrevired[rut];
+    if (!ajuste.anterior && !ajuste.forzado && !ajuste.persona && !ajuste.excluido) delete window.ajustesPrevired[rut];
     await guardarAjustesPrevired();
     await calcularPrevired(mesPreviredActual);
 }
@@ -6004,3 +6035,280 @@ async function moverFirmasRecibos() {
     }
 }
 if (document.getElementById('btnMoverFirmasRecibos')) document.getElementById('btnMoverFirmasRecibos').addEventListener('click', moverFirmasRecibos);
+// ============================================================================
+// CARGAR RESULTADO DE PREVIRED: lee el CSV de errores que devuelve Previred y
+// corrige la AFP en la ficha de cada persona (queda bien para los meses siguientes)
+// ============================================================================
+function claveAfpDesdeTextoPrevired(texto) {
+    const c = window.configPrevired || {};
+    const limpio = String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/^\s*AFP\s+/, '').replace(/[^A-Z]/g, '');
+    if (!limpio) return '';
+    return Object.keys(c.afps || {}).find(k => k !== 'NO_COTIZA' && k.replace(/[^A-Z]/g, '') === limpio) || '';
+}
+
+function leerCsvResultadoPrevired(texto) {
+    const lineas = texto.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
+    if (!lineas.length || !/Descripci/i.test(lineas[0]) || !/Dato desde AFP/i.test(lineas[0])) return null;
+    return lineas.slice(1).map(l => {
+        const [rut, error, nomina, afp] = l.split(';').map(x => (x || '').trim());
+        return { rut: rut.replace(/\./g, '').toUpperCase(), error, nomina, afp };
+    }).filter(r => r.rut && r.error);
+}
+
+// Texto comparable: sin tildes, sin Ñ, sin guiones, en mayúsculas
+function nombreComparablePrevired(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Previred muestra las letras con tilde o Ñ como un espacio ("CHAC N" = CHACÓN). ¿La diferencia es solo eso?
+function soloTildesPrevired(enviado, previred) {
+    const p = nombreComparablePrevired(previred), e = nombreComparablePrevired(enviado);
+    if (!p || !e) return false;
+    return new RegExp('^' + p.split('').map(ch => ch === ' ' ? '.' : ch).join('') + '$').test(e);
+}
+function distanciaPrevired(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...new Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+}
+// Parecido = mal escrito, apodo o incompleto. Muy distinto = probablemente es el RUT de otra persona.
+function nombreParecidoPrevired(enviado, previred) {
+    const a = nombreComparablePrevired(enviado), b = nombreComparablePrevired(previred);
+    if (!a || !b) return false;
+    if (a.includes(b) || b.includes(a)) return true;
+    if (1 - distanciaPrevired(a, b) / Math.max(a.length, b.length) >= 0.6) return true;
+    const particulas = ['DE', 'DEL', 'LA', 'LAS', 'LOS', 'SAN', 'SANTA'];
+    const raiz = (s) => s.split(' ').filter(w => w.length >= 3 && !particulas.includes(w)).map(w => w.slice(0, 3));
+    const rb = raiz(b);
+    return raiz(a).some(r => rb.includes(r));
+}
+
+function clasificarNombrePrevired(f, trabajadores, ajustes, nombres, noEncontrados) {
+    const campo = /^Nombres/i.test(f.error) ? 'nombres' : (/Paterno/i.test(f.error) ? 'paterno' : (/Materno/i.test(f.error) ? 'materno' : ''));
+    const sinMaterno = campo === 'materno' && !f.afp; // Previred no tiene apellido materno (ej: extranjeros): se quita
+    if (!campo || (!f.afp && !sinMaterno)) return nombres.manual.push({ ...f, nota: 'Previred no indica el dato correcto' });
+    if (!sinMaterno && soloTildesPrevired(f.nomina, f.afp)) return nombres.tildes.push(f);
+    const correcto = nombreComparablePrevired(f.afp);
+    // Con letras perdidas (tildes/Ñ dentro de una diferencia real) o guion, no se puede escribir bien solo
+    if (/-/.test(f.afp) || correcto.split(' ').some(w => w.length === 1 && w !== 'Y')) return nombres.manual.push({ ...f, nota: /-/.test(f.afp) ? 'Apellido con guion: revisar a mano' : 'Previred lo muestra sin tildes/Ñ: corregir a mano' });
+    const tr = trabajadores[f.rut];
+    const persona = !tr && ajustes[f.rut] && ajustes[f.rut].persona;
+    if (!tr && !persona) return noEncontrados.push(f);
+    const base = tr || persona;
+    const ap = separarApellidosOriginal(base.apellidos);
+    const actual = campo === 'nombres' ? base.nombres : ap[campo];
+    if (nombreComparablePrevired(actual) === correcto) return; // ya corregido antes
+    const p = nombres.propuestas[f.rut] = nombres.propuestas[f.rut] || { rut: f.rut, manual: !tr, actualNombres: base.nombres || '', actualApellidos: base.apellidos || '', nuevo: {}, distinto: false };
+    p.nuevo[campo] = correcto;
+    if (!sinMaterno && !nombreParecidoPrevired(f.nomina, f.afp)) p.distinto = true;
+}
+
+function nombreNuevoPrevired(p) {
+    const ap = separarApellidosOriginal(p.actualApellidos);
+    return {
+        nombres: p.nuevo.nombres || p.actualNombres,
+        apellidos: [p.nuevo.paterno || ap.paterno, 'materno' in p.nuevo ? p.nuevo.materno : ap.materno].filter(Boolean).join(' ')
+    };
+}
+
+async function prepararResultadoPrevired(archivo) {
+    const texto = await new Promise((ok, mal) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = mal; fr.readAsText(archivo, 'ISO-8859-1'); });
+    const filas = leerCsvResultadoPrevired(texto);
+    if (!filas) return alert("Este archivo no parece el resultado de Previred.\nDebe ser el CSV con las columnas: RUT; Descripción Error; Dato desde su Nómina; Dato desde AFP.");
+    const c = window.configPrevired;
+    const trabSnap = await window.obtenerTrabajadores();
+    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+    const ajustes = window.ajustesPrevired || {};
+
+    const cambios = {}, yaBien = new Set(), noEncontrados = [], nombres = { propuestas: {}, tildes: [], manual: [] }, otros = [];
+    for (const f of filas) {
+        if (/AFP|afiliaci/i.test(f.error)) {
+            const clave = claveAfpDesdeTextoPrevired(f.afp);
+            if (!clave) { otros.push(f); continue; }
+            const tr = trabajadores[f.rut];
+            const persona = ajustes[f.rut] && ajustes[f.rut].persona;
+            if (!tr && !persona) { noEncontrados.push(f); continue; }
+            const actual = String((persona && !tr ? persona.afp : tr.afp) || '');
+            if (actual === clave) { yaBien.add(f.rut); continue; }
+            const nombre = tr ? `${tr.nombres || ''} ${tr.apellidos || ''}` : `${persona.nombres || ''} ${persona.apellidos || ''}`;
+            cambios[f.rut] = { rut: f.rut, nombre: nombre.trim(), actual, clave, manual: !tr, motivo: f.error };
+        } else if (/corresponde/i.test(f.error)) clasificarNombrePrevired(f, trabajadores, ajustes, nombres, noEncontrados);
+        else otros.push(f);
+    }
+    window.__resultadoPrevired = cambios;
+    window.__nombresPrevired = nombres.propuestas;
+    mostrarResultadoPrevired(Object.values(cambios), yaBien.size, noEncontrados, nombres, otros);
+}
+
+function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros) {
+    const c = window.configPrevired;
+    const nombreAfp = (k) => k && c.afps[k] ? c.afps[k].nombre : (k || 'Sin AFP / No sé');
+    let cont = document.getElementById('panelResultadoPrevired');
+    if (!cont) {
+        cont = document.createElement('div');
+        cont.id = 'panelResultadoPrevired';
+        document.getElementById('tablaPrevired').insertAdjacentElement('beforebegin', cont);
+    }
+    const filaTabla = (cols) => `<tr>${cols.map(x => `<td>${escPrevired(x)}</td>`).join('')}</tr>`;
+    const propuestasNombre = Object.values(nombres.propuestas).sort((a, b) => (a.distinto - b.distinto) || a.rut.localeCompare(b.rut));
+    cont.innerHTML = `
+        <div class="p-3 rounded mb-3" style="background: #0d1a26; border: 2px solid #0dcaf0;">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span class="fw-bold fs-5 text-info">📂 Resultado de Previred</span>
+                <button class="btn btn-sm btn-outline-light" id="btnCerrarResultadoPrev">Cerrar</button>
+            </div>
+            <div class="small text-white mt-2">
+                ✏️ <b>${cambios.length}</b> persona(s) con la AFP por corregir en su ficha ·
+                ✅ <b>${yaBien}</b> ya tienen la AFP correcta ·
+                👤 <b>${propuestasNombre.length}</b> nombre(s) por corregir
+                ${noEncontrados.length ? ` · ⚠️ <b>${noEncontrados.length}</b> RUT no encontrados en la base` : ''}
+            </div>
+            ${cambios.length ? `
+            <div class="table-responsive mt-3" style="max-height: 40vh;">
+                <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;">
+                    <thead style="position: sticky; top: 0;"><tr><th><input type="checkbox" id="chkTodosResultadoPrev" checked></th><th>RUT</th><th>Nombre</th><th>AFP en la ficha</th><th></th><th>AFP según Previred</th></tr></thead>
+                    <tbody>${cambios.map(x => `<tr>
+                        <td><input type="checkbox" class="chk-resultado-prev" data-rut="${escPrevired(x.rut)}" checked></td>
+                        <td class="fw-bold">${escPrevired(x.rut)}</td><td>${escPrevired(x.nombre)}${x.manual ? ' <span class="badge bg-info text-dark">agregada a mano</span>' : ''}</td>
+                        <td class="text-danger">${escPrevired(nombreAfp(x.actual))}</td><td>→</td><td class="text-success fw-bold">${escPrevired(nombreAfp(x.clave))}</td></tr>`).join('')}</tbody>
+                </table>
+            </div>
+            <div class="text-end mt-2"><button class="btn btn-info fw-bold" id="btnAplicarResultadoPrev">✅ Aplicar correcciones de AFP</button></div>` : '<div class="alert alert-success small mt-3 mb-0">No hay AFP por corregir: todas las fichas ya coinciden con Previred.</div>'}
+            ${propuestasNombre.length ? `
+            <div class="fw-bold text-warning mt-4">👤 Nombres y apellidos por corregir (${propuestasNombre.length})</div>
+            <div class="small text-muted mb-1">Se usa el nombre que tiene Previred. Los marcados ⚠️ son muy distintos: probablemente la persona escribió mal su RUT. Revísalos antes de marcarlos (o usa "Excluir").</div>
+            <div class="table-responsive" style="max-height: 40vh;">
+                <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;">
+                    <thead style="position: sticky; top: 0;"><tr><th><input type="checkbox" id="chkTodosNombresPrev"></th><th>RUT</th><th>En la ficha</th><th></th><th>Según Previred</th><th></th></tr></thead>
+                    <tbody>${propuestasNombre.map(p => { const n = nombreNuevoPrevired(p); return `<tr>
+                        <td><input type="checkbox" class="chk-nombre-prev" data-rut="${escPrevired(p.rut)}" ${p.distinto ? '' : 'checked'}></td>
+                        <td class="fw-bold">${escPrevired(p.rut)}</td>
+                        <td class="text-danger">${escPrevired(`${p.actualNombres} ${p.actualApellidos}`)}</td><td>→</td>
+                        <td class="text-success fw-bold">${escPrevired(`${n.nombres} ${n.apellidos}`)}</td>
+                        <td>${p.distinto ? '<span class="badge bg-danger">⚠️ Muy distinto: ¿RUT equivocado?</span>' : '<span class="badge bg-secondary">Mal escrito</span>'}</td></tr>`; }).join('')}</tbody>
+                </table>
+            </div>
+            <div class="text-end mt-2"><button class="btn btn-warning fw-bold text-dark" id="btnAplicarNombresPrev">✅ Aplicar correcciones de nombres</button></div>` : ''}
+            ${nombres.tildes.length ? `
+            <details class="mt-2"><summary class="text-secondary" style="cursor: pointer;">Solo tildes o Ñ (${nombres.tildes.length}) — no requieren cambio</summary>
+                <div class="small text-muted my-1">El archivo Previred siempre va sin tildes ni Ñ, así que este aviso no se puede evitar. El nombre está bien.</div>
+                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><tbody>${nombres.tildes.map(f => filaTabla([f.rut, f.error, f.nomina, f.afp])).join('')}</tbody></table>
+            </details>` : ''}
+            ${nombres.manual.length ? `
+            <details class="mt-2" open><summary class="text-warning" style="cursor: pointer;">Revisar a mano en BD & Edición (${nombres.manual.length})</summary>
+                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><thead><tr><th>RUT</th><th>Aviso</th><th>Enviado</th><th>Según Previred</th><th>Por qué</th></tr></thead>
+                <tbody>${nombres.manual.map(f => filaTabla([f.rut, f.error, f.nomina, f.afp, f.nota])).join('')}</tbody></table>
+            </details>` : ''}
+            ${noEncontrados.length || otros.length ? `
+            <details class="mt-2"><summary class="text-secondary" style="cursor: pointer;">Otros avisos (${noEncontrados.length + otros.length})</summary>
+                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><tbody>${[...noEncontrados, ...otros].map(f => filaTabla([f.rut, f.error, f.nomina, f.afp])).join('')}</tbody></table>
+            </details>` : ''}
+        </div>`;
+    document.getElementById('btnCerrarResultadoPrev').addEventListener('click', () => cont.remove());
+    const todos = document.getElementById('chkTodosResultadoPrev');
+    if (todos) todos.addEventListener('change', () => document.querySelectorAll('.chk-resultado-prev').forEach(ch => { ch.checked = todos.checked; }));
+    const btn = document.getElementById('btnAplicarResultadoPrev');
+    if (btn) btn.addEventListener('click', aplicarResultadoPrevired);
+    const todosN = document.getElementById('chkTodosNombresPrev');
+    if (todosN) todosN.addEventListener('change', () => document.querySelectorAll('.chk-nombre-prev').forEach(ch => { ch.checked = todosN.checked; }));
+    const btnN = document.getElementById('btnAplicarNombresPrev');
+    if (btnN) btnN.addEventListener('click', aplicarNombresPrevired);
+    cont.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function aplicarResultadoPrevired() {
+    const cambios = window.__resultadoPrevired || {};
+    const elegidos = [...document.querySelectorAll('.chk-resultado-prev:checked')].map(ch => cambios[ch.dataset.rut]).filter(Boolean);
+    if (!elegidos.length) return alert("No hay correcciones seleccionadas.");
+    if (!confirm(`¿Corregir la AFP de ${elegidos.length} persona(s) en su ficha?\n\nQueda guardado para los meses siguientes.`)) return;
+    const btn = document.getElementById('btnAplicarResultadoPrev');
+    btn.disabled = true; btn.innerText = '⏳ Guardando...';
+    try {
+        const enFicha = elegidos.filter(x => !x.manual);
+        // La AFP es dato privado (1p_privado): se guarda con guardarCamposFicha, igual que el resto del panel
+        for (let i = 0; i < enFicha.length; i++) {
+            btn.innerText = `⏳ Guardando ${i + 1} de ${enFicha.length}...`;
+            await window.guardarCamposFicha(enFicha[i].rut, { afp: enFicha[i].clave });
+        }
+        // Caché local: solo el campo cambiado (sin volver a descargar la base)
+        let tocoCache = false;
+        enFicha.forEach(x => {
+            if (window.cacheTrabajadores && window.cacheTrabajadores[x.rut]) { window.cacheTrabajadores[x.rut].afp = x.clave; tocoCache = true; }
+            if (listaGlobalCRM && listaGlobalCRM[x.rut]) listaGlobalCRM[x.rut].afp = x.clave;
+        });
+        if (tocoCache) await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
+        const manuales = elegidos.filter(x => x.manual);
+        if (manuales.length) {
+            manuales.forEach(x => { window.ajustesPrevired[x.rut].persona.afp = x.clave; });
+            await guardarAjustesPrevired();
+        }
+        // Quita del recuadro las AFP ya corregidas (los nombres siguen disponibles)
+        elegidos.forEach(x => { const ch = document.querySelector(`.chk-resultado-prev[data-rut="${CSS.escape(x.rut)}"]`); if (ch) ch.closest('tr').remove(); delete cambios[x.rut]; });
+        if (!document.querySelector('.chk-resultado-prev')) { btn.closest('div').previousElementSibling.remove(); btn.closest('div').remove(); }
+        else { btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de AFP'; }
+        await calcularPrevired(mesPreviredActual);
+        alert(`✅ Listo: ${elegidos.length} AFP corregida(s).\n\nDescarga de nuevo el TXT Previred y vuelve a subirlo.`);
+    } catch (e) {
+        console.error(e);
+        btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de AFP';
+        alert("❌ No se pudieron guardar las correcciones. No se cambió nada; inténtalo de nuevo.");
+    }
+}
+
+async function aplicarNombresPrevired() {
+    const propuestas = window.__nombresPrevired || {};
+    const elegidos = [...document.querySelectorAll('.chk-nombre-prev:checked')].map(ch => propuestas[ch.dataset.rut]).filter(Boolean);
+    if (!elegidos.length) return alert("No hay nombres seleccionados.");
+    const distintos = elegidos.filter(p => p.distinto).length;
+    if (!confirm(`¿Corregir el nombre de ${elegidos.length} persona(s) en su ficha con el nombre que tiene Previred?` + (distintos ? `\n\n⚠️ ${distintos} son MUY distintos (posible RUT equivocado).` : ''))) return;
+    const btn = document.getElementById('btnAplicarNombresPrev');
+    btn.disabled = true; btn.innerText = '⏳ Guardando...';
+    try {
+        const enFicha = elegidos.filter(p => !p.manual);
+        // guardarCamposFicha también actualiza el autocompletado con PIN de la persona
+        for (let i = 0; i < enFicha.length; i++) {
+            btn.innerText = `⏳ Guardando ${i + 1} de ${enFicha.length}...`;
+            await window.guardarCamposFicha(enFicha[i].rut, nombreNuevoPrevired(enFicha[i]));
+        }
+        let tocoCache = false;
+        enFicha.forEach(p => {
+            const n = nombreNuevoPrevired(p);
+            if (window.cacheTrabajadores && window.cacheTrabajadores[p.rut]) { Object.assign(window.cacheTrabajadores[p.rut], n); tocoCache = true; }
+            if (listaGlobalCRM && listaGlobalCRM[p.rut]) Object.assign(listaGlobalCRM[p.rut], n);
+        });
+        if (tocoCache) await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
+        const manuales = elegidos.filter(p => p.manual);
+        if (manuales.length) {
+            manuales.forEach(p => Object.assign(window.ajustesPrevired[p.rut].persona, nombreNuevoPrevired(p)));
+            await guardarAjustesPrevired();
+        }
+        elegidos.forEach(p => { const fila = document.querySelector(`.chk-nombre-prev[data-rut="${CSS.escape(p.rut)}"]`); if (fila) fila.closest('tr').remove(); delete propuestas[p.rut]; });
+        btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de nombres';
+        await calcularPrevired(mesPreviredActual);
+        alert(`✅ Listo: ${elegidos.length} nombre(s) corregido(s).`);
+    } catch (e) {
+        console.error(e);
+        btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de nombres';
+        alert("❌ No se pudieron guardar los nombres. No se cambió nada; inténtalo de nuevo.");
+    }
+}
+
+// Botón "Cargar resultado de Previred" junto a los de Previred (se crea solo, sin tocar panel.html)
+(function crearBotonResultadoPrevired() {
+    const btnRev = document.getElementById('btnDescargarRevisionPrevired');
+    if (!btnRev || document.getElementById('btnCargarResultadoPrevired')) return;
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.csv,text/csv'; input.className = 'd-none'; input.id = 'inputResultadoPrevired';
+    const b = document.createElement('button');
+    b.type = 'button'; b.id = 'btnCargarResultadoPrevired'; b.className = 'btn btn-outline-warning fw-bold';
+    b.innerText = '📂 Cargar resultado de Previred';
+    b.title = 'Sube el CSV de errores que devuelve Previred: corrige la AFP de cada persona en su ficha';
+    btnRev.insertAdjacentElement('beforebegin', b);
+    b.insertAdjacentElement('afterend', input);
+    b.addEventListener('click', () => {
+        if (!mesPreviredActual) return alert("Primero elige el mes a declarar.");
+        input.value = ''; input.click();
+    });
+    input.addEventListener('change', () => { if (input.files[0]) prepararResultadoPrevired(input.files[0]).catch(e => { console.error(e); alert("❌ No se pudo leer el archivo."); }); });
+})();
