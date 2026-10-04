@@ -5383,6 +5383,63 @@ function leerCsvResultadoPrevired(texto) {
     }).filter(r => r.rut && r.error);
 }
 
+// Texto comparable: sin tildes, sin Ñ, sin guiones, en mayúsculas
+function nombreComparablePrevired(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+// Previred muestra las letras con tilde o Ñ como un espacio ("CHAC N" = CHACÓN). ¿La diferencia es solo eso?
+function soloTildesPrevired(enviado, previred) {
+    const p = nombreComparablePrevired(previred), e = nombreComparablePrevired(enviado);
+    if (!p || !e) return false;
+    return new RegExp('^' + p.split('').map(ch => ch === ' ' ? '.' : ch).join('') + '$').test(e);
+}
+function distanciaPrevired(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...new Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++)
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+}
+// Parecido = mal escrito, apodo o incompleto. Muy distinto = probablemente es el RUT de otra persona.
+function nombreParecidoPrevired(enviado, previred) {
+    const a = nombreComparablePrevired(enviado), b = nombreComparablePrevired(previred);
+    if (!a || !b) return false;
+    if (a.includes(b) || b.includes(a)) return true;
+    if (1 - distanciaPrevired(a, b) / Math.max(a.length, b.length) >= 0.6) return true;
+    const particulas = ['DE', 'DEL', 'LA', 'LAS', 'LOS', 'SAN', 'SANTA'];
+    const raiz = (s) => s.split(' ').filter(w => w.length >= 3 && !particulas.includes(w)).map(w => w.slice(0, 3));
+    const rb = raiz(b);
+    return raiz(a).some(r => rb.includes(r));
+}
+
+function clasificarNombrePrevired(f, trabajadores, ajustes, nombres, noEncontrados) {
+    const campo = /^Nombres/i.test(f.error) ? 'nombres' : (/Paterno/i.test(f.error) ? 'paterno' : (/Materno/i.test(f.error) ? 'materno' : ''));
+    const sinMaterno = campo === 'materno' && !f.afp; // Previred no tiene apellido materno (ej: extranjeros): se quita
+    if (!campo || (!f.afp && !sinMaterno)) return nombres.manual.push({ ...f, nota: 'Previred no indica el dato correcto' });
+    if (!sinMaterno && soloTildesPrevired(f.nomina, f.afp)) return nombres.tildes.push(f);
+    const correcto = nombreComparablePrevired(f.afp);
+    // Con letras perdidas (tildes/Ñ dentro de una diferencia real) o guion, no se puede escribir bien solo
+    if (/-/.test(f.afp) || correcto.split(' ').some(w => w.length === 1 && w !== 'Y')) return nombres.manual.push({ ...f, nota: /-/.test(f.afp) ? 'Apellido con guion: revisar a mano' : 'Previred lo muestra sin tildes/Ñ: corregir a mano' });
+    const tr = trabajadores[f.rut];
+    const persona = !tr && ajustes[f.rut] && ajustes[f.rut].persona;
+    if (!tr && !persona) return noEncontrados.push(f);
+    const base = tr || persona;
+    const ap = separarApellidosOriginal(base.apellidos);
+    const actual = campo === 'nombres' ? base.nombres : ap[campo];
+    if (nombreComparablePrevired(actual) === correcto) return; // ya corregido antes
+    const p = nombres.propuestas[f.rut] = nombres.propuestas[f.rut] || { rut: f.rut, manual: !tr, actualNombres: base.nombres || '', actualApellidos: base.apellidos || '', nuevo: {}, distinto: false };
+    p.nuevo[campo] = correcto;
+    if (!sinMaterno && !nombreParecidoPrevired(f.nomina, f.afp)) p.distinto = true;
+}
+
+function nombreNuevoPrevired(p) {
+    const ap = separarApellidosOriginal(p.actualApellidos);
+    return {
+        nombres: p.nuevo.nombres || p.actualNombres,
+        apellidos: [p.nuevo.paterno || ap.paterno, 'materno' in p.nuevo ? p.nuevo.materno : ap.materno].filter(Boolean).join(' ')
+    };
+}
+
 async function prepararResultadoPrevired(archivo) {
     const texto = await new Promise((ok, mal) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = mal; fr.readAsText(archivo, 'ISO-8859-1'); });
     const filas = leerCsvResultadoPrevired(texto);
@@ -5392,7 +5449,7 @@ async function prepararResultadoPrevired(archivo) {
     const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
     const ajustes = window.ajustesPrevired || {};
 
-    const cambios = {}, yaBien = new Set(), noEncontrados = [], nombres = [], otros = [];
+    const cambios = {}, yaBien = new Set(), noEncontrados = [], nombres = { propuestas: {}, tildes: [], manual: [] }, otros = [];
     for (const f of filas) {
         if (/AFP|afiliaci/i.test(f.error)) {
             const clave = claveAfpDesdeTextoPrevired(f.afp);
@@ -5404,10 +5461,11 @@ async function prepararResultadoPrevired(archivo) {
             if (actual === clave) { yaBien.add(f.rut); continue; }
             const nombre = tr ? `${tr.nombres || ''} ${tr.apellidos || ''}` : `${persona.nombres || ''} ${persona.apellidos || ''}`;
             cambios[f.rut] = { rut: f.rut, nombre: nombre.trim(), actual, clave, manual: !tr, motivo: f.error };
-        } else if (/corresponde/i.test(f.error)) nombres.push(f);
+        } else if (/corresponde/i.test(f.error)) clasificarNombrePrevired(f, trabajadores, ajustes, nombres, noEncontrados);
         else otros.push(f);
     }
     window.__resultadoPrevired = cambios;
+    window.__nombresPrevired = nombres.propuestas;
     mostrarResultadoPrevired(Object.values(cambios), yaBien.size, noEncontrados, nombres, otros);
 }
 
@@ -5421,6 +5479,7 @@ function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros
         document.getElementById('tablaPrevired').insertAdjacentElement('beforebegin', cont);
     }
     const filaTabla = (cols) => `<tr>${cols.map(x => `<td>${escPrevired(x)}</td>`).join('')}</tr>`;
+    const propuestasNombre = Object.values(nombres.propuestas).sort((a, b) => (a.distinto - b.distinto) || a.rut.localeCompare(b.rut));
     cont.innerHTML = `
         <div class="p-3 rounded mb-3" style="background: #0d1a26; border: 2px solid #0dcaf0;">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -5430,7 +5489,7 @@ function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros
             <div class="small text-white mt-2">
                 ✏️ <b>${cambios.length}</b> persona(s) con la AFP por corregir en su ficha ·
                 ✅ <b>${yaBien}</b> ya tienen la AFP correcta ·
-                👤 <b>${nombres.length}</b> aviso(s) de nombre/apellido para revisar a mano
+                👤 <b>${propuestasNombre.length}</b> nombre(s) por corregir
                 ${noEncontrados.length ? ` · ⚠️ <b>${noEncontrados.length}</b> RUT no encontrados en la base` : ''}
             </div>
             ${cambios.length ? `
@@ -5444,11 +5503,30 @@ function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros
                 </table>
             </div>
             <div class="text-end mt-2"><button class="btn btn-info fw-bold" id="btnAplicarResultadoPrev">✅ Aplicar correcciones de AFP</button></div>` : '<div class="alert alert-success small mt-3 mb-0">No hay AFP por corregir: todas las fichas ya coinciden con Previred.</div>'}
-            ${nombres.length ? `
-            <details class="mt-3"><summary class="text-warning fw-bold" style="cursor: pointer;">👤 Nombres y apellidos distintos (${nombres.length}) — revisar a mano en BD & Edición</summary>
-                <div class="small text-muted my-1">No se corrigen solos: Previred los muestra sin tildes ni Ñ. Corrige solo los que estén realmente mal escritos.</div>
-                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><thead><tr><th>RUT</th><th>Aviso</th><th>En la ficha</th><th>Según Previred</th></tr></thead>
-                <tbody>${nombres.map(f => filaTabla([f.rut, f.error, f.nomina, f.afp])).join('')}</tbody></table>
+            ${propuestasNombre.length ? `
+            <div class="fw-bold text-warning mt-4">👤 Nombres y apellidos por corregir (${propuestasNombre.length})</div>
+            <div class="small text-muted mb-1">Se usa el nombre que tiene Previred. Los marcados ⚠️ son muy distintos: probablemente la persona escribió mal su RUT. Revísalos antes de marcarlos (o usa "Excluir").</div>
+            <div class="table-responsive" style="max-height: 40vh;">
+                <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;">
+                    <thead style="position: sticky; top: 0;"><tr><th><input type="checkbox" id="chkTodosNombresPrev"></th><th>RUT</th><th>En la ficha</th><th></th><th>Según Previred</th><th></th></tr></thead>
+                    <tbody>${propuestasNombre.map(p => { const n = nombreNuevoPrevired(p); return `<tr>
+                        <td><input type="checkbox" class="chk-nombre-prev" data-rut="${escPrevired(p.rut)}" ${p.distinto ? '' : 'checked'}></td>
+                        <td class="fw-bold">${escPrevired(p.rut)}</td>
+                        <td class="text-danger">${escPrevired(`${p.actualNombres} ${p.actualApellidos}`)}</td><td>→</td>
+                        <td class="text-success fw-bold">${escPrevired(`${n.nombres} ${n.apellidos}`)}</td>
+                        <td>${p.distinto ? '<span class="badge bg-danger">⚠️ Muy distinto: ¿RUT equivocado?</span>' : '<span class="badge bg-secondary">Mal escrito</span>'}</td></tr>`; }).join('')}</tbody>
+                </table>
+            </div>
+            <div class="text-end mt-2"><button class="btn btn-warning fw-bold text-dark" id="btnAplicarNombresPrev">✅ Aplicar correcciones de nombres</button></div>` : ''}
+            ${nombres.tildes.length ? `
+            <details class="mt-2"><summary class="text-secondary" style="cursor: pointer;">Solo tildes o Ñ (${nombres.tildes.length}) — no requieren cambio</summary>
+                <div class="small text-muted my-1">El archivo Previred siempre va sin tildes ni Ñ, así que este aviso no se puede evitar. El nombre está bien.</div>
+                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><tbody>${nombres.tildes.map(f => filaTabla([f.rut, f.error, f.nomina, f.afp])).join('')}</tbody></table>
+            </details>` : ''}
+            ${nombres.manual.length ? `
+            <details class="mt-2" open><summary class="text-warning" style="cursor: pointer;">Revisar a mano en BD & Edición (${nombres.manual.length})</summary>
+                <table class="table table-dark table-sm mb-0" style="font-size: 0.85em;"><thead><tr><th>RUT</th><th>Aviso</th><th>Enviado</th><th>Según Previred</th><th>Por qué</th></tr></thead>
+                <tbody>${nombres.manual.map(f => filaTabla([f.rut, f.error, f.nomina, f.afp, f.nota])).join('')}</tbody></table>
             </details>` : ''}
             ${noEncontrados.length || otros.length ? `
             <details class="mt-2"><summary class="text-secondary" style="cursor: pointer;">Otros avisos (${noEncontrados.length + otros.length})</summary>
@@ -5460,6 +5538,10 @@ function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros
     if (todos) todos.addEventListener('change', () => document.querySelectorAll('.chk-resultado-prev').forEach(ch => { ch.checked = todos.checked; }));
     const btn = document.getElementById('btnAplicarResultadoPrev');
     if (btn) btn.addEventListener('click', aplicarResultadoPrevired);
+    const todosN = document.getElementById('chkTodosNombresPrev');
+    if (todosN) todosN.addEventListener('change', () => document.querySelectorAll('.chk-nombre-prev').forEach(ch => { ch.checked = todosN.checked; }));
+    const btnN = document.getElementById('btnAplicarNombresPrev');
+    if (btnN) btnN.addEventListener('click', aplicarNombresPrevired);
     cont.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -5487,13 +5569,52 @@ async function aplicarResultadoPrevired() {
             manuales.forEach(x => { window.ajustesPrevired[x.rut].persona.afp = x.clave; });
             await guardarAjustesPrevired();
         }
-        document.getElementById('panelResultadoPrevired').remove();
+        // Quita del recuadro las AFP ya corregidas (los nombres siguen disponibles)
+        elegidos.forEach(x => { const ch = document.querySelector(`.chk-resultado-prev[data-rut="${CSS.escape(x.rut)}"]`); if (ch) ch.closest('tr').remove(); delete cambios[x.rut]; });
+        if (!document.querySelector('.chk-resultado-prev')) { btn.closest('div').previousElementSibling.remove(); btn.closest('div').remove(); }
+        else { btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de AFP'; }
         await calcularPrevired(mesPreviredActual);
         alert(`✅ Listo: ${elegidos.length} AFP corregida(s).\n\nDescarga de nuevo el TXT Previred y vuelve a subirlo.`);
     } catch (e) {
         console.error(e);
         btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de AFP';
         alert("❌ No se pudieron guardar las correcciones. No se cambió nada; inténtalo de nuevo.");
+    }
+}
+
+async function aplicarNombresPrevired() {
+    const propuestas = window.__nombresPrevired || {};
+    const elegidos = [...document.querySelectorAll('.chk-nombre-prev:checked')].map(ch => propuestas[ch.dataset.rut]).filter(Boolean);
+    if (!elegidos.length) return alert("No hay nombres seleccionados.");
+    const distintos = elegidos.filter(p => p.distinto).length;
+    if (!confirm(`¿Corregir el nombre de ${elegidos.length} persona(s) en su ficha con el nombre que tiene Previred?` + (distintos ? `\n\n⚠️ ${distintos} son MUY distintos (posible RUT equivocado).` : ''))) return;
+    const btn = document.getElementById('btnAplicarNombresPrev');
+    btn.disabled = true; btn.innerText = '⏳ Guardando...';
+    try {
+        const actualizacion = {};
+        const enFicha = elegidos.filter(p => !p.manual);
+        enFicha.forEach(p => { const n = nombreNuevoPrevired(p); actualizacion[`1_trabajadores/${p.rut}/nombres`] = n.nombres; actualizacion[`1_trabajadores/${p.rut}/apellidos`] = n.apellidos; });
+        if (enFicha.length) await update(ref(db), actualizacion);
+        let tocoCache = false;
+        enFicha.forEach(p => {
+            const n = nombreNuevoPrevired(p);
+            if (window.cacheTrabajadores && window.cacheTrabajadores[p.rut]) { Object.assign(window.cacheTrabajadores[p.rut], n); tocoCache = true; }
+            if (listaGlobalCRM && listaGlobalCRM[p.rut]) Object.assign(listaGlobalCRM[p.rut], n);
+        });
+        if (tocoCache) await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
+        const manuales = elegidos.filter(p => p.manual);
+        if (manuales.length) {
+            manuales.forEach(p => Object.assign(window.ajustesPrevired[p.rut].persona, nombreNuevoPrevired(p)));
+            await guardarAjustesPrevired();
+        }
+        elegidos.forEach(p => { const fila = document.querySelector(`.chk-nombre-prev[data-rut="${CSS.escape(p.rut)}"]`); if (fila) fila.closest('tr').remove(); delete propuestas[p.rut]; });
+        btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de nombres';
+        await calcularPrevired(mesPreviredActual);
+        alert(`✅ Listo: ${elegidos.length} nombre(s) corregido(s).`);
+    } catch (e) {
+        console.error(e);
+        btn.disabled = false; btn.innerText = '✅ Aplicar correcciones de nombres';
+        alert("❌ No se pudieron guardar los nombres. No se cambió nada; inténtalo de nuevo.");
     }
 }
 
