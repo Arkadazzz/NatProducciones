@@ -27,7 +27,7 @@
 
 <div class="container" style="max-width: 600px;">
     <div class="text-center mt-4 mb-3">
-        <img src="https://arkadazzz.github.io/NatProducciones/NAT_Blanco.png" alt="Nat Logo" style="height: 60px;">
+        <img src="NAT_Blanco.png" alt="Nat Logo" style="height: 60px;">
         <h3 class="mt-3 fw-bold" style="color: #b066ff;">Formulario de Acreditación</h3>
         <p class="text-muted">Completa tus datos para ingresar al evento</p>
     </div>
@@ -83,8 +83,9 @@
                 <div class="col-12 mb-3">
                     <label class="form-label text-success fw-bold">RUT</label>
                     <input type="text" id="rut" class="form-control border-success" required placeholder="12345678-9">
+                    <div id="avisoRegistrado" class="alert alert-success small mt-2 mb-0 d-none"></div>
                 </div>
-                <div class="col-12 mb-3">
+                <div class="col-12 mb-3" id="cajaAutocompletar">
                     <div class="p-3 rounded" style="background: #0d1b2a; border: 1px solid #17a2b8;">
                         <label class="form-label text-info fw-bold mb-1">🔑 ¿Ya te registraste antes?</label>
                         <p class="text-muted small mb-2">Escribe tu PIN personal de 4 dígitos para cargar tus datos.</p>
@@ -95,6 +96,7 @@
                         <div id="estadoAutocompletar" class="small mt-2"></div>
                     </div>
                 </div>
+                <div class="col-12 solo-nuevos"><div class="row">
                 <div class="col-12 mb-3">
                     <label class="form-label">Nombres</label>
                     <input type="text" id="nombres" class="form-control" required>
@@ -159,8 +161,10 @@
                         <option value="Otra">Otra</option>
                     </select>
                 </div>
+                </div></div>
             </div>
 
+            <div class="solo-nuevos">
             <div class="separator"></div>
 
             <!-- SECCIÓN 3: DATOS MEDICOS -->
@@ -266,6 +270,28 @@
                     Declaro que la información médica entregada es verdadera. Autorizo expresamente a NAT Producciones a mantener y utilizar estos <strong>datos sensibles de salud</strong> (Ley 19.628) de forma estrictamente confidencial, con el único fin de aplicar protocolos de primeros auxilios o contactar a mi red de apoyo frente a una emergencia médica durante la jornada.
                 </label>
             </div>
+            </div>
+
+            <!-- PERSONA YA REGISTRADA SIN PIN: crea su PIN aquí; se activa al escribirlo en el iPad de la puerta -->
+            <div id="seccionPinPendiente" class="mb-4 p-3 rounded d-none" style="background: #0d1b2a; border: 1px solid #17a2b8;">
+                <h6 class="text-info fw-bold mb-1">🔑 Crea tu PIN personal</h6>
+                <p class="text-muted small mb-2">La próxima vez solo escribes tu RUT y este PIN, y tus datos se cargan solos. <b>Se activará cuando firmes en la puerta:</b> ahí te pedirán escribirlo. No lo compartas.</p>
+                <div class="row g-2">
+                    <div class="col-6"><input type="password" inputmode="numeric" maxlength="4" id="pinPendiente" class="form-control text-center fs-5" placeholder="PIN (4 números)"></div>
+                    <div class="col-6"><input type="password" inputmode="numeric" maxlength="4" id="pinPendienteConfirmar" class="form-control text-center fs-5" placeholder="Repetir PIN"></div>
+                </div>
+            </div>
+
+            <div id="seccionMenorRegistrado" class="mb-4 p-3 rounded d-none" style="background: #1a0a0a; border: 1px solid #ff3333;">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="menorRegistrado" style="transform: scale(1.3); margin-top: 5px;">
+                    <label class="form-check-label text-white" for="menorRegistrado">Soy <b>menor de 18 años</b> (necesito la autorización de mi apoderado)</label>
+                </div>
+                <div id="divNombreMenorRegistrado" class="mt-3 d-none">
+                    <label class="form-label">Tu nombre completo</label>
+                    <input type="text" id="nombreMenorRegistrado" class="form-control border-danger" placeholder="Nombres y apellidos">
+                </div>
+            </div>
 
             <!-- SECCIÓN 5: MENORES DE EDAD -->
             <div id="contenedorMenorVisual" class="d-none">
@@ -344,7 +370,7 @@
 <!-- FIREBASE & LOGIC -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getDatabase, ref, get, update, child, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+    import { getDatabase, ref, get, update, child, onValue, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
     import { separarFicha, datosAutocompletar, resumenBancario, hashPin, claveAutocompletar, nuevoVerif, pinValido, escaparHTML, activarAppCheck } from "./seguridad.js?v=v21";
 
     const firebaseConfig = {
@@ -373,6 +399,8 @@
 
     // Si la persona cargó sus datos con RUT + PIN, aquí quedan las huellas de su PIN
     let sesionPin = null;
+    // Persona ya registrada (sus datos están guardados): { tienePin } . null = persona nueva o no revisado
+    let modoRegistrado = null;
 
     let programasDisponibles = {};
     const esMenorCheck = document.getElementById('esMenorEdad');
@@ -389,7 +417,12 @@
             let edad = hoy.getFullYear() - cumple.getFullYear();
             if (hoy.getMonth() - cumple.getMonth() < 0 || (hoy.getMonth() - cumple.getMonth() === 0 && hoy.getDate() < cumple.getDate())) { edad--; }
 
-            if (edad < 18) {
+            mostrarSeccionMenor(edad < 18);
+        }
+    });
+
+    function mostrarSeccionMenor(esMenor) {
+            if (esMenor) {
                 esMenorCheck.checked = true;
                 contenedorMenorVisual.classList.remove('d-none');
                 seccionMenores.classList.remove('d-none');
@@ -410,7 +443,12 @@
                 contenedorMenorVisual.classList.add('d-none');
                 seccionMenores.classList.add('d-none');
             }
-        }
+    }
+
+    document.getElementById('menorRegistrado').addEventListener('change', function() {
+        document.getElementById('divNombreMenorRegistrado').classList.toggle('d-none', !this.checked);
+        document.getElementById('nombreMenorRegistrado').required = this.checked;
+        mostrarSeccionMenor(this.checked);
     });
 
     document.getElementById('btnLimpiarFirmaApoderado')?.addEventListener('click', () => {
@@ -526,7 +564,7 @@
             invitadoPorInput.required = false;
             
             seccionBancaria.classList.remove('d-none');
-            camposBancarios.forEach(id => document.getElementById(id).required = !sesionPin);
+            camposBancarios.forEach(id => document.getElementById(id).required = !sesionPin && !modoRegistrado);
             
             if (progClave && programasDisponibles[progClave] && programasDisponibles[progClave].incluye_almuerzo) {
                 document.getElementById('divVegetariano').classList.remove('d-none');
@@ -557,11 +595,76 @@
         let val = this.value.replace(/[^0-9kK]/g, '').toUpperCase();
         if (val.length > 1) val = val.slice(0, -1) + '-' + val.slice(-1);
         this.value = val;
+        revisarRegistro();
     });
+
+    function rutValido(rut) {
+        if (!/^[0-9]+-[0-9K]$/.test(rut)) return false;
+        let [num, dv] = rut.split('-'); let n = parseInt(num, 10), m = 0, s = 1;
+        for (; n; n = Math.floor(n / 10)) s = (s + n % 10 * (9 - m++ % 6)) % 11;
+        return String(s ? s - 1 : 'K') === dv;
+    }
+
+    // ¿Este RUT ya está registrado? El público solo puede saber si existe y si tiene PIN (sí/no), ningún dato.
+    async function revisarRegistro() {
+        if (sesionPin) return;
+        const rut = document.getElementById('rut').value.trim();
+        if (!rutValido(rut)) return salirModoRegistrado();
+        try {
+            const snap = await get(ref(db, `1_trabajadores/${rut}/tiene_pin`));
+            if (document.getElementById('rut').value.trim() !== rut || sesionPin) return; // cambió mientras se revisaba
+            if (snap.exists()) entrarModoRegistrado(snap.val() === true);
+            else salirModoRegistrado();
+        } catch (e) {
+            console.warn("No se pudo revisar si el RUT está registrado", e);
+            salirModoRegistrado();
+        }
+    }
+
+    function entrarModoRegistrado(tienePin) {
+        modoRegistrado = { tienePin };
+        document.querySelectorAll('.solo-nuevos').forEach(sec => {
+            sec.classList.add('d-none');
+            sec.querySelectorAll('input, select, textarea').forEach(el => {
+                if (el.dataset.req === undefined) el.dataset.req = el.required ? '1' : '0';
+                el.required = false;
+            });
+        });
+        const aviso = document.getElementById('avisoRegistrado');
+        aviso.innerHTML = tienePin
+            ? '✅ <b>Ya tienes tus datos guardados.</b> Elige el programa y envía. Si quieres revisarlos o cambiarlos, escribe tu PIN abajo y presiona "Cargar mis datos".'
+            : '✅ <b>Ya tienes tus datos guardados.</b> No necesitas escribirlos de nuevo: elige el programa y crea tu PIN al final.';
+        aviso.classList.remove('d-none');
+        document.getElementById('cajaAutocompletar').classList.toggle('d-none', !tienePin);
+        document.getElementById('seccionPinPendiente').classList.toggle('d-none', tienePin);
+        document.getElementById('pinPendiente').required = !tienePin;
+        document.getElementById('pinPendienteConfirmar').required = !tienePin;
+        document.getElementById('seccionMenorRegistrado').classList.remove('d-none');
+        actualizarFormulario();
+    }
+
+    function salirModoRegistrado() {
+        if (!modoRegistrado) return;
+        modoRegistrado = null;
+        document.querySelectorAll('.solo-nuevos').forEach(sec => {
+            sec.classList.remove('d-none');
+            sec.querySelectorAll('input, select, textarea').forEach(el => { if (el.dataset.req !== undefined) { el.required = el.dataset.req === '1'; delete el.dataset.req; } });
+        });
+        document.getElementById('avisoRegistrado').classList.add('d-none');
+        document.getElementById('cajaAutocompletar').classList.remove('d-none');
+        document.getElementById('seccionPinPendiente').classList.add('d-none');
+        document.getElementById('pinPendiente').required = false;
+        document.getElementById('pinPendienteConfirmar').required = false;
+        document.getElementById('seccionMenorRegistrado').classList.add('d-none');
+        const menor = document.getElementById('menorRegistrado');
+        if (menor.checked) { menor.checked = false; menor.dispatchEvent(new Event('change')); }
+        actualizarFormulario();
+    }
 
     // Si cambian el RUT después de cargar datos, se vuelve al modo "persona nueva"
     document.getElementById('rut').addEventListener('input', () => {
         if (sesionPin) activarModoActualizacion(null);
+        salirModoRegistrado();
     });
 
     // Muestra banco, tipo y últimos 2 dígitos guardados (para que la persona sepa que sus datos existen)
@@ -573,6 +676,7 @@
     }
 
     function activarModoActualizacion(sesion) {
+        if (sesion) salirModoRegistrado(); // cargó sus datos con PIN: vuelve al formulario completo
         sesionPin = sesion;
         const actualizando = !!sesion;
         document.getElementById('seccionCrearPin').classList.toggle('d-none', actualizando);
@@ -632,6 +736,72 @@
         }
     });
 
+    function mostrarRegistroExitoso(rut) {
+        document.getElementById('form-container').classList.add('d-none');
+        document.getElementById('success-container').classList.remove('d-none');
+        document.getElementById('displayRut').innerText = rut;
+        
+        new QRCode(document.getElementById("qr-container"), {
+            text: rut,
+            width: 200,
+            height: 200,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+        });
+
+        window.scrollTo(0,0);
+    }
+
+    // Persona ya registrada: solo se guarda la inscripción (sus datos no se tocan) y, si no tiene PIN,
+    // el PIN que creó queda pendiente hasta que lo escriba en el iPad de la puerta.
+    async function inscribirPersonaRegistrada(rut, prog, tipo, esMenor) {
+        let pinHashPendiente = null;
+        if (!modoRegistrado.tienePin) {
+            const pin = document.getElementById('pinPendiente').value.trim();
+            if (!pinValido(pin)) { alert("🔑 Crea tu PIN personal de 4 números (al final del formulario)."); throw new Error("Falta PIN"); }
+            if (pin !== document.getElementById('pinPendienteConfirmar').value.trim()) { alert("🔑 Los dos PIN no coinciden."); throw new Error("PIN no coincide"); }
+            pinHashPendiente = await hashPin(rut, pin);
+        }
+        const inscripcion = {};
+        const reserva = { rut: rut, tipo: tipo, invitado_por: tipo === "Cortesía" ? invitadoPorInput.value : "" };
+        if (tipo === "Pago" && pinInput.value) reserva.pin = pinInput.value.trim();
+        inscripcion[`3_reservas/${prog.fecha}/${prog.nombre}/${rut}`] = reserva;
+        if (esMenor) {
+            inscripcion[`8_autorizaciones_menores/${prog.fecha}/${prog.nombre}/${rut}`] = {
+                fecha_programa: prog.fecha,
+                nombre_programa: prog.nombre,
+                nombre_apoderado: document.getElementById('apoderadoNombre').value.toUpperCase(),
+                nacionalidad_apoderado: document.getElementById('apoderadoNacionalidad').value.toUpperCase(),
+                profesion_apoderado: document.getElementById('apoderadoProfesion').value.toUpperCase(),
+                rut_apoderado: document.getElementById('apoderadoRut').value.toUpperCase(),
+                domicilio_apoderado: document.getElementById('apoderadoDomicilio').value.toUpperCase(),
+                relacion_apoderado: document.getElementById('apoderadoRelacion').value,
+                nombre_menor: document.getElementById('nombreMenorRegistrado').value.trim().toUpperCase(),
+                rut_menor: rut,
+                edad_menor: document.getElementById('edadMenor').value,
+                firma_apoderado: signaturePadApoderado.toDataURL("image/jpeg")
+            };
+        }
+        Object.values(inscripcion).forEach(limpiarTextos);
+        try {
+            await update(ref(db), inscripcion);
+        } catch (errInscripcion) {
+            alert("❌ No se pudo completar la inscripción.\n\nLo más probable es que YA ESTÉS INSCRITO/A en este programa (no hace falta inscribirse dos veces).\n\nSi no es así, revisa el PIN que te dio tu captador.");
+            throw errInscripcion;
+        }
+        if (pinHashPendiente) {
+            try {
+                await update(ref(db), { [`1q_pin_pendiente/${rut}`]: { pin_hash: pinHashPendiente, creado: serverTimestamp() } });
+                alert("✅ Quedaste inscrito/a.\n\n🔑 Tu PIN se activará cuando firmes en la puerta: ahí te pedirán escribirlo. Recuérdalo.");
+            } catch (errPin) {
+                console.error("No se pudo guardar el PIN pendiente", errPin);
+                alert("✅ Quedaste inscrito/a.\n\nTu PIN no se pudo guardar: lo podrás crear en la puerta al firmar.");
+            }
+        }
+        mostrarRegistroExitoso(rut);
+    }
+
     // 4. ENVIAR FORMULARIO
     document.getElementById('registroForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -675,7 +845,7 @@
 
             // Personas nuevas: deben crear su PIN personal
             const pinNuevo = document.getElementById('pinNuevo').value.trim();
-            if (!sesionPin) {
+            if (!sesionPin && !modoRegistrado) {
                 if (!pinValido(pinNuevo)) {
                     alert("🔑 Crea tu PIN personal de 4 números (al final del formulario).");
                     throw new Error("Falta PIN personal");
@@ -703,6 +873,12 @@
             if (blacklistSnap.exists()) {
                 alert("⛔ No puedes registrarte. Tu RUT está bloqueado en el sistema.");
                 throw new Error("Blacklist");
+            }
+
+            if (modoRegistrado) {
+                if (esMenor && !document.getElementById('nombreMenorRegistrado').value.trim()) { alert("❌ Escribe tu nombre completo para la autorización del apoderado."); throw new Error("Falta nombre del menor"); }
+                await inscribirPersonaRegistrada(rut, prog, tipo, esMenor);
+                return;
             }
 
             let telefonoLimpio = document.getElementById('telefono').value.replace(/^\+56\s*9/, '9').replace(/^\+56/, '9').replace(/\s+/g, '');
@@ -809,20 +985,7 @@
                 }
             }
 
-            document.getElementById('form-container').classList.add('d-none');
-            document.getElementById('success-container').classList.remove('d-none');
-            document.getElementById('displayRut').innerText = rut;
-            
-            new QRCode(document.getElementById("qr-container"), {
-                text: rut,
-                width: 200,
-                height: 200,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
-
-            window.scrollTo(0,0);
+            mostrarRegistroExitoso(rut);
 
         } catch (err) {
             btn.disabled = false;

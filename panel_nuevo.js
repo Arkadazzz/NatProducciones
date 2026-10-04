@@ -1466,7 +1466,7 @@ async function onScanSuccess(decodedText) {
                 `;
             }
 
-            mostrarBloquePinPersonal(opcionesDiv, datos);
+            mostrarBloquePinPersonal(opcionesDiv, { ...datos, rut: datos.rut || rutActual });
 
             if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.remove('d-none'); 
             if (document.getElementById('numeroAsignado')) document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
@@ -1500,10 +1500,18 @@ async function onScanSuccess(decodedText) {
 // ==========================================
 // Si la persona todavía no tiene PIN (o un admin se lo reseteó), lo crea aquí al firmar.
 // Con su RUT + PIN podrá autocompletar sus datos en el formulario público.
-function mostrarBloquePinPersonal(opcionesDiv, datos) {
+async function mostrarBloquePinPersonal(opcionesDiv, datos) {
     const anterior = document.getElementById('bloquePinPersonal');
     if (anterior) anterior.remove();
+    window.__pinPendiente = null;
     if (!opcionesDiv || datos.tiene_pin === true) return;
+
+    // ¿Creó un PIN en el formulario? Se activa solo si lo vuelve a escribir aquí (así se sabe que es ella)
+    const turno = window.__turnoPinPersonal = (window.__turnoPinPersonal || 0) + 1;
+    let pendiente = null;
+    try { pendiente = (await get(ref(db, `1q_pin_pendiente/${datos.rut}`))).val(); } catch (e) { console.warn("No se pudo leer el PIN pendiente", e); }
+    if (turno !== window.__turnoPinPersonal) return; // ya se escaneó a otra persona
+    if (document.getElementById('bloquePinPersonal')) document.getElementById('bloquePinPersonal').remove();
 
     const bloque = document.createElement('div');
     bloque.id = 'bloquePinPersonal';
@@ -1517,18 +1525,34 @@ function mostrarBloquePinPersonal(opcionesDiv, datos) {
             <div class="col-6"><input type="password" inputmode="numeric" maxlength="4" id="pinPersonalConfirmar" class="form-control text-center fs-4" placeholder="Repetir"></div>
         </div>
         <small class="text-muted">Opcional: si lo dejan en blanco, se puede crear en su próxima visita.</small>`;
+    if (pendiente && pendiente.pin_hash) {
+        window.__pinPendiente = { rut: datos.rut, pin_hash: pendiente.pin_hash };
+        const crear = bloque.innerHTML;
+        bloque.innerHTML = `
+            <strong class="text-info">🔑 Activar su PIN</strong>
+            <p class="small text-white-50 mb-2">Esta persona creó un PIN al inscribirse. Pídele que lo escriba ella misma para activarlo.</p>
+            <input type="password" inputmode="numeric" maxlength="4" id="pinPendienteActivar" class="form-control text-center fs-4" placeholder="PIN que creó al inscribirse">
+            <button type="button" class="btn btn-link btn-sm text-warning px-0 mt-1" id="btnPinPendienteOlvido">¿No lo recuerda? Crear uno nuevo</button>`;
+        bloque.querySelector('#btnPinPendienteOlvido').addEventListener('click', () => { window.__pinPendiente.olvido = true; bloque.innerHTML = crear; });
+    }
     opcionesDiv.after(bloque);
 }
 
 async function guardarPinPersonal(rut, ficha) {
+    const activarEl = document.getElementById('pinPendienteActivar');
     const pinEl = document.getElementById('pinPersonalNuevo');
-    if (!pinEl) return;
-    const pin = pinEl.value.trim();
-    const confirmar = document.getElementById('pinPersonalConfirmar').value.trim();
-    if (!pin && !confirmar) return;
+    let pin = '';
+    if (activarEl) pin = activarEl.value.trim();
+    else if (pinEl) {
+        pin = pinEl.value.trim();
+        if (!pin && !document.getElementById('pinPersonalConfirmar').value.trim()) pin = '';
+    }
+    if (!pin) return;
     const pinHash = await hashPin(rut, pin);
     const autoKey = await claveAutocompletar(rut, pin);
+    const pendiente = window.__pinPendiente && window.__pinPendiente.rut === rut;
     await update(ref(db), {
+        ...(pendiente ? { [`1q_pin_pendiente/${rut}`]: null } : {}),
         [`1p_privado/${rut}/pin_hash`]: pinHash,
         [`1p_privado/${rut}/verif`]: nuevoVerif(pinHash),
         [`1p_privado/${rut}/auto_key`]: autoKey,
@@ -1538,7 +1562,18 @@ async function guardarPinPersonal(rut, ficha) {
     });
 }
 
-function validarPinPersonalIngresado() {
+async function validarPinPersonalIngresado(rut) {
+    const activarEl = document.getElementById('pinPendienteActivar');
+    if (activarEl) {
+        const pin = activarEl.value.trim();
+        if (!pin) return true; // se puede activar en otra visita
+        if (!pinValido(pin)) { alert("El PIN debe tener exactamente 4 números."); return false; }
+        if (await hashPin(rut, pin) !== window.__pinPendiente.pin_hash) {
+            alert("Ese PIN no coincide con el que creó al inscribirse.\n\nPídele que lo intente de nuevo, o presiona \"¿No lo recuerda? Crear uno nuevo\".");
+            return false;
+        }
+        return true;
+    }
     const pinEl = document.getElementById('pinPersonalNuevo');
     if (!pinEl) return true;
     const pin = pinEl.value.trim();
@@ -1599,7 +1634,7 @@ if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnC
 
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
-    if (!validarPinPersonalIngresado()) return;
+    if (!(await validarPinPersonalIngresado(rutActual))) return;
     
     const firmaBase64 = window.comprimirFirma(signaturePad); 
     const now = new Date();

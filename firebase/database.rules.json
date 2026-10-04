@@ -36,6 +36,10 @@
       ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       "$rut": {
         ".write": "(!data.exists() && newData.child('rut').val() === $rut) || (data.exists() && newData.exists() && newData.parent().parent().child('1p_privado').child($rut).child('verif').val() !== root.child('1p_privado').child($rut).child('verif').val())",
+        "tiene_pin": {
+          ".read": true,
+          ".validate": "newData.isBoolean()"
+        },
         "$campo": {
           ".validate": "!newData.isString() || !newData.val().matches(/[<>\"`]/)"
         }
@@ -67,6 +71,19 @@
         ".validate": "!newData.exists() || newData.hasChildren(['rut', 'nombres'])",
         "$campo": {
           ".validate": "!newData.isString() || !newData.val().matches(/[<>\"`]/)"
+        }
+      }
+    },
+    "1q_pin_pendiente": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      "$rut": {
+        ".write": "newData.exists() && root.child('1_trabajadores').child($rut).exists() && root.child('1_trabajadores').child($rut).child('tiene_pin').val() !== true",
+        ".validate": "!newData.exists() || (newData.hasChildren(['pin_hash', 'creado']) && newData.child('pin_hash').isString() && newData.child('pin_hash').val().length >= 32 && newData.child('pin_hash').val().length <= 128 && newData.child('creado').val() === now)",
+        "pin_hash": {},
+        "creado": {},
+        "$otro": {
+          ".validate": false
         }
       }
     },
