@@ -5194,6 +5194,7 @@ function renderTablaPrevired() {
                 <span>Imponible total: <b>${$(tot.bruto)}</b></span>
                 <span>Cotizaciones trabajador: <b>${$(tot.trabajador)}</b></span>
                 <span>Aportes empleador: <b>${$(tot.empleador)}</b></span>
+                <span class="px-2 rounded" style="background: #0d2a1a; border: 1px solid #00d26a;">💰 Total a pagar en Previred: <b class="text-success fs-6" id="totalPagarPrevired">${$(tot.trabajador + tot.empleador)}</b></span>
             </div>
             ${ajustesPreviredSoloLocal ? '<div class="small text-warning mt-2">⚠️ Los ajustes se están guardando solo en este computador (falta regla 11_previred_ajustes en Firebase).</div>' : ''}
             <div class="small text-muted mt-1">✏️ Puedes editar Días, Primer día, Líquido y AFP directamente en la tabla: el bruto y las cotizaciones se recalculan solos.</div>
