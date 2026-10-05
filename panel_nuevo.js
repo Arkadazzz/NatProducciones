@@ -5016,8 +5016,9 @@ async function construirFilasMes(mes, ajustes, todas) {
             isl: pct(bruto, c.isl),
             cev: sinAfp ? 0 : pct(bruto, c.expectativaVida),
             crp: sinAfp ? 0 : pct(bruto, c.rentabilidadProtegida),
-            afcTrab: pct(bruto, c.cesantiaTrabajador),
-            afcEmp: pct(bruto, c.cesantiaEmpleador)
+            // Pensionados ("No cotiza"): por ley (19.728) no cotizan Seguro de Cesantía
+            afcTrab: sinAfp ? 0 : pct(bruto, c.cesantiaTrabajador),
+            afcEmp: sinAfp ? 0 : pct(bruto, c.cesantiaEmpleador)
         };
 
         filas.push({
@@ -5093,6 +5094,8 @@ function construirLineaPrevired(f) {
         campos[26] = "00";
         campos[27] = "0"; campos[28] = "0"; campos[29] = "0";
         campos[94] = "0"; campos[95] = "0";
+        // Tampoco Seguro de Cesantía (Previred lo rechaza sin AFP: "No informa Código AFP para Aporte Empleador Seguro Cesantía")
+        campos[100] = "0"; campos[101] = "0"; campos[102] = "0";
     }
     return campos.slice(1).join(';');
 }
@@ -5794,7 +5797,7 @@ function construirFilaLRE(f, c) {
     v['1141'] = afp.lre;
     v['1142'] = '0';
     v['1143'] = salud.lre;
-    v['1151'] = '1';
+    v['1151'] = afp.sinAfp ? '0' : '1'; // AFC: los pensionados ("No cotiza") no cotizan Seguro de Cesantía
     v['1110'] = '0';
     v['1152'] = '0';
     v['1111'] = '0'; v['1112'] = '0'; v['1113'] = '0';
@@ -6122,12 +6125,20 @@ function claveAfpDesdeTextoPrevired(texto) {
     return Object.keys(c.afps || {}).find(k => k !== 'NO_COTIZA' && k.replace(/[^A-Z]/g, '') === limpio) || '';
 }
 
+// Previred entrega dos archivos: el de afiliación (RUT; Descripción Error; Dato desde su Nómina; Dato desde AFP)
+// y el de errores de carga (Línea; RUT; Descripción del Error; Dato Enviado; Dato Esperado). Se leen los dos.
 function leerCsvResultadoPrevired(texto) {
     const lineas = texto.replace(/^﻿/, '').split(/\r?\n/).filter(l => l.trim());
-    if (!lineas.length || !/Descripci/i.test(lineas[0]) || !/Dato desde AFP/i.test(lineas[0])) return null;
+    if (!lineas.length) return null;
+    const cab = lineas[0].split(';').map(x => x.trim());
+    const col = (re) => cab.findIndex(x => re.test(x));
+    const iRut = col(/^RUT$/i), iErr = col(/Descripci/i);
+    const iNom = col(/Dato desde su N|Dato Enviado/i), iAfp = col(/Dato desde AFP|Dato Esperado/i);
+    if (iRut < 0 || iErr < 0 || iAfp < 0) return null;
+    const deCarga = /Dato Esperado/i.test(lineas[0]);
     return lineas.slice(1).map(l => {
-        const [rut, error, nomina, afp] = l.split(';').map(x => (x || '').trim());
-        return { rut: rut.replace(/\./g, '').toUpperCase(), error, nomina, afp };
+        const p = l.split(';').map(x => (x || '').trim());
+        return { rut: (p[iRut] || '').replace(/\./g, '').toUpperCase(), error: p[iErr] || '', nomina: iNom >= 0 ? p[iNom] || '' : '', afp: p[iAfp] || '', deCarga };
     }).filter(r => r.rut && r.error);
 }
 
@@ -6191,14 +6202,17 @@ function nombreNuevoPrevired(p) {
 async function prepararResultadoPrevired(archivo) {
     const texto = await new Promise((ok, mal) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = mal; fr.readAsText(archivo, 'ISO-8859-1'); });
     const filas = leerCsvResultadoPrevired(texto);
-    if (!filas) return alert("Este archivo no parece el resultado de Previred.\nDebe ser el CSV con las columnas: RUT; Descripción Error; Dato desde su Nómina; Dato desde AFP.");
+    if (!filas) return alert("Este archivo no parece un resultado de Previred.\nDebe ser el CSV de afiliación (RUT; Descripción Error; Dato desde su Nómina; Dato desde AFP) o el de errores de carga (Línea; RUT; Descripción del Error; Dato Enviado; Dato Esperado).");
     const c = window.configPrevired;
     const trabSnap = await window.obtenerTrabajadores();
     const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
     const ajustes = window.ajustesPrevired || {};
 
     const cambios = {}, yaBien = new Set(), noEncontrados = [], nombres = { propuestas: {}, tildes: [], manual: [] }, otros = [];
+    const cesantia = [];
     for (const f of filas) {
+        if (/Seguro Cesant/i.test(f.error)) { cesantia.push(f); continue; }
+        if (f.deCarga) { otros.push(f); continue; }
         if (/AFP|afiliaci/i.test(f.error)) {
             const clave = claveAfpDesdeTextoPrevired(f.afp);
             if (!clave) { otros.push(f); continue; }
@@ -6214,10 +6228,16 @@ async function prepararResultadoPrevired(archivo) {
     }
     window.__resultadoPrevired = cambios;
     window.__nombresPrevired = nombres.propuestas;
-    mostrarResultadoPrevired(Object.values(cambios), yaBien.size, noEncontrados, nombres, otros);
+    // Seguro de Cesantía de pensionados: ya no se informa. Se confirma con la tabla actual quiénes quedan bien.
+    const filasMes = Object.fromEntries((window.filasPrevired || []).map(f => [f.rut, f]));
+    const cesantiaInfo = cesantia.length ? {
+        resueltos: cesantia.filter(f => filasMes[f.rut] && filasMes[f.rut].calc.afcEmp === 0).length,
+        pendientes: cesantia.filter(f => !(filasMes[f.rut] && filasMes[f.rut].calc.afcEmp === 0))
+    } : null;
+    mostrarResultadoPrevired(Object.values(cambios), yaBien.size, noEncontrados, nombres, otros, cesantiaInfo);
 }
 
-function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros) {
+function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros, cesantiaInfo = null) {
     const c = window.configPrevired;
     const nombreAfp = (k) => k && c.afps[k] ? c.afps[k].nombre : (k || 'Sin AFP / No sé');
     let cont = document.getElementById('panelResultadoPrevired');
@@ -6240,6 +6260,11 @@ function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros
                 👤 <b>${propuestasNombre.length}</b> nombre(s) por corregir
                 ${noEncontrados.length ? ` · ⚠️ <b>${noEncontrados.length}</b> RUT no encontrados en la base` : ''}
             </div>
+            ${cesantiaInfo ? `<div class="alert ${cesantiaInfo.pendientes.length ? 'alert-warning' : 'alert-success'} small mt-3 mb-0">
+                🛡️ <b>Seguro de Cesantía de pensionados (${cesantiaInfo.resueltos + cesantiaInfo.pendientes.length}):</b>
+                ${cesantiaInfo.resueltos ? `✅ ${cesantiaInfo.resueltos} ya quedaron corregidos: los pensionados ("No cotiza") ahora van sin Seguro de Cesantía. <b>Descarga el TXT de nuevo y súbelo.</b>` : ''}
+                ${cesantiaInfo.pendientes.length ? `<br>⚠️ Revisa estos RUT (no están en "No cotiza" en este mes): ${cesantiaInfo.pendientes.map(f => escPrevired(f.rut)).join(', ')}` : ''}
+            </div>` : ''}
             ${cambios.length ? `
             <div class="table-responsive mt-3" style="max-height: 40vh;">
                 <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;">
