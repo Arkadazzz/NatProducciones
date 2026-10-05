@@ -5106,7 +5106,14 @@ function renderTablaPrevired() {
     const c = window.configPrevired;
     const mes = mesPreviredActual;
     const $ = n => '$' + Math.round(n).toLocaleString('es-CL');
-    const opcionesAfp = Object.keys(c.afps).map(k => `<option value="${k}">${c.afps[k].nombre}</option>`).join('');
+    // "No cotiza" es solo para pensionados (la regla de edad lo pone sola); se aclara para no elegirlo por error
+    const nombreAfpOpcion = k => c.afps[k].nombre + (k === 'NO_COTIZA' ? ' (solo pensionados)' : '');
+    const opcionesAfp = Object.keys(c.afps).map(k => `<option value="${k}">${nombreAfpOpcion(k)}</option>`).join('');
+    const selectorAfp = f => `<select class="form-select form-select-sm bg-dark ${f.afpKey ? 'text-white' : 'text-warning'} prev-fix" data-rut="${f.rut}" data-campo="afp" style="min-width: 120px;">`
+        + (f.afpKey ? '' : '<option value="">AFP...</option>')
+        + Object.keys(c.afps).map(k => `<option value="${k}" ${k === f.afpKey ? 'selected' : ''}>${c.afps[k].nombre}</option>`).join('') + '</select>';
+    // "No cotiza" elegido a mano (no por la regla de edad): casi siempre es un error
+    const noCotizaAMano = filas.filter(f => f.afpKey === 'NO_COTIZA' && !f.afpPorRegla);
     const opcionesSalud = Object.keys(c.saludes).map(k => `<option value="${k}">${c.saludes[k].nombre}</option>`).join('');
     const [anioM, mesM] = mes.split('-').map(Number);
     const ultimoDia = new Date(anioM, mesM, 0).getDate();
@@ -5186,7 +5193,11 @@ function renderTablaPrevired() {
                 <span>Aportes empleador: <b>${$(tot.empleador)}</b></span>
             </div>
             ${ajustesPreviredSoloLocal ? '<div class="small text-warning mt-2">⚠️ Los ajustes se están guardando solo en este computador (falta regla 11_previred_ajustes en Firebase).</div>' : ''}
-            <div class="small text-muted mt-1">✏️ Puedes editar Días, Primer día y Líquido directamente en la tabla: el bruto y las cotizaciones se recalculan solos.</div>
+            <div class="small text-muted mt-1">✏️ Puedes editar Días, Primer día, Líquido y AFP directamente en la tabla: el bruto y las cotizaciones se recalculan solos.</div>
+            ${noCotizaAMano.length ? `<div class="mt-2 p-2 rounded" style="background: #332200; border: 1px solid #ffcc00;">
+                <span class="small text-warning fw-bold">⚠️ ${noCotizaAMano.length} persona${noCotizaAMano.length === 1 ? '' : 's'} con AFP "No cotiza" puesta a mano. "No cotiza" es solo para pensionados; si no lo son, deben ir en AFP UNO.</span>
+                <button class="btn btn-sm btn-warning fw-bold text-dark ms-2 mt-1" id="btnNoCotizaAUno">🔁 Pasar a AFP UNO a ${noCotizaAMano.length === 1 ? 'esa persona' : `las ${noCotizaAMano.length}`}</button>
+            </div>` : ''}
         </div>
         <div class="table-responsive" style="max-height: 60vh;">
         <table class="table table-dark table-hover table-bordered align-middle text-center mb-0" style="font-size: 0.85em;">
@@ -5196,9 +5207,8 @@ function renderTablaPrevired() {
 
     for (const f of filas) {
         const ok = f.errores.length === 0;
-        const fijos = ["Falta AFP", "Falta salud", "Falta sexo M/F", "Falta nacionalidad"];
+        const fijos = ["Falta salud", "Falta sexo M/F", "Falta nacionalidad"]; // la AFP se elige en su propia columna
         const correcciones = [
-            f.errores.includes("Falta AFP") ? selFix(f, 'afp', 'AFP...', opcionesAfp) : '',
             f.errores.includes("Falta salud") ? selFix(f, 'salud', 'Salud...', opcionesSalud) : '',
             f.errores.includes("Falta sexo M/F") ? selFix(f, 'sexo', 'Sexo...', '<option value="M">M</option><option value="F">F</option>') : '',
             f.errores.includes("Falta nacionalidad") ? selFix(f, 'nacionalidad', 'Nacionalidad...', '<option value="Chilena">Chilena</option><option value="Extranjera">Extranjera</option>') : ''
@@ -5223,7 +5233,7 @@ function renderTablaPrevired() {
             <td>${inputEdit(f, 'inicio', 'date', fechaISOPrevired(f.inicio), `min="${minFecha}" max="${maxFecha}"`)}</td>
             <td>${fechaPrevired(f.termino)}</td>
             <td>${inputEdit(f, 'liquido', 'number', f.liquido, 'min="1"')}</td>
-            <td>${f.afpKey ? `${c.afps[f.afpKey].nombre} ${c.afps[f.afpKey].tasa}%<div class="small text-muted">Prev. ${c.afps[f.afpKey].codigo} · LRE ${c.afps[f.afpKey].lre}</div>` : '—'}</td>
+            <td>${selectorAfp(f)}${f.afpKey ? `<div class="small text-muted">${c.afps[f.afpKey].tasa}% · Prev. ${c.afps[f.afpKey].codigo} · LRE ${c.afps[f.afpKey].lre}</div>` : ''}${f.afpKey === 'NO_COTIZA' && !f.afpPorRegla ? '<div class="small text-warning fw-bold">⚠️ Solo pensionados</div>' : ''}</td>
             <td>${f.saludKey ? `${c.saludes[f.saludKey].nombre}<div class="small text-muted">Prev. ${c.saludes[f.saludKey].codigo} · LRE ${c.saludes[f.saludKey].lre}</div>` : '—'}</td>
             <td class="fw-bold text-warning">${$(f.calc.bruto)}</td>
             <td>${$(f.calc.cotAfp)}</td>
@@ -5236,6 +5246,8 @@ function renderTablaPrevired() {
 
     document.querySelectorAll('.prev-fix').forEach(sel => sel.addEventListener('change', corregirDatoPrevired));
     document.querySelectorAll('.prev-edit').forEach(inp => inp.addEventListener('change', editarValorPrevired));
+    const btnUno = document.getElementById('btnNoCotizaAUno');
+    if (btnUno) btnUno.addEventListener('click', () => pasarNoCotizaAUno(noCotizaAMano, btnUno));
     document.querySelectorAll('.prev-accion').forEach(btn => btn.addEventListener('click', accionFilaPrevired));
     conectarFormularioAgregarPrevired();
 
@@ -5360,6 +5372,33 @@ async function accionFilaPrevired(e) {
     await calcularPrevired(mesPreviredActual);
 }
 
+// Corrige de una vez a quienes quedaron con "No cotiza" elegido a mano (no por la regla de edad)
+async function pasarNoCotizaAUno(filas, btn) {
+    if (!confirm(`¿Pasar a AFP UNO a ${filas.length} persona(s) que están con "No cotiza"?\n\nRevisa antes que ninguna sea pensionada.`)) return;
+    btn.disabled = true;
+    try {
+        const tieneFicha = rut => !!(((window.cacheTrabajadores || {})[rut]) || listaGlobalCRM[rut]);
+        let manuales = 0;
+        for (let i = 0; i < filas.length; i++) {
+            const rut = filas[i].rut, ajuste = window.ajustesPrevired[rut];
+            btn.innerText = `⏳ ${i + 1} de ${filas.length}...`;
+            if (ajuste && ajuste.persona && !tieneFicha(rut)) { ajuste.persona.afp = 'UNO'; manuales++; continue; }
+            await window.guardarCamposFicha(rut, { afp: 'UNO' });
+            if (window.cacheTrabajadores && window.cacheTrabajadores[rut]) window.cacheTrabajadores[rut].afp = 'UNO';
+            if (listaGlobalCRM && listaGlobalCRM[rut]) listaGlobalCRM[rut].afp = 'UNO';
+            if (ajuste && ajuste.persona && 'afp' in ajuste.persona) { ajuste.persona.afp = 'UNO'; manuales++; } // el ajuste manda sobre la ficha
+        }
+        if (manuales) await guardarAjustesPrevired();
+        if (manuales < filas.length && window.cacheTrabajadores) await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
+        await calcularPrevired(mesPreviredActual);
+        alert(`✅ Listo: ${filas.length} persona(s) pasaron a AFP UNO.`);
+    } catch (e) {
+        console.error(e);
+        btn.disabled = false; btn.innerText = '🔁 Reintentar';
+        alert("❌ No se pudieron guardar todos los cambios. Revisa la tabla e inténtalo de nuevo.");
+    }
+}
+
 async function corregirDatoPrevired(e) {
     const sel = e.target;
     const rut = sel.dataset.rut, campo = sel.dataset.campo, valor = sel.value;
@@ -5380,6 +5419,8 @@ async function corregirDatoPrevired(e) {
                 await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
             }
             if (listaGlobalCRM && listaGlobalCRM[rut]) listaGlobalCRM[rut][campo] = valor;
+            // Si además fue agregada a mano en este mes, el dato del ajuste manda sobre la ficha: se corrige también
+            if (ajuste && ajuste.persona && campo in ajuste.persona) { ajuste.persona[campo] = valor; await guardarAjustesPrevired(); }
         }
         await calcularPrevired(mesPreviredActual);
     } catch (err) {
