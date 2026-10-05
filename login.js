@@ -25,7 +25,7 @@ document.getElementById('formularioLogin').addEventListener('submit', async (e) 
 
     try {
         await signInWithEmailAndPassword(auth, email, password);
-        window.location.href = "panel.html"; 
+        window.location.href = "panel.html?v=2"; // dirección nueva: Safari tenía guardado el panel sin ícono 
     } catch (error) {
         console.error("Error de acceso:", error.code);
         mensajeError.classList.remove('d-none');
