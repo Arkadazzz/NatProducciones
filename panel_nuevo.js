@@ -727,12 +727,16 @@ if (document.getElementById('btnActivarWeb')) document.getElementById('btnActiva
         return alert("Completa todos los campos obligatorios.");
     }
 
+    // Si la sala de ese día ya tenía PIN de captador (por ejemplo, al reabrirla), se mantiene el mismo
     let pinGenerado = ""; 
     if (nom.includes("Detrás del Muro")) {
-        pinGenerado = Math.floor(1000 + Math.random() * 9000).toString();
+        let pinExistente = null;
+        try { pinExistente = (await get(ref(db, `0_config/pins_captador/${fec}/${nom}`))).val(); } catch (e) { console.warn("No se pudo leer el PIN existente", e); }
+        pinGenerado = pinExistente ? String(pinExistente) : Math.floor(1000 + Math.random() * 9000).toString();
     }
     
-    const claveSegura = nom.replace(/[.#$\[\]]/g, "_");
+    // La sala se identifica por FECHA + programa: así el mismo programa puede estar abierto hoy y mañana sin pisarse
+    const claveSegura = `${fec}_${nom}`.replace(/[.#$\[\]\/]/g, "_");
     
     if (pinGenerado) await set(ref(db, `0_config/pins_captador/${fec}/${nom}`), pinGenerado);
     await set(ref(db, `0_estado_sistema/programas_activos/${claveSegura}`), { 
