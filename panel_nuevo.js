@@ -1055,7 +1055,7 @@ function activarRadares() {
             const btnEditarPago = `<span class="badge bg-success fs-6 btn-pago-editable" onclick="window.editarMontoIndividual('${rut}', ${asis.monto}, '${escaparHTML(String(trab.nombres || '').replace(/['\"\`]/g, ''))}')" title="Click para editar sueldo">✏️ $${asis.monto}</span>`;
 
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td><span class="badge bg-secondary fs-6">${num || '-'}</span></td>
+            tr.innerHTML = `<td><span class="badge bg-secondary fs-6" style="cursor:pointer" onclick="window.editarTicket('${rut}', '${num || ''}')" title="Tocar para cambiar el ticket">${num || '-'} ✏️</span></td>
                             <td>${escaparHTML(trab.nombres)} ${escaparHTML(trab.apellidos)}<br>${btnEditarPago}</td>
                             <td>${asis.hora_ingreso}</td>
                             <td>${badgeDT} ${btnPDFInstante}</td>
@@ -1473,7 +1473,10 @@ async function onScanSuccess(decodedText) {
             mostrarBloquePinPersonal(opcionesDiv, { ...datos, rut: datos.rut || rutActual });
 
             if (document.getElementById('seccionFirma')) document.getElementById('seccionFirma').classList.remove('d-none'); 
-            if (document.getElementById('numeroAsignado')) document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
+            if (document.getElementById('numeroAsignado')) {
+                const previoTicket = asistenciasGlobales[rutActual];
+                document.getElementById('numeroAsignado').value = (previoTicket && previoTicket.tipo_ingreso !== "Anulado" && previoTicket.numero_asignado) || window.siguienteTicketAutomatico;
+            }
             
             const canvasAdmin = document.getElementById('signature-pad');
             if (canvasAdmin) {
@@ -1594,17 +1597,67 @@ async function validarPinPersonalIngresado(rut) {
 // El número se pide al guardar a un contador compartido (2_tickets/{fecha}/{programa}) con una transacción:
 // dos iPads que confirman al mismo tiempo nunca reciben el mismo número.
 // Nunca entrega un número menor al más alto ya usado en la sala (salas abiertas antes de este cambio).
-async function asignarTicket(rut) {
+// Si el staff escribió otro número en el recuadro (para que calce con el ticket físico), se respeta mientras nadie más lo tenga.
+async function asignarTicket(rut, pedido) {
     const previo = asistenciasGlobales[rut];
     if (previo && previo.tipo_ingreso !== "Anulado" && previo.numero_asignado) return String(previo.numero_asignado); // ya había entrado: conserva su ticket
     const maxLocal = Math.max(0, (parseInt(window.siguienteTicketAutomatico, 10) || 1) - 1);
+    const numPedido = parseInt(pedido, 10);
+    const pedidoLibre = numPedido >= 1 && !ticketOcupadoPor(numPedido, rut);
+    const manual = pedidoLibre && numPedido !== maxLocal + 1; // lo escribió el staff a mano
+    let elegido = null;
     try {
-        const r = await runTransaction(ref(db, `2_tickets/${fechaPrograma}/${nombrePrograma}`), (actual) => Math.max(Number(actual) || 0, maxLocal) + 1);
-        if (r.committed && r.snapshot.exists()) return String(r.snapshot.val());
+        const r = await runTransaction(ref(db, `2_tickets/${fechaPrograma}/${nombrePrograma}`), (actual) => {
+            const base = Math.max(Number(actual) || 0, maxLocal);
+            if (pedidoLibre && numPedido > base) { elegido = numPedido; return numPedido; }
+            if (manual) { elegido = numPedido; return; } // número bajo libre (ej. uno que se saltó): el contador no cambia
+            elegido = base + 1;
+            return base + 1;
+        });
+        if (elegido !== null && (r.committed || manual)) return String(elegido);
     } catch (e) {
         console.error("No se pudo usar el contador de tickets; se usa el número local", e);
     }
-    return String(maxLocal + 1);
+    return String(pedidoLibre ? numPedido : maxLocal + 1);
+}
+
+// Devuelve el RUT de quien ya tiene ese ticket en la sala (sin contar anulados ni a la misma persona)
+function ticketOcupadoPor(numero, rutPropio) {
+    for (const r in asistenciasGlobales) {
+        const a = asistenciasGlobales[r];
+        if (r !== rutPropio && a && a.tipo_ingreso !== "Anulado" && parseInt(a.numero_asignado, 10) === Number(numero)) return r;
+    }
+    return null;
+}
+
+// Cambiar el ticket de alguien que ya ingresó (tocando su número en la lista)
+window.editarTicket = async function(rut, numeroActual) {
+    const nuevo = prompt(`Nuevo número de ticket (actual: ${numeroActual || '-'}):`, numeroActual || '');
+    if (nuevo === null || nuevo.trim() === "") return;
+    const num = parseInt(nuevo, 10);
+    if (!/^\d+$/.test(nuevo.trim()) || num < 1) return alert("Escribe solo un número mayor que 0.");
+    if (num === parseInt(numeroActual, 10)) return;
+    const ocupado = ticketOcupadoPor(num, rut);
+    if (ocupado) {
+        const f = fichaPuerta(ocupado);
+        return alert(`El ticket N° ${num} ya lo tiene ${f.nombres || ''} ${f.apellidos || ''}.\nCambia primero el de esa persona.`);
+    }
+    try {
+        window.limpiarCache();
+        await update(ref(db, `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rut}`), { numero_asignado: String(num) });
+        await runTransaction(ref(db, `2_tickets/${fechaPrograma}/${nombrePrograma}`), (actual) => Math.max(Number(actual) || 0, num));
+    } catch (e) {
+        alert("Error al cambiar el ticket.");
+    }
+}
+
+// Si el ingreso no se pudo guardar, devuelve el número al contador (solo si nadie pidió otro después)
+async function devolverTicket(numero) {
+    try {
+        await runTransaction(ref(db, `2_tickets/${fechaPrograma}/${nombrePrograma}`), (actual) => Number(actual) === Number(numero) ? (Number(numero) > 1 ? Number(numero) - 1 : null) : actual);
+    } catch (e) {
+        console.error("No se pudo devolver el ticket", e);
+    }
 }
 
 // Muestra en grande el ticket definitivo mientras ya se escanea a la siguiente persona
@@ -1636,14 +1689,39 @@ if (document.getElementById('btnCancelarEscaneo')) document.getElementById('btnC
 });
 
 
+// Un solo guardado a la vez: un doble toque en "Confirmar Ingreso" pedía dos tickets y se saltaba un número
 if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGuardarIngreso').addEventListener('click', async () => {
+    const boton = document.getElementById('btnGuardarIngreso');
+    if (boton.disabled) return;
+    const textoBoton = boton.textContent;
+    boton.disabled = true;
+    boton.textContent = "Guardando...";
+    try {
+        await guardarIngreso();
+    } finally {
+        boton.disabled = false;
+        boton.textContent = textoBoton;
+    }
+});
+
+async function guardarIngreso() {
     if (signaturePad.isEmpty()) return alert("El trabajador debe firmar.");
     if (!(await validarPinPersonalIngresado(rutActual))) return;
+    const escrito = document.getElementById('numeroAsignado').value.trim();
+    if (!/^\d+$/.test(escrito) || parseInt(escrito, 10) < 1) return alert("Escribe el número del ticket (solo números).");
+    const duenoTicket = ticketOcupadoPor(parseInt(escrito, 10), rutActual);
+    if (duenoTicket) {
+        const f = fichaPuerta(duenoTicket);
+        if (!confirm(`El ticket N° ${escrito} ya lo tiene ${f.nombres || ''} ${f.apellidos || ''}.\n\n¿Asignar el siguiente número libre?`)) return;
+        document.getElementById('numeroAsignado').value = window.siguienteTicketAutomatico;
+    }
     
     const firmaBase64 = window.comprimirFirma(signaturePad); 
     const now = new Date();
     const horaActual = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     let numeroFinal = document.getElementById('numeroAsignado').value; // estimado; el definitivo lo entrega el contador al guardar
+    const numeroEstimado = numeroFinal;
+    let ticketNuevo = null; // número pedido al contador en este guardado (se devuelve si falla)
     
     const textoInfo = document.getElementById('infoInvitado').innerText; 
     const tipo = textoInfo.includes("CORTESÍA") ? "Cortesía" : "Pago";
@@ -1681,7 +1759,10 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
         window.limpiarCache();
         window.limpiarCache();
         const rutaAsistencia = `2_asistencias/${fechaPrograma}/${nombrePrograma}/${rutActual}`;
-        numeroFinal = await asignarTicket(rutActual);
+        const previo = asistenciasGlobales[rutActual];
+        const yaTeniaTicket = previo && previo.tipo_ingreso !== "Anulado" && previo.numero_asignado;
+        numeroFinal = await asignarTicket(rutActual, numeroEstimado);
+        if (!yaTeniaTicket) ticketNuevo = numeroFinal;
         const datosAsistencia = { 
             rut: rutActual, 
             nombre_programa: nombrePrograma, 
@@ -1723,10 +1804,14 @@ if (document.getElementById('btnGuardarIngreso')) document.getElementById('btnGu
         signaturePad.clear(); 
         try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
         rutActual = "";
+        if (numeroEstimado && String(numeroFinal) !== String(numeroEstimado)) {
+            alert(`⚠️ OJO: el ticket de esta persona es el N° ${numeroFinal}, no el ${numeroEstimado}.\n\nOtro iPad ya usó el ${numeroEstimado}. Entrégale el ticket N° ${numeroFinal}.`);
+        }
     } catch (error) { 
+        if (ticketNuevo) await devolverTicket(ticketNuevo);
         alert("Error al guardar."); 
     }
-});
+}
 
 window.anularAsistencia = async function(rut) { 
     if(confirm("¿Seguro que deseas anular esta asistencia?\nLa persona se ocultará de la lista, pero su Ticket quedará bloqueado para mantener el orden numérico exacto.")) {
