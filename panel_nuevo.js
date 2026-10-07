@@ -3392,9 +3392,9 @@ if (document.getElementById('btnCargarContratosDT')) document.getElementById('bt
                                         </thead>
                                         <tbody>`;
                     
-                    // ORDENAR POR CANTIDAD DE TICKETS (DESCENDENTE)
+                    // ORDENAR POR CANTIDAD DE TICKETS (DESCENDENTE) Y, A IGUAL CANTIDAD, POR MONTO (DESCENDENTE)
                     const rutsOrdenados = Object.keys(weekData.ruts).sort((a, b) => {
-                        return weekData.ruts[b].fechas.length - weekData.ruts[a].fechas.length;
+                        return (weekData.ruts[b].fechas.length - weekData.ruts[a].fechas.length) || (weekData.ruts[b].montoSuma - weekData.ruts[a].montoSuma);
                     });
                     
                     for (const rut of rutsOrdenados) {
@@ -4692,6 +4692,83 @@ async function guardarAjustesPrevired() {
     }
 }
 
+// BORRADOR DE EDICIONES: los cambios de la tabla quedan en este computador y se guardan todos juntos
+// con "💾 Guardar cambios" (sin escribir en la base ni recargar la tabla a cada edición).
+window.borradorPrevired = { fichas: {}, ajustes: false };
+
+function hayCambiosPrevired() {
+    return window.borradorPrevired.ajustes || Object.keys(window.borradorPrevired.fichas).length > 0;
+}
+
+function cantidadCambiosPrevired() {
+    const b = window.borradorPrevired;
+    const ruts = new Set(Object.keys(b.fichas));
+    if (b.ajustes) Object.keys(b.rutsAjustes || {}).forEach(r => ruts.add(r));
+    return ruts.size;
+}
+
+function marcarAjustePrevired(rut) {
+    const b = window.borradorPrevired;
+    b.ajustes = true;
+    b.rutsAjustes = { ...(b.rutsAjustes || {}), [rut]: true };
+}
+
+function marcarFichaPrevired(rut, campo, valor) {
+    const b = window.borradorPrevired;
+    b.fichas[rut] = { ...(b.fichas[rut] || {}), [campo]: valor };
+}
+
+// Aplica sobre la lista de trabajadores los cambios de ficha aún no guardados
+function trabajadoresConBorrador(trabajadores) {
+    const pend = window.borradorPrevired.fichas;
+    if (!Object.keys(pend).length) return trabajadores;
+    const copia = { ...trabajadores };
+    for (const rut in pend) if (copia[rut]) copia[rut] = { ...copia[rut], ...pend[rut] };
+    return copia;
+}
+
+async function guardarCambiosPrevired() {
+    const b = window.borradorPrevired;
+    const btn = document.getElementById('btnGuardarCambiosPrev');
+    if (btn) { btn.disabled = true; btn.innerText = '⏳ Guardando...'; }
+    try {
+        const ruts = Object.keys(b.fichas);
+        for (let i = 0; i < ruts.length; i++) {
+            const rut = ruts[i];
+            if (btn) btn.innerText = `⏳ Guardando ${i + 1} de ${ruts.length}...`;
+            await window.guardarCamposFicha(rut, b.fichas[rut]);
+            if (window.cacheTrabajadores && window.cacheTrabajadores[rut]) Object.assign(window.cacheTrabajadores[rut], b.fichas[rut]);
+            if (listaGlobalCRM && listaGlobalCRM[rut]) Object.assign(listaGlobalCRM[rut], b.fichas[rut]);
+            delete b.fichas[rut];
+        }
+        if (ruts.length && window.cacheTrabajadores) await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
+        if (b.ajustes) { await guardarAjustesPrevired(); b.ajustes = false; b.rutsAjustes = {}; }
+        await calcularPrevired(mesPreviredActual, { silencioso: true });
+        alert("✅ Cambios guardados.");
+    } catch (e) {
+        console.error(e);
+        alert("❌ No se pudieron guardar todos los cambios. Revisa tu conexión y presiona Guardar de nuevo (los que faltan siguen en el borrador).");
+        renderTablaPrevired();
+    }
+}
+
+async function descartarCambiosPrevired(preguntar = true) {
+    if (preguntar && !confirm("¿Descartar los cambios sin guardar?")) return false;
+    window.borradorPrevired = { fichas: {}, ajustes: false };
+    window.__mesAjustesCargado = null; // vuelve a leer los ajustes guardados
+    if (mesPreviredActual) await calcularPrevired(mesPreviredActual);
+    return true;
+}
+
+window.addEventListener('beforeunload', (e) => {
+    if (hayCambiosPrevired()) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// Recalcula la tabla sin spinner y sin mover la pantalla
+function recalcularPreviredSinSalto() {
+    return calcularPrevired(mesPreviredActual, { silencioso: true });
+}
+
 // Lee de Firebase SOLO las asistencias del mes (datos frescos, sin depender del caché)
 window.leerAsistenciasMes = async function(mes) {
     const q = query(ref(db, '2_asistencias'), orderByKey(), startAt(mes + '-01'), endAt(mes + '-31'));
@@ -4908,8 +4985,10 @@ async function guardarParametrosPrevired() {
 }
 
 async function cargarPestanaPrevired() {
-    window.__mesAjustesCargado = null; // Releer ajustes (otro miembro del equipo pudo cambiarlos)
-    window.__datosMesPrevired = null;   // Releer asistencias frescas del mes
+    if (!hayCambiosPrevired()) {
+        window.__mesAjustesCargado = null; // Releer ajustes (otro miembro del equipo pudo cambiarlos)
+        window.__datosMesPrevired = null;   // Releer asistencias frescas del mes
+    }
     await cargarConfigPrevired();
     renderParametrosPrevired();
 
@@ -4939,16 +5018,18 @@ async function cargarPestanaPrevired() {
     }
 }
 
-async function calcularPrevired(mes) {
+async function calcularPrevired(mes, opciones = {}) {
     mesPreviredActual = mes;
     const cont = document.getElementById('tablaPrevired');
+    const scrollPagina = window.scrollY;
+    const scrollTabla = cont && cont.querySelector('.table-responsive') ? cont.querySelector('.table-responsive').scrollTop : 0;
     const btnTxt = document.getElementById('btnDescargarPrevired');
     const btnRev = document.getElementById('btnDescargarRevisionPrevired');
     if (btnTxt) btnTxt.disabled = true;
     if (btnRev) btnRev.disabled = true;
     if (document.getElementById('btnDescargarLRE')) document.getElementById('btnDescargarLRE').disabled = true;
     if (!mes) { if (cont) cont.innerHTML = ''; return; }
-    if (cont) cont.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
+    if (cont && !opciones.silencioso) cont.innerHTML = "<div class='text-center'><div class='spinner-border text-info'></div></div>";
 
     if (window.__mesAjustesCargado !== mes) { await cargarAjustesPrevired(mes); window.__mesAjustesCargado = mes; }
     if (!window.__datosMesPrevired || window.__datosMesPrevired.mes !== mes) {
@@ -4959,6 +5040,11 @@ async function calcularPrevired(mes) {
     window.filasPreviredExcluidas = todasFilas.filter(f => f.excluido);
     window.filasPrevired = todasFilas.filter(f => !f.excluido);
     renderTablaPrevired();
+    if (opciones.silencioso) {
+        window.scrollTo(0, scrollPagina);
+        const tabla = cont && cont.querySelector('.table-responsive');
+        if (tabla) tabla.scrollTop = scrollTabla;
+    }
 }
 
 // Cálculo ÚNICO por persona para un mes: lo usan Previred y el reporte del Contador
@@ -4978,7 +5064,7 @@ function edadAlFinDelMesPrevired(fechaNacimiento, mes) {
 async function construirFilasMes(mes, ajustes, todas) {
     const c = window.configPrevired;
     const trabSnap = await window.obtenerTrabajadores();
-    const trabajadores = trabSnap.exists() ? trabSnap.val() : {};
+    const trabajadores = trabajadoresConBorrador(trabSnap.exists() ? trabSnap.val() : {});
 
     // Agrupar por persona todo lo trabajado en el mes
     const porRut = {};
@@ -5212,7 +5298,13 @@ function renderTablaPrevired() {
     const minFecha = `${mes}-01`, maxFecha = `${mes}-${String(ultimoDia).padStart(2, '0')}`;
 
     // Formulario para agregar personas del sistema anterior
-    let html = `
+    const nCambios = cantidadCambiosPrevired();
+    let html = (hayCambiosPrevired() ? `
+        <div class="p-3 rounded mb-3 d-flex flex-wrap align-items-center gap-2" id="barraCambiosPrev" style="background: #2a1f00; border: 2px solid #ffcc00; position: sticky; top: 0; z-index: 6;">
+            <span class="fw-bold text-warning me-auto">✏️ Cambios sin guardar${nCambios ? ` (${nCambios} persona${nCambios === 1 ? '' : 's'})` : ''}. Revisa la tabla y guarda al terminar.</span>
+            <button class="btn btn-success fw-bold" id="btnGuardarCambiosPrev">💾 Guardar cambios</button>
+            <button class="btn btn-outline-light btn-sm" id="btnDescartarCambiosPrev">Descartar</button>
+        </div>` : '') + `
         <div class="p-3 rounded mb-3" style="background: #111; border: 1px dashed #ffcc00;">
             <div class="d-flex justify-content-between align-items-center">
                 <span class="fw-bold text-warning">➕ Agregar persona del sistema anterior (ej: primera semana del mes)</span>
@@ -5286,7 +5378,7 @@ function renderTablaPrevired() {
                 <span class="px-2 rounded" style="background: #0d2a1a; border: 1px solid #00d26a;">💰 Total a pagar en Previred: <b class="text-success fs-6" id="totalPagarPrevired">${$(tot.trabajador + tot.empleador)}</b></span>
             </div>
             ${ajustesPreviredSoloLocal ? '<div class="small text-warning mt-2">⚠️ Los ajustes se están guardando solo en este computador (falta regla 11_previred_ajustes en Firebase).</div>' : ''}
-            <div class="small text-muted mt-1">✏️ Puedes editar Días, Primer día, Líquido y AFP directamente en la tabla: el bruto y las cotizaciones se recalculan solos.</div>
+            <div class="small text-muted mt-1">✏️ Puedes editar Días, Primer día, Líquido y AFP directamente en la tabla: el bruto y las cotizaciones se recalculan solos. Los cambios se guardan todos juntos con "💾 Guardar cambios".</div>
             ${noCotizaAMano.length ? `<div class="mt-2 p-2 rounded" style="background: #332200; border: 1px solid #ffcc00;">
                 <span class="small text-warning fw-bold">⚠️ ${noCotizaAMano.length} persona${noCotizaAMano.length === 1 ? '' : 's'} con AFP "No cotiza" puesta a mano. "No cotiza" es solo para pensionados; si no lo son, deben ir en AFP UNO.</span>
                 <button class="btn btn-sm btn-warning fw-bold text-dark ms-2 mt-1" id="btnNoCotizaAUno">🔁 Pasar a AFP UNO a ${noCotizaAMano.length === 1 ? 'esa persona' : `las ${noCotizaAMano.length}`}</button>
@@ -5341,15 +5433,21 @@ function renderTablaPrevired() {
     document.querySelectorAll('.prev-edit').forEach(inp => inp.addEventListener('change', editarValorPrevired));
     const btnUno = document.getElementById('btnNoCotizaAUno');
     if (btnUno) btnUno.addEventListener('click', () => pasarNoCotizaAUno(noCotizaAMano, btnUno));
+    const btnGuardarCambios = document.getElementById('btnGuardarCambiosPrev');
+    if (btnGuardarCambios) btnGuardarCambios.addEventListener('click', guardarCambiosPrevired);
+    const btnDescartarCambios = document.getElementById('btnDescartarCambiosPrev');
+    if (btnDescartarCambios) btnDescartarCambios.addEventListener('click', () => descartarCambiosPrevired());
     document.querySelectorAll('.prev-accion').forEach(btn => btn.addEventListener('click', accionFilaPrevired));
     conectarFormularioAgregarPrevired();
 
     const btnTxt = document.getElementById('btnDescargarPrevired');
     const btnRev = document.getElementById('btnDescargarRevisionPrevired');
     const btnLre = document.getElementById('btnDescargarLRE');
-    if (btnTxt) btnTxt.disabled = conError > 0;
-    if (btnLre) btnLre.disabled = conError > 0;
-    if (btnRev) btnRev.disabled = false;
+    const pendiente = hayCambiosPrevired();
+    if (btnTxt) btnTxt.disabled = conError > 0 || pendiente;
+    if (btnLre) btnLre.disabled = conError > 0 || pendiente;
+    if (btnRev) btnRev.disabled = pendiente;
+    [btnTxt, btnLre, btnRev].forEach(b => { if (b) b.title = pendiente ? 'Guarda los cambios primero' : ''; });
 }
 
 function conectarFormularioAgregarPrevired() {
@@ -5412,8 +5510,8 @@ async function agregarPersonaPrevired() {
     if (ajuste.anterior && !confirm(`Esta persona ya tenía ${ajuste.anterior.dias} día(s) del sistema anterior.\n¿Reemplazarlos por los nuevos datos?`)) return;
     ajuste.anterior = { dias, inicio, liquido };
     window.ajustesPrevired[rut] = ajuste;
-    await guardarAjustesPrevired();
-    await calcularPrevired(mesPreviredActual);
+    marcarAjustePrevired(rut);
+    await recalcularPreviredSinSalto();
     const form = document.getElementById('formAgregarPrev');
     if (form) form.classList.remove('d-none');
 }
@@ -5424,20 +5522,20 @@ async function editarValorPrevired(e) {
     let valor = inp.value;
     if (campo === 'dias') {
         const n = parseInt(valor, 10);
-        if (!(n >= 1 && n <= 30)) { alert("Días debe estar entre 1 y 30."); return calcularPrevired(mesPreviredActual); }
+        if (!(n >= 1 && n <= 30)) { alert("Días debe estar entre 1 y 30."); return recalcularPreviredSinSalto(); }
         valor = n;
     } else if (campo === 'liquido') {
         const n = parseInt(valor, 10);
-        if (!(n > 0)) { alert("El líquido debe ser mayor a 0."); return calcularPrevired(mesPreviredActual); }
+        if (!(n > 0)) { alert("El líquido debe ser mayor a 0."); return recalcularPreviredSinSalto(); }
         valor = n;
     } else if (campo === 'inicio') {
-        if (!valor || !valor.startsWith(mesPreviredActual + '-')) { alert("El primer día debe ser dentro del mes."); return calcularPrevired(mesPreviredActual); }
+        if (!valor || !valor.startsWith(mesPreviredActual + '-')) { alert("El primer día debe ser dentro del mes."); return recalcularPreviredSinSalto(); }
     }
     const ajuste = window.ajustesPrevired[rut] || {};
     ajuste.forzado = { ...(ajuste.forzado || {}), [campo]: valor };
     window.ajustesPrevired[rut] = ajuste;
-    await guardarAjustesPrevired();
-    await calcularPrevired(mesPreviredActual);
+    marcarAjustePrevired(rut);
+    await recalcularPreviredSinSalto();
 }
 
 async function accionFilaPrevired(e) {
@@ -5447,8 +5545,8 @@ async function accionFilaPrevired(e) {
         const motivo = prompt(`¿Excluir ${rut} de Previred y del LRE de este mes?\n\nMotivo (queda anotado):`, "RUT mal ingresado, sin contrato");
         if (motivo === null) return;
         window.ajustesPrevired[rut] = { ...(window.ajustesPrevired[rut] || {}), excluido: { motivo: motivo.trim().substring(0, 200), fecha: new Date().toISOString().slice(0, 10) } };
-        await guardarAjustesPrevired();
-        return calcularPrevired(mesPreviredActual);
+        marcarAjustePrevired(rut);
+        return recalcularPreviredSinSalto();
     }
     const ajuste = window.ajustesPrevired[rut];
     if (!ajuste) return;
@@ -5461,66 +5559,36 @@ async function accionFilaPrevired(e) {
         if (!ajuste.forzado) delete ajuste.persona;
     }
     if (!ajuste.anterior && !ajuste.forzado && !ajuste.persona && !ajuste.excluido) delete window.ajustesPrevired[rut];
-    await guardarAjustesPrevired();
-    await calcularPrevired(mesPreviredActual);
+    marcarAjustePrevired(rut);
+    await recalcularPreviredSinSalto();
 }
 
 // Corrige de una vez a quienes quedaron con "No cotiza" elegido a mano (no por la regla de edad)
 async function pasarNoCotizaAUno(filas, btn) {
     if (!confirm(`¿Pasar a AFP UNO a ${filas.length} persona(s) que están con "No cotiza"?\n\nRevisa antes que ninguna sea pensionada.`)) return;
     btn.disabled = true;
-    try {
-        const tieneFicha = rut => !!(((window.cacheTrabajadores || {})[rut]) || listaGlobalCRM[rut]);
-        let manuales = 0;
-        for (let i = 0; i < filas.length; i++) {
-            const rut = filas[i].rut, ajuste = window.ajustesPrevired[rut];
-            btn.innerText = `⏳ ${i + 1} de ${filas.length}...`;
-            if (ajuste && ajuste.persona && !tieneFicha(rut)) { ajuste.persona.afp = 'UNO'; manuales++; continue; }
-            await window.guardarCamposFicha(rut, { afp: 'UNO' });
-            if (window.cacheTrabajadores && window.cacheTrabajadores[rut]) window.cacheTrabajadores[rut].afp = 'UNO';
-            if (listaGlobalCRM && listaGlobalCRM[rut]) listaGlobalCRM[rut].afp = 'UNO';
-            if (ajuste && ajuste.persona && 'afp' in ajuste.persona) { ajuste.persona.afp = 'UNO'; manuales++; } // el ajuste manda sobre la ficha
-        }
-        if (manuales) await guardarAjustesPrevired();
-        if (manuales < filas.length && window.cacheTrabajadores) await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
-        await calcularPrevired(mesPreviredActual);
-        alert(`✅ Listo: ${filas.length} persona(s) pasaron a AFP UNO.`);
-    } catch (e) {
-        console.error(e);
-        btn.disabled = false; btn.innerText = '🔁 Reintentar';
-        alert("❌ No se pudieron guardar todos los cambios. Revisa la tabla e inténtalo de nuevo.");
+    for (const f of filas) aplicarCorreccionPrevired(f.rut, 'afp', 'UNO');
+    await recalcularPreviredSinSalto();
+}
+
+// Deja una corrección de dato (AFP, salud, sexo, nacionalidad) en el borrador
+function aplicarCorreccionPrevired(rut, campo, valor) {
+    const ajuste = window.ajustesPrevired[rut];
+    const tieneFicha = !!(((window.cacheTrabajadores || {})[rut]) || listaGlobalCRM[rut]);
+    if (ajuste && ajuste.persona && (!tieneFicha || campo in ajuste.persona)) {
+        // Persona agregada a mano: el dato del ajuste manda sobre la ficha
+        ajuste.persona[campo] = valor;
+        marcarAjustePrevired(rut);
     }
+    if (tieneFicha) marcarFichaPrevired(rut, campo, valor);
 }
 
 async function corregirDatoPrevired(e) {
     const sel = e.target;
     const rut = sel.dataset.rut, campo = sel.dataset.campo, valor = sel.value;
     if (!valor) return;
-    sel.disabled = true;
-    try {
-        const ajuste = window.ajustesPrevired[rut];
-        const tieneFicha = !!(((window.cacheTrabajadores || {})[rut]) || listaGlobalCRM[rut]);
-        if (ajuste && ajuste.persona && !tieneFicha) {
-            // Persona agregada a mano (no existe en la base): se corrige en sus datos del ajuste
-            ajuste.persona[campo] = valor;
-            await guardarAjustesPrevired();
-        } else {
-            await window.guardarCamposFicha(rut, { [campo]: valor });
-            // Actualización quirúrgica del caché local (sin volver a descargar la base)
-            if (window.cacheTrabajadores && window.cacheTrabajadores[rut]) {
-                window.cacheTrabajadores[rut][campo] = valor;
-                await setLocalCache('trabajadores_nat', window.cacheTrabajadores);
-            }
-            if (listaGlobalCRM && listaGlobalCRM[rut]) listaGlobalCRM[rut][campo] = valor;
-            // Si además fue agregada a mano en este mes, el dato del ajuste manda sobre la ficha: se corrige también
-            if (ajuste && ajuste.persona && campo in ajuste.persona) { ajuste.persona[campo] = valor; await guardarAjustesPrevired(); }
-        }
-        await calcularPrevired(mesPreviredActual);
-    } catch (err) {
-        console.error(err);
-        sel.disabled = false;
-        alert("❌ No se pudo guardar la corrección.");
-    }
+    aplicarCorreccionPrevired(rut, campo, valor);
+    await recalcularPreviredSinSalto();
 }
 
 function descargarTxtPrevired() {
@@ -5566,7 +5634,14 @@ function descargarRevisionPrevired() {
 }
 
 if (document.getElementById('previred-tab')) document.getElementById('previred-tab').addEventListener('click', cargarPestanaPrevired);
-if (document.getElementById('selectMesPrevired')) document.getElementById('selectMesPrevired').addEventListener('change', (e) => calcularPrevired(e.target.value));
+if (document.getElementById('selectMesPrevired')) document.getElementById('selectMesPrevired').addEventListener('change', async (e) => {
+    if (hayCambiosPrevired()) {
+        if (!confirm("Tienes cambios sin guardar en este mes.\n\nAceptar = descartarlos y cambiar de mes\nCancelar = quedarte para guardarlos")) { e.target.value = mesPreviredActual; return; }
+        window.borradorPrevired = { fichas: {}, ajustes: false };
+        window.__mesAjustesCargado = null;
+    }
+    calcularPrevired(e.target.value);
+});
 if (document.getElementById('btnDescargarPrevired')) document.getElementById('btnDescargarPrevired').addEventListener('click', descargarTxtPrevired);
 if (document.getElementById('btnDescargarRevisionPrevired')) document.getElementById('btnDescargarRevisionPrevired').addEventListener('click', descargarRevisionPrevired);
 if (document.getElementById('btnToggleParamPrevired')) document.getElementById('btnToggleParamPrevired').addEventListener('click', () => {
@@ -6409,6 +6484,7 @@ function mostrarResultadoPrevired(cambios, yaBien, noEncontrados, nombres, otros
 }
 
 async function aplicarResultadoPrevired() {
+    if (hayCambiosPrevired()) return alert("Primero guarda (o descarta) los cambios de la tabla.");
     const cambios = window.__resultadoPrevired || {};
     const elegidos = [...document.querySelectorAll('.chk-resultado-prev:checked')].map(ch => cambios[ch.dataset.rut]).filter(Boolean);
     if (!elegidos.length) return alert("No hay correcciones seleccionadas.");
@@ -6448,6 +6524,7 @@ async function aplicarResultadoPrevired() {
 }
 
 async function aplicarNombresPrevired() {
+    if (hayCambiosPrevired()) return alert("Primero guarda (o descarta) los cambios de la tabla.");
     const propuestas = window.__nombresPrevired || {};
     const elegidos = [...document.querySelectorAll('.chk-nombre-prev:checked')].map(ch => propuestas[ch.dataset.rut]).filter(Boolean);
     if (!elegidos.length) return alert("No hay nombres seleccionados.");
