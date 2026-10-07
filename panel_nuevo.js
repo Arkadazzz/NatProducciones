@@ -210,6 +210,20 @@ window.obtenerAsistencias = async function(forzar = false) {
     try { return await window._descargaAsistencias; } finally { window._descargaAsistencias = null; }
 };
 
+// Para pagos (Finanzas y Efectivo): usa la copia del computador pero vuelve a leer de la base los últimos 2 meses,
+// así no se muestra como pendiente algo que otro computador ya pagó ni faltan programas nuevos.
+window.obtenerAsistenciasAlDia = async function() {
+    const snap = await window.obtenerAsistencias();
+    const todas = snap.exists() ? { ...snap.val() } : {};
+    const desde = new Date(Date.now() - 62 * 86400000).toISOString().slice(0, 10);
+    const recientes = await get(query(ref(db, '2_asistencias'), orderByKey(), startAt(desde)));
+    for (const f of Object.keys(todas)) if (f >= desde) delete todas[f];
+    if (recientes.exists()) Object.assign(todas, recientes.val());
+    window.cacheAsistencias = todas;
+    await setLocalCache('asistencias_nat', todas);
+    return new FakeSnapshot(Object.keys(todas).length ? todas : null);
+};
+
 // Campos internos de la ficha privada que nunca se muestran ni se mezclan
 const CAMPOS_PIN_INTERNOS = ['pin_hash', 'verif', 'auto_key'];
 
@@ -2510,7 +2524,7 @@ window.desbloquearPrograma = async function(rut, prog) {
 // FINANZAS Y BÓVEDA
 // ==========================================
 if (document.getElementById('finanzas-tab')) document.getElementById('finanzas-tab').addEventListener('click', async () => {
-    const snap = await window.obtenerAsistencias(); 
+    const snap = await window.obtenerAsistenciasAlDia(); 
     if (!snap.exists()) return;
     
     const trabSnap = await window.obtenerTrabajadores(); 
@@ -2752,6 +2766,9 @@ function descargarCSV(c, n) {
 let rutEfectivoActual = "";
 let deudaEfectivoActual = null;
 let firmaRecicladaBase64 = null;
+let signaturePadEfectivo = null; // se crea al mostrar el recuadro (con su tamaño real)
+
+if (document.getElementById('btnLimpiarFirmaEfectivo')) document.getElementById('btnLimpiarFirmaEfectivo').addEventListener('click', () => { if (signaturePadEfectivo) signaturePadEfectivo.clear(); });
 
 // Escuchar clic en la pestaña para cargar la lista
 const tabEfectivo = document.getElementById('efectivo-tab');
@@ -2772,7 +2789,7 @@ async function cargarListaEfectivo() {
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([
-            window.obtenerAsistencias(),
+            window.obtenerAsistenciasAlDia(),
             window.obtenerTrabajadores()
         ]);
         
@@ -2983,18 +3000,16 @@ window.abrirPagoEfectivo = async function(rut, nombrePersona) {
                 <span class="fw-bold fs-5 text-warning">⚠️ Sin Firma Previa</span><br>
                 <small class="text-white">Esta persona no firmó en la puerta. <br><b>Por favor, que firme ahora en el recuadro blanco para entregarle su dinero.</b></small>
             </div>`;
-        if(typeof signaturePadEfectivo !== "undefined") {
+        if (signaturePadEfectivo) signaturePadEfectivo.clear();
+        setTimeout(() => {
+            if (!canvasElement) return;
+            const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
+            canvasElement.width = canvasElement.offsetWidth * ratioEfe;
+            canvasElement.height = canvasElement.offsetHeight * ratioEfe;
+            canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
+            if (!signaturePadEfectivo) signaturePadEfectivo = new SignaturePad(canvasElement, { backgroundColor: 'rgb(255, 255, 255)' });
             signaturePadEfectivo.clear();
-            setTimeout(() => {
-                if (canvasElement) {
-                    const ratioEfe = Math.max(window.devicePixelRatio || 1, 1);
-                    canvasElement.width = canvasElement.offsetWidth * ratioEfe;
-                    canvasElement.height = canvasElement.offsetHeight * ratioEfe;
-                    canvasElement.getContext("2d").scale(ratioEfe, ratioEfe);
-                }
-                signaturePadEfectivo.clear();
-            }, 300);
-        }
+        }, 300);
     }
 
     if (document.getElementById('panelPagoEfectivo')) document.getElementById('panelPagoEfectivo').classList.remove('d-none');
@@ -3013,6 +3028,20 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
     });
 
     if(seleccionados.length === 0) return alert("Debes seleccionar al menos un programa para pagar.");
+    if (!firmaRecicladaBase64 && (!signaturePadEfectivo || signaturePadEfectivo.isEmpty())) return alert("La persona debe firmar en el recuadro blanco antes de recibir el dinero.");
+
+    // Antes de entregar plata: confirmar en la base que esos días siguen pendientes (otro computador pudo pagarlos)
+    try {
+        const estados = await Promise.all(seleccionados.map(s => get(ref(db, `${s.ruta}/estado_pago`))));
+        const yaPagados = seleccionados.filter((s, i) => estados[i].val() !== "Pendiente");
+        if (yaPagados.length) {
+            alert(`🚫 NO ENTREGUES EL DINERO.\n\nEstos programas ya figuran como pagados:\n- ${yaPagados.map(s => s.nombreStr).join('\n- ')}\n\nLa lista se actualizará.`);
+            if (document.getElementById('panelPagoEfectivo')) document.getElementById('panelPagoEfectivo').classList.add('d-none');
+            return cargarListaEfectivo();
+        }
+    } catch (e) {
+        return alert("No se pudo confirmar el estado del pago (revisa la conexión). No entregues el dinero todavía.");
+    }
 
     if (!confirm(`¿Estás seguro de entregar $${deudaEfectivoActual.montoCalculado.toLocaleString('es-CL')} en EFECTIVO a esta persona?`)) return;
     
@@ -3030,7 +3059,7 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
         
         // Guardar el recibo usando la firma reciclada. La firma va en su propio nodo (12_firmas_recibos)
         // para que abrir la pestaña Efectivo no descargue todas las imágenes.
-        const firmaRecibo = firmaRecicladaBase64 || (typeof signaturePadEfectivo !== "undefined" ? window.comprimirFirma(signaturePadEfectivo) : "");
+        const firmaRecibo = firmaRecicladaBase64 || (signaturePadEfectivo && !signaturePadEfectivo.isEmpty() ? window.comprimirFirma(signaturePadEfectivo) : "");
         const datosRecibo = {
             rut: rutEfectivoActual,
             monto: deudaEfectivoActual.montoCalculado,
@@ -3053,7 +3082,8 @@ if (document.getElementById('btnConfirmarPagoEfectivo')) document.getElementById
         await update(ref(db), updates);
         window.limpiarCache();
 
-        alert("✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda.");
+        alert(firmaRecicladaBase64 ? "✅ ¡Pago Exitoso!\n\nEl recibo se ha firmado automáticamente con la firma de la puerta y está archivado en la Bóveda." : "✅ ¡Pago Exitoso!\n\nEl recibo quedó firmado y archivado en la Bóveda.");
+        if (signaturePadEfectivo) signaturePadEfectivo.clear();
         
         if (document.getElementById('panelPagoEfectivo')) document.getElementById('panelPagoEfectivo').classList.add('d-none');
         if (document.getElementById('rutEfectivo')) document.getElementById('rutEfectivo').value = "";
