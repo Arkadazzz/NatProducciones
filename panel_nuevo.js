@@ -5069,6 +5069,15 @@ function edadAlFinDelMesPrevired(fechaNacimiento, mes) {
     return edad;
 }
 
+// Los menores de 18 (edad al último día del mes) no se declaran en Previred ni en el LRE: solo firman cesión de imagen.
+// Quedan en la lista de excluidos y se pueden incluir a mano (ajuste.incluirMenor).
+function exclusionMenorPrevired(tr, mes, aj) {
+    if (aj.incluirMenor) return null;
+    const edad = edadAlFinDelMesPrevired(tr.fechaNacimiento, mes);
+    if (edad === null || edad >= 18) return null;
+    return { motivo: `Menor de edad (${edad} años): no se declara`, menor: true };
+}
+
 async function construirFilasMes(mes, ajustes, todas) {
     const c = window.configPrevired;
     const trabSnap = await window.obtenerTrabajadores();
@@ -5209,7 +5218,7 @@ async function construirFilasMes(mes, ajustes, todas) {
             afpKey, afpPorDefecto, afpPorRegla, saludKey, esFonasa,
             dias, inicio, termino, liquido: liquidoCalc, contratoDT: d.contratoDT,
             enSistema: !d.soloManual, tr, pagado: d.pagado, pendiente: d.pendiente, detalle: d.detalle, anterior: aj.anterior || null, forzado: !!(aj.forzado && Object.keys(aj.forzado).length), personaManual: !!aj.persona,
-            periodo, calc, errores, avisos, excluido: aj.excluido || null,
+            periodo, calc, errores, avisos, excluido: aj.excluido || exclusionMenorPrevired(tr, mes, aj),
             afpActual: tr.afp || "", saludActual: tr.salud || "", sexoActual: tr.sexo || "", nacActual: tr.nacionalidad || ""
         });
     }
@@ -5341,13 +5350,13 @@ function renderTablaPrevired() {
     const excluidas = window.filasPreviredExcluidas || [];
     const htmlExcluidas = excluidas.length ? `
         <div class="p-3 rounded mt-3" style="background: #111; border: 1px solid #666;">
-            <div class="fw-bold text-white mb-2">🚫 Excluidos de Previred este mes (${excluidas.length}) <span class="small text-muted fw-normal">— no van en el archivo Previred ni en el LRE</span></div>
+            <div class="fw-bold text-white mb-2">🚫 Excluidos de Previred este mes (${excluidas.length})${excluidas.some(f => f.excluido.menor) ? ` · 👶 ${excluidas.filter(f => f.excluido.menor).length} menor(es) de edad` : ''} <span class="small text-muted fw-normal">— no van en el archivo Previred ni en el LRE</span></div>
             <table class="table table-dark table-sm align-middle mb-0" style="font-size: 0.85em;"><tbody>
             ${excluidas.map(f => `<tr>
                 <td class="fw-bold">${escPrevired(f.rut)}</td>
                 <td>${escPrevired(`${f.nombres} ${f.paterno} ${f.materno}`)}</td>
                 <td class="text-muted">${escPrevired(f.excluido.motivo || '')}</td>
-                <td class="text-end"><button class="btn btn-sm btn-outline-light py-0 prev-accion" data-rut="${escPrevired(f.rut)}" data-accion="incluir">↩️ Volver a incluir</button></td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-light py-0 prev-accion" data-rut="${escPrevired(f.rut)}" data-accion="incluir" data-menor="${f.excluido.menor ? 1 : 0}">↩️ ${f.excluido.menor ? 'Incluir igual' : 'Volver a incluir'}</button></td>
             </tr>`).join('')}
             </tbody></table>
         </div>` : '';
@@ -5556,6 +5565,12 @@ async function accionFilaPrevired(e) {
         marcarAjustePrevired(rut);
         return recalcularPreviredSinSalto();
     }
+    if (accion === 'incluir' && btn.dataset.menor === '1') {
+        if (!confirm(`${rut} es menor de edad y por eso no se declara en Previred.\n\n¿Incluirlo igual en Previred y en el LRE de este mes?`)) return;
+        window.ajustesPrevired[rut] = { ...(window.ajustesPrevired[rut] || {}), incluirMenor: true };
+        marcarAjustePrevired(rut);
+        return recalcularPreviredSinSalto();
+    }
     const ajuste = window.ajustesPrevired[rut];
     if (!ajuste) return;
     if (accion === 'incluir') delete ajuste.excluido;
@@ -5566,7 +5581,7 @@ async function accionFilaPrevired(e) {
         delete ajuste.anterior;
         if (!ajuste.forzado) delete ajuste.persona;
     }
-    if (!ajuste.anterior && !ajuste.forzado && !ajuste.persona && !ajuste.excluido) delete window.ajustesPrevired[rut];
+    if (!ajuste.anterior && !ajuste.forzado && !ajuste.persona && !ajuste.excluido && !ajuste.incluirMenor) delete window.ajustesPrevired[rut];
     marcarAjustePrevired(rut);
     await recalcularPreviredSinSalto();
 }
