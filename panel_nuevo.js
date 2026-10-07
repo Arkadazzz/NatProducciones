@@ -3748,10 +3748,13 @@ async function cargarReportesDT(forzar = false) {
                                 </button>
                             </h2>
                             <div id="segProg_${mesIdx}_${progIdx}" class="accordion-collapse collapse" data-bs-parent="#accSegProgs_${mesIdx}">
-                                <div class="accordion-body p-0">`;
+                                <div class="accordion-body p-2">`;
             
             const fechasOrdenadas = Object.keys(fechasData).sort().reverse();
+            let diaIdx = 0;
             for (const fecha of fechasOrdenadas) {
+                diaIdx++;
+                const idDia = `segDia_${mesIdx}_${progIdx}_${diaIdx}`;
                 const asisDia = fechasData[fecha].asistentes;
                 const diaNombre = fechasData[fecha].diaNombre;
                 const cantidad = Object.keys(asisDia).length;
@@ -3759,15 +3762,19 @@ async function cargarReportesDT(forzar = false) {
                 const partesF = fecha.split('-');
                 const fechaBonita = `${partesF[2]}-${partesF[1]}-${partesF[0]}`;
                 
+                // Cada día es un acordeón cerrado: se ven todos los días de un vistazo y la lista se abre solo al tocarlo
                 htmlAcordeon += `
-                                    <div class="p-3 border-bottom border-secondary">
-                                        <div class="d-flex justify-content-between align-items-center mb-3">
-                                            <h6 class="text-warning fw-bold mb-0">📌 ${diaNombre} ${fechaBonita} <span class="badge bg-success ms-2">${cantidad} personas</span></h6>
-                                            <button class="btn btn-outline-info btn-sm fw-bold" onclick="window.descargarListaSeguridad('${fecha}', '${prog}')">
+                                    <div class="accordion-item mb-2" style="border: 1px solid #555; background: #111;">
+                                        <div class="d-flex align-items-center" style="background: #1a1a1a;">
+                                            <button class="accordion-button collapsed flex-grow-1 py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${idDia}" style="background: #1a1a1a; color: #ffcc00; box-shadow: none;">
+                                                <span class="fw-bold">📌 ${diaNombre} ${fechaBonita}</span> <span class="badge bg-success ms-2">${cantidad} ${cantidad === 1 ? 'persona' : 'personas'}</span>
+                                            </button>
+                                            <button class="btn btn-outline-info btn-sm fw-bold mx-2 text-nowrap" onclick="window.descargarListaSeguridad('${fecha}', '${prog}')">
                                                 🛡️ Descargar Excel
                                             </button>
                                         </div>
-                                        <div class="table-responsive">
+                                        <div id="${idDia}" class="accordion-collapse collapse">
+                                        <div class="table-responsive p-2">
                                             <table class="table table-dark table-hover table-sm text-center align-middle" style="font-size: 0.85em;">
                                                 <thead style="color: #b066ff;">
                                                     <tr>
@@ -3787,7 +3794,7 @@ async function cargarReportesDT(forzar = false) {
                     
                     let badgeCondicion = "";
                     if (asis.tipo_ingreso === "Cortesía") {
-                        badgeCondicion = `<span class="badge bg-warning text-dark fw-bold">Cortesía (${asis.invitado_por || '-'})</span>`;
+                        badgeCondicion = `<span class="badge bg-warning text-dark fw-bold">Cortesía (${escaparHTML(asis.invitado_por || '-')})</span>`;
                     } else {
                         badgeCondicion = `<span class="badge bg-secondary">Trabajador</span>`;
                     }
@@ -3796,15 +3803,16 @@ async function cargarReportesDT(forzar = false) {
                                                     <tr>
                                                         <td><span class="badge bg-secondary fs-6">${asis.numero_asignado || '-'}</span></td>
                                                         <td>${rut}</td>
-                                                        <td>${tr.nombres} ${tr.apellidos}</td>
+                                                        <td>${escaparHTML(tr.nombres)} ${escaparHTML(tr.apellidos)}</td>
                                                         <td>${badgeCondicion}</td>
-                                                        <td>${tr.telefono || '-'}</td>
-                                                        <td>${tr.direccion || '-'}</td>
+                                                        <td>${escaparHTML(tr.telefono || '-')}</td>
+                                                        <td>${escaparHTML(tr.direccion || '-')}</td>
                                                     </tr>`;
                 }
                 htmlAcordeon += `
                                                 </tbody>
                                             </table>
+                                        </div>
                                         </div>
                                     </div>`;
             }
