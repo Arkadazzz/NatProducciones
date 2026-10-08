@@ -4181,13 +4181,15 @@ if(btnEjecutar) btnEjecutar.addEventListener('click', async () => {
 // ==========================================
 // SORTEO DALE PLAY 
 // ==========================================
-if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab').addEventListener('click', async () => {
+// Fechas de Dale Play disponibles para el sorteo. Una fecha queda fuera si ya se usó en un sorteo (true)
+// o si se descartó a mano (ej. semana sin sorteo): 6_sorteos_fechas_usadas/{fecha} = "descartada".
+async function cargarFechasSorteo() {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
     contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
     
     try {
         const [snapAsis, snapSorteos] = await Promise.all([ 
-            window.obtenerAsistencias(), 
+            window.obtenerAsistenciasAlDia(), 
             get(ref(db, '6_sorteos_fechas_usadas')) 
         ]);
         
@@ -4207,7 +4209,11 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
             }
         }
         
-        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-success fw-bold'>✅ No hay fechas nuevas disponibles para sortear.</p>";
+        const descartadas = Object.keys(fechasUsadas).filter(f => fechasUsadas[f] === "descartada").sort().reverse();
+        const htmlDescartadas = descartadas.length ? `
+            <div class="w-100 small text-white-50 mt-1">🗑️ Fechas quitadas del sorteo: ${descartadas.map(f => `<span class="badge bg-secondary me-1">${escaparHTML(f)} <span style="cursor:pointer;" class="text-warning" onclick="window.restaurarFechaSorteo('${escaparHTML(f)}')" title="Volver a incluirla">↩️ Restaurar</span></span>`).join('')}</div>` : '';
+        
+        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-success fw-bold'>✅ No hay fechas nuevas disponibles para sortear.</p>" + htmlDescartadas;
         
         fechasDalePlay.sort().reverse();
         
@@ -4219,15 +4225,38 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
                 <label class="form-check-label fw-bold ms-2 text-white" for="chk_${fecha}" style="cursor: pointer; width: 100%;">
                     🎬 Dale Play<br><small class="text-warning">${fecha}</small>
                 </label>
+                <button type="button" class="btn btn-outline-danger btn-sm mt-2 w-100" onclick="window.descartarFechaSorteo('${fecha}')">🗑️ Quitar del sorteo</button>
             </div>`;
         });
         
-        contenedorFechas.innerHTML = htmlFechas;
+        contenedorFechas.innerHTML = htmlFechas + htmlDescartadas;
         
     } catch (e) {
         contenedorFechas.innerHTML = "<p class='text-danger'>Error al cargar las fechas.</p>";
     }
-});
+}
+
+window.descartarFechaSorteo = async function(fecha) {
+    if (!confirm(`¿Quitar la jornada del ${fecha} del sorteo?\n\nNo se usará para ningún sorteo (ej. semana sin sorteo). Se puede restaurar más abajo.`)) return;
+    try {
+        await set(ref(db, `6_sorteos_fechas_usadas/${fecha}`), "descartada");
+    } catch (e) {
+        return alert("❌ No se pudo quitar la fecha. Revisa tu conexión.");
+    }
+    cargarFechasSorteo();
+};
+
+window.restaurarFechaSorteo = async function(fecha) {
+    if (!confirm(`¿Volver a incluir la jornada del ${fecha} en el sorteo?`)) return;
+    try {
+        await remove(ref(db, `6_sorteos_fechas_usadas/${fecha}`));
+    } catch (e) {
+        return alert("❌ No se pudo restaurar la fecha. Revisa tu conexión.");
+    }
+    cargarFechasSorteo();
+};
+
+if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab').addEventListener('click', cargarFechasSorteo);
 
 if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.check-sorteo:checked');
@@ -4243,7 +4272,7 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(), 
+            window.obtenerAsistenciasAlDia(), 
             window.obtenerTrabajadores() 
         ]);
         
