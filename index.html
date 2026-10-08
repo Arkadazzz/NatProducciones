@@ -875,8 +875,16 @@
             const blacklistSnap = await get(child(ref(db), `4_bloqueados/${rut}`)); // solo sí/no, sin motivo
 
             if (blacklistSnap.exists()) {
-                alert("⛔ No puedes registrarte. Tu RUT está bloqueado en el sistema.");
+                if (blacklistSnap.val() === 'strikes') alert("⛔ ACCESO DENEGADO\n\nTienes 3 strikes por inasistencia (te inscribiste a programas y no llegaste).\nSi crees que es un error, comunícate con la producción.");
+                else alert("⛔ No puedes registrarte. Tu RUT está bloqueado en el sistema.");
                 throw new Error("Blacklist");
+            }
+            // Bloqueo para este programa en particular (solo sí/no)
+            const bloqProg = (await get(child(ref(db), `4_bloqueados_programa/${rut}`))).val() || {};
+            const normProg = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/_/g, ' ').trim();
+            if (Object.keys(bloqProg).some(p => normProg(p) && normProg(prog.nombre).includes(normProg(p)))) {
+                alert("⛔ ACCESO DENEGADO\n\nNo puedes inscribirte a este programa.\nSi crees que es un error, comunícate con la producción.");
+                throw new Error("Bloqueo programa");
             }
 
             if (modoRegistrado) {
