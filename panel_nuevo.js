@@ -521,7 +521,7 @@ function inicializarContador() {
 // ---- Separa apellidos manteniendo compuestos (San Martín, De la Fuente) y conservando tildes ----
 function separarApellidosOriginal(texto) {
     const particulas = ['DE', 'DEL', 'LA', 'LAS', 'LOS', 'SAN', 'SANTA', 'DA', 'DAS', 'DO', 'DOS', 'DI', 'VAN', 'VON', 'DER', 'MAC', 'MC'];
-    const palabras = String(texto || '').trim().split(/\s+/).filter(Boolean);
+    const palabras = String(texto || '').replace(/\s*-\s*/g, '-').trim().split(/\s+/).filter(Boolean); // "Pérez - Soto" = un solo apellido
     const grupos = [];
     let actual = [];
     for (const p of palabras) {
@@ -4990,10 +4990,13 @@ function limpiarTextoPrevired(txt, largo) {
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
         .replace(/[ñÑ]/g, 'N')
         .toUpperCase()
-        .replace(/[^A-Z ]/g, ' ')
+        .replace(/[^A-Z -]/g, ' ')
+        .replace(/\s*-[\s-]*/g, '-')          // apellidos/nombres con guion se mantienen: "Pérez - Soto" → PEREZ-SOTO
+        .replace(/(^|\s)-+|-+(?=\s|$)/g, '$1') // guion suelto al inicio o al final de una palabra
         .replace(/\s+/g, ' ')
         .trim()
-        .substring(0, largo);
+        .substring(0, largo)
+        .replace(/-$/, '');
 }
 
 // Separa "apellidos" (un solo campo en la ficha) en paterno y materno,
