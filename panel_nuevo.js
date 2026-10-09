@@ -4821,6 +4821,7 @@ const CONFIG_PREVIRED_BASE = {
     cesantiaEmpleador: 3.0,
     cesantiaTrabajador: 0,
     codigoMovimiento: 7,
+    retiroLineaAdicional: true,   // además informa el término con código 2 (Retiro) en una línea 01
     tipoJornada: 1,
     lre: { rutEmpresa: "76932592-1", region: 13, comuna: 13102, jornada: 101, causal: 7, tipoImpuesto: 1, utm: 71721 },
     afpPorDefecto: "",
@@ -5105,6 +5106,7 @@ function renderParametrosPrevired() {
                     <div class="col-7">Seg. Cesantía empleador</div><div class="col-5">${inp('prevAfcEmp', c.cesantiaEmpleador)}</div>
                     <div class="col-7">Seg. Cesantía trabajador</div><div class="col-5">${inp('prevAfcTrab', c.cesantiaTrabajador)}</div>
                     <div class="col-7">Código movimiento (7 = plazo fijo)</div><div class="col-5">${inp('prevMov', c.codigoMovimiento, "1")}</div>
+                    <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" id="prevRetiro" ${c.retiroLineaAdicional ? 'checked' : ''}><label class="form-check-label" for="prevRetiro">Informar el retiro (código 2) en una línea adicional</label></div></div>
                     <div class="col-7">Tipo de jornada (1 completa, 2 parcial)</div><div class="col-5">${inp('prevJornada', c.tipoJornada || 1, "1")}</div>
                     <div class="col-12 mt-2">AFP para quien no sabe su AFP:
                         <select id="prevAfpDef" class="form-select form-select-sm bg-dark text-white mt-1">${opcionesAfpDef}</select>
@@ -5143,6 +5145,7 @@ function leerParametrosPreviredDesdePantalla() {
     c.cesantiaEmpleador = numPrevired(document.getElementById('prevAfcEmp').value);
     c.cesantiaTrabajador = numPrevired(document.getElementById('prevAfcTrab').value);
     c.codigoMovimiento = parseInt(document.getElementById('prevMov').value, 10) || 0;
+    c.retiroLineaAdicional = document.getElementById('prevRetiro').checked;
     c.tipoJornada = parseInt(document.getElementById('prevJornada').value, 10) === 2 ? 2 : 1;
     c.afpPorDefecto = document.getElementById('prevAfpDef').value;
     c.lre = {
@@ -5437,7 +5440,8 @@ function construirLineaPrevired(f) {
     campos[12] = "0";                       // Tipo trabajador: activo
     campos[13] = String(f.dias);            // Días trabajados
     campos[14] = "00";                      // Línea principal
-    campos[15] = String(c.codigoMovimiento);// Movimiento de personal (7 = contratación plazo fijo)
+    // Con el retiro en línea aparte, la principal lleva la contratación (con 2 aquí Previred exige días = día de la fecha hasta)
+    campos[15] = String(c.retiroLineaAdicional && c.codigoMovimiento === 2 ? 7 : c.codigoMovimiento); // Movimiento de personal (7 = contratación plazo fijo)
     campos[16] = fechaPrevired(f.inicio);   // Fecha desde
     campos[17] = fechaPrevired(f.termino);  // Fecha hasta
     campos[18] = "D";                       // Tramo asignación familiar: sin derecho
@@ -5475,6 +5479,23 @@ function construirLineaPrevired(f) {
         // Tampoco Seguro de Cesantía (Previred lo rechaza sin AFP: "No informa Código AFP para Aporte Empleador Seguro Cesantía")
         campos[100] = "0"; campos[101] = "0"; campos[102] = "0";
     }
+    return campos.slice(1).join(';');
+}
+
+// Segundo movimiento de personal (Previred, "Líneas Especiales" → Nuevo Mov de Personal): va justo después de la
+// línea principal, con tipo de línea 01, código 2 (Retiro), solo fecha hasta, 0 días y todos los montos en 0.
+function construirLineaRetiroPrevired(f) {
+    const campos = [''].concat(construirLineaPrevired(f).split(';')); // índice 1..105, igual que en la principal
+    const montos = [19, 20, 21, 22, 23, 24, 27, 28, 29, 64, 70, 71, 77, 79, 80, 94, 95, 97, 100, 101, 102];
+    montos.forEach(i => campos[i] = "0");
+    campos[13] = "0";                       // Días trabajados
+    campos[14] = "01";                      // Línea adicional
+    campos[15] = "2";                       // Retiro
+    campos[16] = "";                        // Fecha desde: no aplica al retiro
+    campos[17] = fechaPrevired(f.termino);  // Fecha hasta = último día del contrato
+    campos[18] = "";                        // Tramo asignación familiar
+    campos[25] = "";                        // Trabajador joven
+    campos[78] = "0";                       // Moneda plan Isapre
     return campos.slice(1).join(';');
 }
 
@@ -5806,7 +5827,7 @@ function descargarTxtPrevired() {
     if (conError.length > 0) return alert(`Hay ${conError.length} persona(s) con datos por corregir. Corrígelos antes de generar el archivo.`);
     if (!window.configPrevired.confirmado && !confirm("⚠️ Los parámetros Previred aún no han sido confirmados/guardados.\n¿Generar el archivo de todas formas?")) return;
 
-    const lineas = filas.map(construirLineaPrevired);
+    const lineas = filas.flatMap(f => window.configPrevired.retiroLineaAdicional ? [construirLineaPrevired(f), construirLineaRetiroPrevired(f)] : [construirLineaPrevired(f)]);
     const malas = lineas.filter(l => l.split(';').length !== 105);
     if (malas.length > 0) return alert("Error interno: hay líneas que no tienen 105 campos. No se generó el archivo.");
 
