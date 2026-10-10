@@ -106,11 +106,11 @@
                     <input type="text" id="nombres" class="form-control" required>
                 </div>
                 <div class="col-6 mb-3">
-                    <label class="form-label">Apellido Paterno</label>
+                    <label class="form-label">1er Apellido</label>
                     <input type="text" id="apellidoPaterno" class="form-control" required>
                 </div>
                 <div class="col-6 mb-3">
-                    <label class="form-label">Apellido Materno</label>
+                    <label class="form-label">2do Apellido</label>
                     <input type="text" id="apellidoMaterno" class="form-control" required>
                 </div>
                 <div class="col-6 mb-3">
@@ -595,12 +595,20 @@
     }
 
     // 3. FORMATO DEL RUT Y AUTOCOMPLETADO CON RUT + PIN
-    document.getElementById('rut').addEventListener('blur', function() {
-        let val = this.value.replace(/[^0-9kK]/g, '').toUpperCase();
+    // RUT siempre sin puntos, con guion y K mayúscula (también si el celular lo autocompletó sin tocar el campo)
+    function normalizarRutFormulario(v) {
+        let val = String(v || '').replace(/[^0-9kK]/g, '').toUpperCase();
         if (val.length > 1) val = val.slice(0, -1) + '-' + val.slice(-1);
-        this.value = val;
+        return val;
+    }
+    function formatearCampoRut() {
+        const campo = document.getElementById('rut');
+        const val = normalizarRutFormulario(campo.value);
+        if (campo.value !== val) campo.value = val;
         revisarRegistro();
-    });
+    }
+    document.getElementById('rut').addEventListener('blur', formatearCampoRut);
+    document.getElementById('rut').addEventListener('change', formatearCampoRut);
 
     function rutValido(rut) {
         if (!/^[0-9]+-[0-9K]$/.test(rut)) return false;
@@ -816,6 +824,7 @@
 
         try {
             // ---> NUEVA DEFENSA DE RUT <---
+            document.getElementById('rut').value = normalizarRutFormulario(document.getElementById('rut').value);
             const rutValidar = document.getElementById('rut').value.trim();
             if (!/^[0-9]+[-|‐]{1}[0-9kK]{1}$/.test(rutValidar)) {
                 alert("❌ Formato de RUT incorrecto. Usa guión (Ej: 12345678-9).");
@@ -875,8 +884,16 @@
             const blacklistSnap = await get(child(ref(db), `4_bloqueados/${rut}`)); // solo sí/no, sin motivo
 
             if (blacklistSnap.exists()) {
-                alert("⛔ No puedes registrarte. Tu RUT está bloqueado en el sistema.");
+                if (blacklistSnap.val() === 'strikes') alert("⛔ ACCESO DENEGADO\n\nTienes 3 strikes por inasistencia (te inscribiste a programas y no llegaste).\nSi crees que es un error, comunícate con la producción.");
+                else alert("⛔ No puedes registrarte. Tu RUT está bloqueado en el sistema.");
                 throw new Error("Blacklist");
+            }
+            // Bloqueo para este programa en particular (solo sí/no)
+            const bloqProg = (await get(child(ref(db), `4_bloqueados_programa/${rut}`))).val() || {};
+            const normProg = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/_/g, ' ').trim();
+            if (Object.keys(bloqProg).some(p => normProg(p) && normProg(prog.nombre).includes(normProg(p)))) {
+                alert("⛔ ACCESO DENEGADO\n\nNo puedes inscribirte a este programa.\nSi crees que es un error, comunícate con la producción.");
+                throw new Error("Bloqueo programa");
             }
 
             if (modoRegistrado) {

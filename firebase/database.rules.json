@@ -123,12 +123,22 @@
       ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       "$rut": {
         ".read": true,
-        ".validate": "!newData.exists() || newData.val() === true"
+        ".validate": "!newData.exists() || newData.val() === true || newData.val() === 'strikes'"
       }
     },
     "4_blacklist_programas": {
-      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
       ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
+    },
+    "4_bloqueados_programa": {
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
+      "$rut": {
+        ".read": true,
+        "$prog": {
+          ".validate": "!newData.exists() || newData.val() === true"
+        }
+      }
     },
     "5_historial_dt": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
@@ -157,8 +167,8 @@
       }
     },
     "9_strikes": {
-      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'",
-      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).val() === 'admin'"
+      ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",
+      ".write": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()"
     },
     "10_firmas": {
       ".read": "auth != null && root.child('0_roles').child(auth.token.email.toLowerCase().replace('.', ',')).exists()",

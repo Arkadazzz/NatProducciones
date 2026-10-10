@@ -521,7 +521,7 @@ function inicializarContador() {
 // ---- Separa apellidos manteniendo compuestos (San Martín, De la Fuente) y conservando tildes ----
 function separarApellidosOriginal(texto) {
     const particulas = ['DE', 'DEL', 'LA', 'LAS', 'LOS', 'SAN', 'SANTA', 'DA', 'DAS', 'DO', 'DOS', 'DI', 'VAN', 'VON', 'DER', 'MAC', 'MC'];
-    const palabras = String(texto || '').trim().split(/\s+/).filter(Boolean);
+    const palabras = String(texto || '').replace(/\s*-\s*/g, '-').trim().split(/\s+/).filter(Boolean); // "Pérez - Soto" = un solo apellido
     const grupos = [];
     let actual = [];
     for (const p of palabras) {
@@ -882,6 +882,9 @@ if (document.getElementById('btnEsUnDia')) document.getElementById('btnEsUnDia')
 Se calculó la salida y el pago a ${procesados} personas.`);
             }
         }
+        try {
+            await sugerirStrikesInasistencia(fechaPrograma, nombrePrograma, reservasGlobales, asistenciasGlobales);
+        } catch (e) { console.error("No se pudieron revisar las inasistencias", e); }
         await remove(ref(db, `0_estado_sistema/programas_activos/${claveActual}`));
         alert("¡Jornada terminada con éxito!");
         salirDeSala();
@@ -1409,8 +1412,15 @@ async function onScanSuccess(decodedText) {
     
     try {
         const blacklistSnap = await get(ref(db, `4_blacklist/${rutActual}`));
-        if (blacklistSnap.exists()) { 
-            alert(`⛔ ACCESO DENEGADO ⛔\nLa persona no tiene permitido el ingreso.`); 
+        let motivoNegado = null;
+        if (blacklistSnap.exists()) {
+            motivoNegado = blacklistSnap.val().por_strikes ? "Tiene 3 strikes por inasistencia (se inscribió y no llegó)." : "La persona no tiene permitido el ingreso.";
+        } else {
+            const progBloq = programaBloqueadoPara((await get(ref(db, `4_bloqueados_programa/${rutActual}`))).val(), nombrePrograma);
+            if (progBloq) motivoNegado = `La persona está bloqueada para ${progBloq.replace(/_/g, ' ')}.`;
+        }
+        if (motivoNegado) { 
+            alert(`⛔ ACCESO DENEGADO ⛔\n${motivoNegado}`); 
             try { if(html5QrcodeScanner) html5QrcodeScanner.resume(); } catch(e) {} 
             if (document.getElementById('mensajeEscaneo')) document.getElementById('mensajeEscaneo').classList.add('d-none'); 
             return; 
@@ -2097,6 +2107,7 @@ if (document.getElementById('crm-tab')) document.getElementById('crm-tab').addEv
     blacklistGlobal = blackSnap.exists() ? blackSnap.val() : {}; 
     
     renderCRM(listaGlobalCRM);
+    sincronizarBloqueosPrograma();
 });
 
 function renderCRM(datos) {
@@ -2142,9 +2153,11 @@ window.verPerfil = async function(rut) {
     
     // Lecturas protegidas: si Firebase niega el permiso, la ficha se abre igual
     let strikesActuales = 0;
+    let historialStrikes = {};
     try {
         const strSnap = await get(ref(db, `9_strikes/${rut}`));
         strikesActuales = strSnap.exists() ? (strSnap.val().count || 0) : 0;
+        historialStrikes = strSnap.exists() ? (strSnap.val().historial || {}) : {};
     } catch (e) {
         console.warn("No se pudieron leer los strikes (revisar reglas de Firebase para 9_strikes)", e);
     }
@@ -2253,6 +2266,8 @@ window.verPerfil = async function(rut) {
                         <button class="btn btn-outline-danger btn-sm" onclick="window.modificarStrikes('${rut}', 1)">+ Añadir</button>
                     </div>
                 </div>
+                ${Object.keys(historialStrikes).length ? `<div class="small text-white-50 mb-2 ms-1">${Object.values(historialStrikes).sort((a, b) => String(b.puesto || '').localeCompare(String(a.puesto || ''))).map(h => `• ${escaparHTML(h.fecha || '')} — ${escaparHTML(String(h.programa || '').replace(' - ', ' / '))} (${escaparHTML(h.motivo || '')})`).join('<br>')}</div>` : ''}
+                ${blacklistGlobal[rut] && blacklistGlobal[rut].por_strikes ? '<div class="small text-danger fw-bold mb-2 ms-1">⛔ Bloqueada automáticamente por strikes (se desbloquea al bajar de 3).</div>' : ''}
                 
                 <div class="mb-3 p-2 bg-dark rounded border border-warning">
                     <label class="text-white mb-1 small">Bloquear de un programa específico:</label>
@@ -2466,30 +2481,139 @@ window.resetearPinPersonal = async function(rut) {
     }
 };
 
+// ==========================================
+// STRIKES POR INASISTENCIA
+// ==========================================
+// 9_strikes/{rut} = { count, historial: { clave: {fecha, programa, motivo, puesto} } }
+// Con 3 o más strikes la persona queda bloqueada sola (4_bloqueados = 'strikes'); si baja de 3, se desbloquea
+// (solo si el bloqueo fue por strikes, nunca uno puesto a mano).
+const claveFirebase = (t) => String(t).replace(/[.#$\[\]\/]/g, "_");
+
+async function aplicarStrike(rut, delta, info = null) {
+    const r = await runTransaction(ref(db, `9_strikes/${rut}`), (actual) => {
+        const d = actual || {};
+        const historial = { ...(d.historial || {}) };
+        if (delta > 0 && info) {
+            if (historial[info.clave]) return; // ya tiene strike por esa jornada
+            historial[info.clave] = { fecha: info.fecha, programa: info.programa, motivo: info.motivo, puesto: new Date().toISOString() };
+        }
+        if (delta < 0) {
+            const claves = Object.keys(historial).sort((a, b) => String(historial[a].puesto || '').localeCompare(String(historial[b].puesto || '')));
+            if (claves.length) delete historial[claves[claves.length - 1]]; // quita el más reciente
+        }
+        return { ...d, count: Math.max(0, (Number(d.count) || 0) + delta), historial };
+    });
+    if (!r.committed || !r.snapshot.exists()) return null;
+    const count = r.snapshot.val().count || 0;
+    const cambio = await sincronizarBloqueoStrikes(rut, count);
+    return { count, cambio };
+}
+
+async function sincronizarBloqueoStrikes(rut, count) {
+    const bl = (await get(ref(db, `4_blacklist/${rut}`))).val();
+    if (count >= 3 && !bl) {
+        const dato = { fecha: new Date().toISOString(), motivo: `Bloqueo automático: ${count} strikes por inasistencia.`, por_strikes: true };
+        await update(ref(db), { [`4_blacklist/${rut}`]: dato, [`4_bloqueados/${rut}`]: 'strikes' });
+        blacklistGlobal[rut] = dato;
+        return 'bloqueado';
+    }
+    if (count < 3 && bl && bl.por_strikes) {
+        await update(ref(db), { [`4_blacklist/${rut}`]: null, [`4_bloqueados/${rut}`]: null });
+        delete blacklistGlobal[rut];
+        return 'desbloqueado';
+    }
+    return null;
+}
+
 window.modificarStrikes = async function(rut, cant) {
-    const strRef = ref(db, `9_strikes/${rut}/count`);
-    let nuevo = 0;
+    let res;
     try {
-        const snap = await get(strRef);
-        let actual = snap.exists() ? snap.val() : 0;
-        nuevo = actual + cant;
-        if (nuevo < 0) nuevo = 0;
-        await set(strRef, nuevo);
+        const hoy = new Date().toISOString().slice(0, 10);
+        res = await aplicarStrike(rut, cant, cant > 0 ? { clave: `manual_${Date.now()}`, fecha: hoy, programa: 'Puesto a mano', motivo: 'Agregado desde la ficha' } : null);
     } catch (e) {
         console.error("Error modificando strikes", e);
-        return alert("⚠️ No se pudo modificar los strikes: Firebase no da permiso sobre '9_strikes'. Hay que agregar esa regla en Firebase.");
+        return alert("⚠️ No se pudo modificar los strikes (revisa la conexión o las reglas de Firebase).");
     }
-    if (nuevo >= 3) {
-        if(confirm(`Esta persona ha alcanzado ${nuevo} strikes. ¿Deseas bloquearla GLOBALMENTE (Blacklist)?`)) {
-            await update(ref(db), {
-                [`4_blacklist/${rut}`]: { fecha: new Date().toISOString(), motivo: "Alcanzó 3 strikes manualmente." },
-                [`4_bloqueados/${rut}`]: true
-            });
-        }
-    }
+    if (!res) return;
     const display = document.getElementById('displayStrikes');
-    if (display) display.innerText = nuevo;
+    if (display) display.innerText = res.count;
+    if (res.cambio === 'bloqueado') alert(`⛔ Esta persona llegó a ${res.count} strikes y quedó BLOQUEADA automáticamente.\nNo podrá inscribirse ni entrar hasta que se le quiten strikes.`);
+    if (res.cambio === 'desbloqueado') alert(`✅ Bajó a ${res.count} strikes: se quitó el bloqueo automático.`);
 };
+
+// Al cerrar la jornada: lista de inscritos que no llegaron, para confirmar a quién se le pone strike
+function elegirStrikesInasistencia(faltan) {
+    return new Promise((resolve) => {
+        const fondo = document.createElement('div');
+        fondo.id = 'modalStrikesInasistencia';
+        fondo.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px;';
+        fondo.innerHTML = `
+            <div style="background:#141414;border:2px solid #ffcc00;border-radius:10px;max-width:560px;width:100%;max-height:90vh;display:flex;flex-direction:column;">
+                <div class="p-3 border-bottom border-secondary">
+                    <h5 class="text-warning fw-bold mb-1">⚠️ Inscritos que no llegaron (${faltan.length})</h5>
+                    <small class="text-white-50">Marcados = se les pone 1 strike por inasistencia. Desmarca a quien avisó o tuvo justificación. Con 3 strikes la persona queda bloqueada.</small>
+                </div>
+                <div class="p-3" style="overflow-y:auto;">
+                    ${faltan.map(f => `<div class="form-check mb-2 p-2 rounded" style="background:#222;">
+                        <input class="form-check-input chk-strike ms-0 me-2" type="checkbox" value="${escaparHTML(f.rut)}" id="stk_${escaparHTML(f.rut)}" checked style="transform:scale(1.3);">
+                        <label class="form-check-label text-white" for="stk_${escaparHTML(f.rut)}">${escaparHTML(f.nombre)} <small class="text-muted">${escaparHTML(f.rut)} · ${f.strikes} strike(s) actuales</small></label>
+                    </div>`).join('')}
+                </div>
+                <div class="p-3 border-top border-secondary d-flex gap-2 justify-content-end flex-wrap">
+                    <button class="btn btn-outline-light" id="btnSinStrikes">No poner strikes</button>
+                    <button class="btn btn-warning fw-bold text-dark" id="btnAplicarStrikes">Poner strike a los marcados</button>
+                </div>
+            </div>`;
+        document.body.appendChild(fondo);
+        const cerrar = (valor) => { fondo.remove(); resolve(valor); };
+        fondo.querySelector('#btnSinStrikes').addEventListener('click', () => cerrar([]));
+        fondo.querySelector('#btnAplicarStrikes').addEventListener('click', () => cerrar([...fondo.querySelectorAll('.chk-strike:checked')].map(c => c.value)));
+    });
+}
+
+async function sugerirStrikesInasistencia(fecha, programa, reservas, asistencias) {
+    const ruts = Object.keys(reservas || {}).filter(r => !(asistencias || {})[r]);
+    if (!ruts.length) return;
+    try { await window.asegurarFichas(ruts); } catch (e) {}
+    const faltan = [];
+    for (const r of ruts) {
+        let strikes = 0;
+        try { const s2 = await get(ref(db, `9_strikes/${r}/count`)); strikes = s2.val() || 0; } catch (e) {}
+        const f = fichaPuerta(r);
+        faltan.push({ rut: r, nombre: `${f.nombres || ''} ${f.apellidos || ''}`.trim() || r, strikes });
+    }
+    const elegidos = await elegirStrikesInasistencia(faltan);
+    if (!elegidos.length) return;
+    const clave = claveFirebase(`${fecha}_${programa}`);
+    let puestos = 0, bloqueados = [], errores = 0;
+    for (const r of elegidos) {
+        try {
+            const res = await aplicarStrike(r, 1, { clave, fecha, programa, motivo: 'Se inscribió y no llegó' });
+            if (res) { puestos++; if (res.cambio === 'bloqueado') bloqueados.push(r); }
+        } catch (e) { console.error("No se pudo poner strike a", r, e); errores++; }
+    }
+    alert(`✅ Strikes aplicados: ${puestos}.` + (bloqueados.length ? `\n⛔ Quedaron bloqueados por llegar a 3 strikes: ${bloqueados.length}.` : '') + (errores ? `\n⚠️ ${errores} no se pudieron guardar.` : ''));
+}
+
+// Bloqueos por programa: la marca pública (4_bloqueados_programa/{rut}/{programa}) es la que revisan la puerta y el formulario
+function programaBloqueadoPara(bloqueos, nombrePrograma) {
+    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/_/g, ' ').trim();
+    const nombre = norm(nombrePrograma);
+    return Object.keys(bloqueos || {}).find(p => norm(p) && nombre.includes(norm(p))) || null;
+}
+
+let bloqueosProgramaSincronizados = false;
+async function sincronizarBloqueosPrograma() {
+    // Bloqueos puestos antes de este cambio: se copia su marca pública (una vez por sesión, solo admin)
+    if (bloqueosProgramaSincronizados || !window.esAdmin) return;
+    try {
+        const todos = (await get(ref(db, '4_blacklist_programas'))).val() || {};
+        const updates = {};
+        for (const prog in todos) for (const rut in todos[prog]) updates[`4_bloqueados_programa/${rut}/${claveFirebase(prog)}`] = true;
+        if (Object.keys(updates).length) await update(ref(db), updates);
+        bloqueosProgramaSincronizados = true;
+    } catch (e) { console.warn("No se pudieron sincronizar los bloqueos por programa", e); }
+}
 
 window.bloquearPrograma = async function(rut) {
     let prog = document.getElementById('selectProgBloqueo').value;
@@ -2497,9 +2621,9 @@ window.bloquearPrograma = async function(rut) {
     if (!prog) return;
     
     try {
-        await set(ref(db, `4_blacklist_programas/${prog}/${rut}`), {
-            fecha: new Date().toISOString(),
-            motivo: "Bloqueo específico de programa por administración."
+        await update(ref(db), {
+            [`4_blacklist_programas/${claveFirebase(prog)}/${rut}`]: { fecha: new Date().toISOString(), motivo: "Bloqueo específico de programa por administración." },
+            [`4_bloqueados_programa/${rut}/${claveFirebase(prog)}`]: true
         });
     } catch (e) {
         console.error("Error bloqueando programa", e);
@@ -2511,7 +2635,7 @@ window.bloquearPrograma = async function(rut) {
 window.desbloquearPrograma = async function(rut, prog) {
     if(confirm(`¿Desbloquear a esta persona de ${prog}?`)) {
         try {
-            await remove(ref(db, `4_blacklist_programas/${prog}/${rut}`));
+            await update(ref(db), { [`4_blacklist_programas/${prog}/${rut}`]: null, [`4_bloqueados_programa/${rut}/${claveFirebase(prog)}`]: null });
         } catch (e) {
             console.error("Error desbloqueando programa", e);
             return alert("⚠️ No se pudo desbloquear: Firebase no da permiso sobre '4_blacklist_programas'.");
@@ -4057,13 +4181,15 @@ if(btnEjecutar) btnEjecutar.addEventListener('click', async () => {
 // ==========================================
 // SORTEO DALE PLAY 
 // ==========================================
-if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab').addEventListener('click', async () => {
+// Fechas de Dale Play disponibles para el sorteo. Una fecha queda fuera si ya se usó en un sorteo (true)
+// o si se descartó a mano (ej. semana sin sorteo): 6_sorteos_fechas_usadas/{fecha} = "descartada".
+async function cargarFechasSorteo() {
     const contenedorFechas = document.getElementById('listaFechasSorteo');
     contenedorFechas.innerHTML = "<div class='spinner-border text-warning'></div> Buscando programas...";
     
     try {
         const [snapAsis, snapSorteos] = await Promise.all([ 
-            window.obtenerAsistencias(), 
+            window.obtenerAsistenciasAlDia(), 
             get(ref(db, '6_sorteos_fechas_usadas')) 
         ]);
         
@@ -4083,7 +4209,11 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
             }
         }
         
-        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-success fw-bold'>✅ No hay fechas nuevas disponibles para sortear.</p>";
+        const descartadas = Object.keys(fechasUsadas).filter(f => fechasUsadas[f] === "descartada").sort().reverse();
+        const htmlDescartadas = descartadas.length ? `
+            <div class="w-100 small text-white-50 mt-1">🗑️ Fechas quitadas del sorteo: ${descartadas.map(f => `<span class="badge bg-secondary me-1">${escaparHTML(f)} <span style="cursor:pointer;" class="text-warning" onclick="window.restaurarFechaSorteo('${escaparHTML(f)}')" title="Volver a incluirla">↩️ Restaurar</span></span>`).join('')}</div>` : '';
+        
+        if (fechasDalePlay.length === 0) return contenedorFechas.innerHTML = "<p class='text-success fw-bold'>✅ No hay fechas nuevas disponibles para sortear.</p>" + htmlDescartadas;
         
         fechasDalePlay.sort().reverse();
         
@@ -4095,15 +4225,38 @@ if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab')
                 <label class="form-check-label fw-bold ms-2 text-white" for="chk_${fecha}" style="cursor: pointer; width: 100%;">
                     🎬 Dale Play<br><small class="text-warning">${fecha}</small>
                 </label>
+                <button type="button" class="btn btn-outline-danger btn-sm mt-2 w-100" onclick="window.descartarFechaSorteo('${fecha}')">🗑️ Quitar del sorteo</button>
             </div>`;
         });
         
-        contenedorFechas.innerHTML = htmlFechas;
+        contenedorFechas.innerHTML = htmlFechas + htmlDescartadas;
         
     } catch (e) {
         contenedorFechas.innerHTML = "<p class='text-danger'>Error al cargar las fechas.</p>";
     }
-});
+}
+
+window.descartarFechaSorteo = async function(fecha) {
+    if (!confirm(`¿Quitar la jornada del ${fecha} del sorteo?\n\nNo se usará para ningún sorteo (ej. semana sin sorteo). Se puede restaurar más abajo.`)) return;
+    try {
+        await set(ref(db, `6_sorteos_fechas_usadas/${fecha}`), "descartada");
+    } catch (e) {
+        return alert("❌ No se pudo quitar la fecha. Revisa tu conexión.");
+    }
+    cargarFechasSorteo();
+};
+
+window.restaurarFechaSorteo = async function(fecha) {
+    if (!confirm(`¿Volver a incluir la jornada del ${fecha} en el sorteo?`)) return;
+    try {
+        await remove(ref(db, `6_sorteos_fechas_usadas/${fecha}`));
+    } catch (e) {
+        return alert("❌ No se pudo restaurar la fecha. Revisa tu conexión.");
+    }
+    cargarFechasSorteo();
+};
+
+if (document.getElementById('sorteo-tab')) document.getElementById('sorteo-tab').addEventListener('click', cargarFechasSorteo);
 
 if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRealizarSorteo').addEventListener('click', async () => {
     const checkboxes = document.querySelectorAll('.check-sorteo:checked');
@@ -4119,7 +4272,7 @@ if (document.getElementById('btnRealizarSorteo')) document.getElementById('btnRe
     
     try {
         const [asisSnap, trabSnap] = await Promise.all([ 
-            window.obtenerAsistencias(), 
+            window.obtenerAsistenciasAlDia(), 
             window.obtenerTrabajadores() 
         ]);
         
@@ -4838,10 +4991,13 @@ function limpiarTextoPrevired(txt, largo) {
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
         .replace(/[ñÑ]/g, 'N')
         .toUpperCase()
-        .replace(/[^A-Z ]/g, ' ')
+        .replace(/[^A-Z -]/g, ' ')
+        .replace(/\s*-[\s-]*/g, '-')          // apellidos/nombres con guion se mantienen: "Pérez - Soto" → PEREZ-SOTO
+        .replace(/(^|\s)-+|-+(?=\s|$)/g, '$1') // guion suelto al inicio o al final de una palabra
         .replace(/\s+/g, ' ')
         .trim()
-        .substring(0, largo);
+        .substring(0, largo)
+        .replace(/-$/, '');
 }
 
 // Separa "apellidos" (un solo campo en la ficha) en paterno y materno,

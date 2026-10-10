@@ -147,13 +147,20 @@ reglas = {
         },
         # Motivo y fecha del bloqueo: solo staff y admin
         "4_blacklist": solo(STAFF, STAFF),
-        # Lo único que ve el público: si un RUT puntual está bloqueado (true). No se puede listar.
+        # Lo único que ve el público: si un RUT puntual está bloqueado (true, o 'strikes' si fue por 3 strikes). No se puede listar.
         "4_bloqueados": {
             ".read": STAFF,
             ".write": STAFF,
-            "$rut": {".read": True, ".validate": "!newData.exists() || newData.val() === true"},
+            "$rut": {".read": True, ".validate": "!newData.exists() || newData.val() === true || newData.val() === 'strikes'"},
         },
-        "4_blacklist_programas": solo(ADMIN, ADMIN),
+        # Motivo y fecha de los bloqueos por programa: el staff los lee en la puerta, solo admin los pone
+        "4_blacklist_programas": solo(STAFF, ADMIN),
+        # Lo que ve el público: de qué programas está bloqueado un RUT puntual (sí/no, sin motivo). No se puede listar.
+        "4_bloqueados_programa": {
+            ".read": STAFF,
+            ".write": ADMIN,
+            "$rut": {".read": True, "$prog": {".validate": "!newData.exists() || newData.val() === true"}},
+        },
         "5_historial_dt": solo(ADMIN, ADMIN),
         "6_sorteos_fechas_usadas": solo(STAFF, STAFF),
         "7_pagos_efectivo": solo(ADMIN, ADMIN),
@@ -162,7 +169,8 @@ reglas = {
             ".write": STAFF,
             "$fecha": {"$prog": {"$rut": {".write": "!data.exists() && newData.exists()", "$campo": TEXTO_SEGURO}}},
         },
-        "9_strikes": solo(ADMIN, ADMIN),
+        # Strikes por inasistencia: el staff los aplica al cerrar la jornada (con confirmación)
+        "9_strikes": solo(STAFF, STAFF),
         "10_firmas": solo(STAFF, STAFF),
         "11_previred_ajustes": solo(ADMIN, ADMIN),
         # Firmas de los recibos de efectivo (separadas de 7_pagos_efectivo para no descargarlas al abrir la pestaña)
